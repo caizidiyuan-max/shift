@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<!-- shift-calendar build 2026-07-26-02 -->
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>シフトカレンダー</title>
+<style>
+  :root {
+    --navy: #2b3990;
+    --navy-dark: #1f2a6e;
+    --sat: #1a6fc9;
+    --sun: #d43c3c;
+    --line: #d9d9d9;
+    --bg: #ffffff;
+    --dim: #b9b9c4;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  /* 画面の高さにアプリを固定(dvh = アドレスバーの出入りに追従する高さ。古い端末は 100vh で代用) */
+  html, body { height: 100vh; height: 100dvh; }
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+    background: var(--bg);
+    color: #222;
+    display: flex;
+    flex-direction: column;
+    overscroll-behavior: none;
+    overflow: hidden;
+  }
+
+  /* ===== ヘッダー ===== */
+  header {
+    background: var(--navy);
+    color: #fff;
+    padding: calc(env(safe-area-inset-top) + 8px) 10px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  header .ym {
+    text-align: center;
+    line-height: 1.15;
+    min-width: 7em;
+  }
+  header .ym .y { font-size: 12px; display: block; }
+  header .ym .m { font-size: 22px; font-weight: bold; }
+  header button {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 22px;
+    padding: 6px 14px;
+    cursor: pointer;
+  }
+  header .today-btn {
+    position: absolute;
+    right: 10px;
+    font-size: 13px;
+    border: 1px solid #fff;
+    border-radius: 4px;
+    padding: 5px 9px;
+  }
+  /* 見た目はそのまま、タップの当たり判定だけを上下左右7pxずつ広げる(44px確保) */
+  header .today-btn::after {
+    content: '';
+    position: absolute;
+    top: -7px; right: -7px; bottom: -7px; left: -7px;
+  }
+  header { position: relative; }
+
+  /* ===== 曜日行 ===== */
+  .weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    background: var(--navy);
+    color: #fff;
+    font-size: 12px;
+    text-align: center;
+    padding-bottom: 4px;
+    flex-shrink: 0;
+  }
+  .weekdays .sat { color: #9ec9ff; }
+  .weekdays .sun { color: #ffb3b3; }
+
+  /* ===== カレンダー ===== */
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    flex: 1 1 auto;
+    min-height: 0;          /* flexの中で縮めるための必須指定 */
+    overflow-y: auto;       /* はみ出す月はカレンダー部分だけスクロール */
+    border-top: 1px solid var(--line);
+    border-left: 1px solid var(--line);
+  }
+  .cell {
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    min-height: 56px;
+    padding: 2px 1px;
+    font-size: 11px;
+    text-align: center;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow: hidden;
+  }
+  .cell .num {
+    font-size: 12px;
+    font-weight: bold;
+    line-height: 18px;
+    width: 20px;
+    height: 18px;
+    border-radius: 9px;
+    align-self: flex-start;
+    margin-left: 2px;
+  }
+  .cell.sat .num { color: var(--sat); }
+  .cell.sun .num { color: var(--sun); }
+  .cell.other { background: #fafafa; }
+  .cell.other .num { color: var(--dim); font-weight: normal; }
+  .cell.today .num { background: var(--navy); color: #fff; text-align: center; }
+  .cell.selected { outline: 2px solid var(--navy); outline-offset: -2px; }
+  .cell .shift {
+    font-weight: bold;
+    font-size: 13px;
+    margin-top: 2px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cell .shift.long { font-size: 10px; }
+  .cell .time { font-size: 9px; color: #666; }
+  .cell .stamps { font-size: 10px; line-height: 1.1; margin-top: 1px; word-break: break-all; }
+  .cell .memo-dot { font-size: 8px; color: #e08600; }
+
+  /* ===== 選択日の詳細 ===== */
+  #dayinfo {
+    background: var(--navy);
+    color: #fff;
+    padding: 8px 12px calc(env(safe-area-inset-bottom) + 8px);
+    min-height: 66px;
+    flex-shrink: 0;
+  }
+  #dayinfo .di-date { font-weight: bold; font-size: 14px; }
+  #dayinfo .di-body { font-size: 13px; margin-top: 3px; line-height: 1.5; }
+  #dayinfo .di-stamp-btn {
+    float: right;
+    background: #fff;
+    color: var(--navy);
+    border: none;
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+
+  /* ===== 下部メニュー ===== */
+  nav {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-top: 1px solid var(--line);
+    background: #f6f6f8;
+    flex-shrink: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  nav button {
+    background: none;
+    border: none;
+    padding: 10px 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #333;
+  }
+  nav button .ico { display: block; font-size: 20px; margin-bottom: 2px; }
+
+  /* ===== シート(下からせり上がる画面) ===== */
+  .sheet-back {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    display: none;
+    z-index: 10;
+  }
+  .sheet-back.open { display: block; }
+  .sheet {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    background: #fff;
+    border-radius: 14px 14px 0 0;
+    max-height: 88%;
+    overflow-y: auto;
+    padding: 14px 16px calc(env(safe-area-inset-bottom) + 20px);
+    z-index: 11;
+    display: none;
+  }
+  .sheet.open { display: block; }
+  .sheet h2 {
+    font-size: 16px;
+    margin-bottom: 10px;
+    color: var(--navy);
+  }
+  .sheet .close-x {
+    position: absolute;
+    top: 10px; right: 12px;
+    background: #eee;
+    border: none;
+    border-radius: 50%;
+    width: 30px; height: 30px;
+    font-size: 15px;
+    cursor: pointer;
+  }
+  .sheet .step {
+    font-size: 13px;
+    margin: 10px 0 6px;
+    font-weight: bold;
+  }
+  .sheet .hint { font-size: 12px; color: #666; line-height: 1.6; }
+  .btn {
+    display: block;
+    width: 100%;
+    background: var(--navy);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    margin: 8px 0;
+  }
+  .btn.sub { background: #fff; color: var(--navy); border: 2px solid var(--navy); }
+  .btn.small { padding: 8px; font-size: 13px; }
+  .btn.danger { background: #b71c1c; color: #fff; }
+  .btn:disabled { opacity: .5; }
+  textarea {
+    width: 100%;
+    min-height: 90px;
+    border: 1px solid #bbb;
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  input[type=text] {
+    width: 100%;
+    border: 1px solid #bbb;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 15px;
+  }
+  .notice {
+    background: #fff6e0;
+    border: 1px solid #eccd85;
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 12px;
+    line-height: 1.6;
+    margin: 10px 0;
+  }
+  .result-box {
+    background: #eef3ff;
+    border: 1px solid #b9c6ee;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 13px;
+    line-height: 1.7;
+    margin: 10px 0;
+    display: none;
+  }
+  .result-box.error { background: #ffefef; border-color: #e2a8a8; }
+  .result-box.show { display: block; }
+
+  /* スタンプ選択 */
+  .stamp-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  .stamp-chip {
+    border: 2px solid #ccc;
+    border-radius: 20px;
+    background: #fff;
+    padding: 9px 14px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .stamp-chip.on {
+    border-color: var(--navy);
+    background: var(--navy);
+    color: #fff;
+    font-weight: bold;
+  }
+
+  /* 種類一覧 */
+  .type-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .type-item {
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 13px;
+    font-weight: bold;
+    color: #fff;
+  }
+
+  /* トースト */
+  #toast {
+    position: fixed;
+    bottom: 90px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(30,30,30,.9);
+    color: #fff;
+    border-radius: 20px;
+    padding: 10px 18px;
+    font-size: 13px;
+    z-index: 30;
+    display: none;
+    max-width: 86%;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <button id="prev" aria-label="前の月">◀</button>
+  <div class="ym"><span class="y" id="ym-y">2026年</span><span class="m" id="ym-m">7月</span></div>
+  <button id="next" aria-label="次の月">▶</button>
+  <button class="today-btn" id="today-btn">今日</button>
+</header>
+
+<div class="weekdays">
+  <div>月</div><div>火</div><div>水</div><div>木</div><div>金</div>
+  <div class="sat">土</div><div class="sun">日</div>
+</div>
+
+<div id="grid"></div>
+
+<div id="dayinfo">
+  <button class="di-stamp-btn" id="di-stamp-btn">スタンプ</button>
+  <div class="di-date" id="di-date">--</div>
+  <div class="di-body" id="di-body">日付をタップすると詳細が見られます</div>
+</div>
+
+<nav>
+  <button id="nav-import"><span class="ico">📥</span>AI取り込み</button>
+  <button id="nav-settings"><span class="ico">⚙️</span>設定・バックアップ</button>
+</nav>
+
+<!-- ===== AI取り込みシート ===== -->
+<div class="sheet-back" data-close="import"></div>
+<div class="sheet" id="sheet-import">
+  <button class="close-x" data-close="import">✕</button>
+  <h2>📥 AI取り込み</h2>
+  <div class="step">① お願い文をコピーする</div>
+  <button class="btn" id="copy-prompt">AIへのお願い文をコピー</button>
+  <div class="step">② Claude にシフト表と一緒に送る</div>
+  <div class="hint">シフト表の Excel・PDF・写真(複数枚OK)と、①のお願い文をそのまま Claude に送ってください。</div>
+  <div class="step">③ 返ってきた返事をここに貼る</div>
+  <textarea id="import-text" placeholder="Claude の返事をまるごと貼り付けてOK(コードが2個あっても取り込めます)"></textarea>
+  <button class="btn" id="do-import">取り込み</button>
+  <div class="result-box" id="import-result"></div>
+</div>
+
+<!-- ===== スタンプシート ===== -->
+<div class="sheet-back" data-close="stamp"></div>
+<div class="sheet" id="sheet-stamp">
+  <button class="close-x" data-close="stamp">✕</button>
+  <h2 id="stamp-title">スタンプ</h2>
+  <div id="stamp-shift-info" class="hint"></div>
+  <div class="stamp-list" id="stamp-list"></div>
+  <div class="hint">タップで付く/もう一度タップで消えます。シフトが入っている日にも付けられます。</div>
+</div>
+
+<!-- ===== 設定シート ===== -->
+<div class="sheet-back" data-close="settings"></div>
+<div class="sheet" id="sheet-settings">
+  <button class="close-x" data-close="settings">✕</button>
+  <h2>⚙️ 設定・バックアップ</h2>
+
+  <div class="step">シフト表上の自分の名前</div>
+  <div class="hint">シフト表は職場全員分の一覧なので、あなたの行を見つけるために使います。表に書かれている表記のまま入れてください。名前はこの端末の中だけに保存されます。</div>
+  <input type="text" id="user-name" placeholder="例: 山田">
+  <button class="btn small" id="save-name">名前を保存</button>
+
+  <div class="step">シフトの種類と色</div>
+  <div class="hint">取り込みで新しい種類(店舗名など)が来ると、自動でここに追加されます。</div>
+  <div class="type-list" id="type-list"></div>
+
+  <div class="step">バックアップ</div>
+  <div class="notice">データはこのスマホのこのブラウザだけに保存されます。機種変更・履歴の削除で消えることがあるので、<b>月1回(シフト取り込みのついで)のバックアップをおすすめします。</b></div>
+  <button class="btn sub" id="backup-out">書き出し(テキストをコピー)</button>
+  <div class="step" style="margin-top:14px;">バックアップから復元</div>
+  <textarea id="backup-in" placeholder="書き出したテキストをここに貼り付け"></textarea>
+  <button class="btn sub" id="backup-restore">読み込み(復元)</button>
+  <div class="result-box" id="backup-result"></div>
+
+  <div class="step" style="margin-top:14px;">全データを消す</div>
+  <div class="hint">シフト・スタンプ・名前をすべて消して最初の状態に戻します。消す前にバックアップの書き出しをおすすめします。</div>
+  <button class="btn small danger" id="reset-all">全データ消去(リセット)</button>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+/* ================= データ ================= */
+var STORE_KEY = 'shift-calendar-v1';
+
+var DEFAULT_TYPES = [
+  { label: '日勤', color: '#8d2b1e' },
+  { label: '早番', color: '#2e7d32' },
+  { label: '遅番', color: '#1e40c9' },
+  { label: '休み', color: '#b34700' },
+  { label: '希休', color: '#37474f' },
+  { label: '有休', color: '#7b1fa2' },
+  { label: '半9',  color: '#c2185b' },
+  { label: 'MT',   color: '#6a5d00' },
+  { label: '健診', color: '#0277bd' },
+  { label: '応援', color: '#00838f' }
+];
+
+/* 自動追加用の色パレット(未知のシフト名が来たら順番に使う)
+   ※ 既定10色・不明グレーも含めた全色で互いのΔE76が24以上・白地コントラスト4.6以上に
+      なるよう機械的に選定した14色(2026-07-26 色再設計) */
+var AUTO_PALETTE = ['#905a8d', '#1d2d78', '#1c3c15', '#e5192d', '#7b5641',
+                    '#6a0836', '#d61f9b', '#7d65c5', '#627b5a', '#5d115d',
+                    '#ae5b6d', '#533049', '#a3670a', '#656b90'];
+
+var STAMPS = [
+  { label: '希望休', icon: '🙏' },
+  { label: '研修',   icon: '📚' },
+  { label: '有休申請', icon: '📝' },
+  { label: '通院',   icon: '🏥' },
+  { label: '予定あり', icon: '⭐' }
+];
+
+var UNKNOWN_LABEL = '不明';
+var UNKNOWN_COLOR = '#9e9e9e';
+
+function defaultState() {
+  return {
+    version: 1,
+    shiftTypes: DEFAULT_TYPES.map(function (t) { return { label: t.label, color: t.color }; }),
+    shifts: {},
+    stamps: {},
+    settings: { userName: '' }
+  };
+}
+
+var state = loadState();
+
+function loadState() {
+  var s = defaultState();
+  try {
+    var raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return s;
+    var d = JSON.parse(raw);
+    if (!d || typeof d !== 'object') return s;
+    if (Array.isArray(d.shiftTypes)) {
+      s.shiftTypes = d.shiftTypes.filter(function (t) {
+        return t && typeof t.label === 'string' && typeof t.color === 'string';
+      });
+      if (s.shiftTypes.length === 0) s.shiftTypes = defaultState().shiftTypes;
+      migrateTypeColors(s.shiftTypes);
+    }
+    s.shifts = sanitizeShifts(d.shifts);
+    s.stamps = sanitizeStamps(d.stamps);
+    if (d.settings && typeof d.settings === 'object' && typeof d.settings.userName === 'string') {
+      s.settings.userName = d.settings.userName;
+    }
+  } catch (e) { /* 壊れた保存データは初期状態で開く(上書きは操作があるまでしない) */ }
+  return s;
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  } catch (e) {
+    toast('保存に失敗しました。空き容量を確認してください');
+  }
+}
+
+/* ================= 便利関数 ================= */
+function $(id) { return document.getElementById(id); }
+
+function ymKey(y, m) { return y + '-' + (m < 10 ? '0' + m : '' + m); }
+
+function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
+
+/* --- 壊れデータ対策(問題2): 1日ぶんのシフトを検査して整える。ダメなら null --- */
+function normShift(v) {
+  if (typeof v === 'string' && v.trim()) return { label: v.trim() }; /* 旧形式 */
+  if (v && typeof v === 'object' && typeof v.label === 'string' && v.label.trim()) {
+    var e = { label: v.label.trim() };
+    if (typeof v.time === 'string' && v.time.trim()) e.time = v.time.trim();
+    if (typeof v.memo === 'string' && v.memo.trim()) e.memo = v.memo.trim();
+    return e;
+  }
+  return null;
+}
+
+/* shifts 全体を洗浄。おかしい月・日だけ捨てて残りを返す */
+function sanitizeShifts(src) {
+  var out = {};
+  if (!src || typeof src !== 'object' || Array.isArray(src)) return out;
+  Object.keys(src).forEach(function (ym) {
+    if (!/^\d{4}-\d{2}$/.test(ym)) return;
+    var mo = src[ym];
+    if (!mo || typeof mo !== 'object' || Array.isArray(mo)) return;
+    var cleanMo = {};
+    Object.keys(mo).forEach(function (dk) {
+      if (!/^\d{1,2}$/.test(dk)) return;
+      var d = parseInt(dk, 10);
+      if (d < 1 || d > 31) return;
+      var e = normShift(mo[dk]);
+      if (e) cleanMo[String(d)] = e;
+    });
+    if (Object.keys(cleanMo).length) out[ym] = cleanMo;
+  });
+  return out;
+}
+
+/* stamps 全体を洗浄。配列でない値・文字列でない中身は捨てる */
+function sanitizeStamps(src) {
+  var out = {};
+  if (!src || typeof src !== 'object' || Array.isArray(src)) return out;
+  Object.keys(src).forEach(function (ym) {
+    if (!/^\d{4}-\d{2}$/.test(ym)) return;
+    var mo = src[ym];
+    if (!mo || typeof mo !== 'object' || Array.isArray(mo)) return;
+    var cleanMo = {};
+    Object.keys(mo).forEach(function (dk) {
+      var arr = mo[dk];
+      if (!Array.isArray(arr)) return;
+      var s = arr.filter(function (x) { return typeof x === 'string'; });
+      if (s.length) cleanMo[dk] = s;
+    });
+    if (Object.keys(cleanMo).length) out[ym] = cleanMo;
+  });
+  return out;
+}
+
+/* 色の移行処理(2026-07-26 色再設計に対応):
+   1. 初期10種類はラベルで見て、常に最新の既定色にそろえる(初版の色・前回修正の色の
+      どちらから読んでも同じ結果になる)
+   2. 自動追加された種類は、色が「新パレットの色で、まだ誰も使っていない」ときだけ維持。
+      旧パレットの色・旧退避色・既定色や他の種類とかぶる色は、空いている新パレット色へ差し替える
+   この処理は何度実行しても結果が変わらない(移行済みデータをもう一度通しても壊れない) */
+function migrateTypeColors(types) {
+  var paletteSet = {};
+  AUTO_PALETTE.forEach(function (c) { paletteSet[c] = true; });
+  var used = {};
+  DEFAULT_TYPES.forEach(function (t) { used[t.color] = true; });
+  var autos = [];
+  types.forEach(function (t) {
+    for (var i = 0; i < DEFAULT_TYPES.length; i++) {
+      if (DEFAULT_TYPES[i].label === t.label) { t.color = DEFAULT_TYPES[i].color; return; }
+    }
+    autos.push(t);
+  });
+  autos.forEach(function (t) {
+    if (paletteSet[t.color] && !used[t.color]) { used[t.color] = true; return; }
+    for (var j = 0; j < AUTO_PALETTE.length; j++) {
+      if (!used[AUTO_PALETTE[j]]) { t.color = AUTO_PALETTE[j]; used[AUTO_PALETTE[j]] = true; return; }
+    }
+    /* 空きが無い(自動追加が14種類を超えている)ときは現状の色のまま */
+  });
+  return types;
+}
+
+/* --- XSS対策(問題1): 結果欄は「文字としてだけ」追加する --- */
+function resetResult(boxId, isError) {
+  var box = $(boxId);
+  box.textContent = '';
+  box.className = 'result-box show' + (isError ? ' error' : '');
+  return box;
+}
+function addLine(box, text) {
+  if (box.childNodes.length) box.appendChild(document.createElement('br'));
+  box.appendChild(document.createTextNode(text));
+}
+
+function findType(label) {
+  for (var i = 0; i < state.shiftTypes.length; i++) {
+    if (state.shiftTypes[i].label === label) return state.shiftTypes[i];
+  }
+  return null;
+}
+
+/* 未知のシフト名に色を割り当てて登録。新規登録なら true */
+function ensureType(label) {
+  if (label === UNKNOWN_LABEL) return false;
+  if (findType(label)) return false;
+  var used = {};
+  state.shiftTypes.forEach(function (t) { used[t.color] = true; });
+  var color = null;
+  for (var i = 0; i < AUTO_PALETTE.length; i++) {
+    if (!used[AUTO_PALETTE[i]]) { color = AUTO_PALETTE[i]; break; }
+  }
+  if (!color) color = AUTO_PALETTE[state.shiftTypes.length % AUTO_PALETTE.length];
+  state.shiftTypes.push({ label: label, color: color });
+  return true;
+}
+
+function typeColor(label) {
+  if (label === UNKNOWN_LABEL) return UNKNOWN_COLOR;
+  var t = findType(label);
+  return t ? t.color : '#333';
+}
+
+function toast(msg) {
+  var el = $('toast');
+  el.textContent = msg;
+  el.style.display = 'block';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(function () { el.style.display = 'none'; }, 2600);
+}
+
+function copyText(text, okMsg) {
+  function fallback() {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+    if (ok) toast(okMsg);
+    else prompt('コピーできませんでした。長押しでコピーしてください', text);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () { toast(okMsg); }, fallback);
+  } else {
+    fallback();
+  }
+}
+
+/* ================= カレンダー描画 ================= */
+var now = new Date();
+var cur = { y: now.getFullYear(), m: now.getMonth() + 1 };
+var selected = null; /* {y, m, d} */
+
+function render() {
+  $('ym-y').textContent = cur.y + '年';
+  $('ym-m').textContent = cur.m + '月';
+
+  var grid = $('grid');
+  grid.textContent = '';
+
+  var first = new Date(cur.y, cur.m - 1, 1);
+  var offset = (first.getDay() + 6) % 7; /* 月曜始まり */
+  var dim = daysInMonth(cur.y, cur.m);
+  var prevDim = daysInMonth(cur.m === 1 ? cur.y - 1 : cur.y, cur.m === 1 ? 12 : cur.m - 1);
+  var totalCells = Math.ceil((offset + dim) / 7) * 7;
+
+  var today = new Date();
+  var tY = today.getFullYear(), tM = today.getMonth() + 1, tD = today.getDate();
+  var ym = ymKey(cur.y, cur.m);
+  var monthShifts = state.shifts[ym] || {};
+  var monthStamps = state.stamps[ym] || {};
+
+  for (var i = 0; i < totalCells; i++) {
+    var cell = document.createElement('div');
+    cell.className = 'cell';
+    var col = i % 7;
+    if (col === 5) cell.className += ' sat';
+    if (col === 6) cell.className += ' sun';
+
+    var dayNum, inMonth = true;
+    if (i < offset) {
+      dayNum = prevDim - offset + 1 + i;
+      inMonth = false;
+    } else if (i >= offset + dim) {
+      dayNum = i - (offset + dim) + 1;
+      inMonth = false;
+    } else {
+      dayNum = i - offset + 1;
+    }
+
+    var num = document.createElement('div');
+    num.className = 'num';
+    num.textContent = dayNum;
+    cell.appendChild(num);
+
+    if (!inMonth) {
+      cell.className += ' other';
+      /* 前月・翌月のグレーの日をタップ → その月へ移動して選択(問題15) */
+      (function (d, isPrev) {
+        cell.addEventListener('click', function () {
+          if (isPrev) { cur.m--; if (cur.m < 1) { cur.m = 12; cur.y--; } }
+          else        { cur.m++; if (cur.m > 12) { cur.m = 1; cur.y++; } }
+          selected = { y: cur.y, m: cur.m, d: d };
+          render();
+        });
+      })(dayNum, i < offset);
+    } else {
+      if (cur.y === tY && cur.m === tM && dayNum === tD) cell.className += ' today';
+      if (selected && selected.y === cur.y && selected.m === cur.m && selected.d === dayNum) {
+        cell.className += ' selected';
+      }
+
+      /* 万一壊れたデータが混ざっても、その日のマスだけ空にして月全体は描き切る(問題2) */
+      try {
+        var sh = normShift(monthShifts[String(dayNum)]);
+        if (sh) {
+          var shiftEl = document.createElement('div');
+          shiftEl.className = 'shift' + (sh.label.length >= 4 ? ' long' : '');
+          shiftEl.textContent = sh.label === UNKNOWN_LABEL ? '?' : sh.label;
+          shiftEl.style.color = typeColor(sh.label);
+          cell.appendChild(shiftEl);
+          if (sh.time) {
+            var timeEl = document.createElement('div');
+            timeEl.className = 'time';
+            timeEl.textContent = sh.time;
+            cell.appendChild(timeEl);
+          }
+          if (sh.memo) {
+            var dot = document.createElement('div');
+            dot.className = 'memo-dot';
+            dot.textContent = '●メモ';
+            cell.appendChild(dot);
+          }
+        }
+
+        var stArr = monthStamps[String(dayNum)];
+        if (Array.isArray(stArr) && stArr.length) {
+          var stEl = document.createElement('div');
+          stEl.className = 'stamps';
+          stEl.textContent = stArr.filter(function (s) { return typeof s === 'string'; })
+            .map(function (s) {
+              var def = null;
+              for (var k = 0; k < STAMPS.length; k++) if (STAMPS[k].label === s) def = STAMPS[k];
+              return def ? def.icon + s : s;
+            }).join(' ');
+          cell.appendChild(stEl);
+        }
+      } catch (e) { /* このマスは日付だけ表示して続行 */ }
+
+      (function (d) {
+        cell.addEventListener('click', function () { selectDay(d); });
+      })(dayNum);
+    }
+    grid.appendChild(cell);
+  }
+
+  renderDayInfo();
+}
+
+var WEEK_JA = ['日', '月', '火', '水', '木', '金', '土'];
+
+function renderDayInfo() {
+  if (!selected || selected.y !== cur.y || selected.m !== cur.m) {
+    $('di-date').textContent = cur.y + '年' + cur.m + '月';
+    $('di-body').textContent = '日付をタップすると詳細が見られます';
+    $('di-stamp-btn').style.display = 'none';
+    return;
+  }
+  var w = WEEK_JA[new Date(selected.y, selected.m - 1, selected.d).getDay()];
+  $('di-date').textContent = selected.m + '/' + selected.d + '(' + w + ')';
+  var ym = ymKey(selected.y, selected.m);
+  var sh = normShift((state.shifts[ym] || {})[String(selected.d)]);
+  var st = (state.stamps[ym] || {})[String(selected.d)];
+  if (!Array.isArray(st)) st = [];
+  var parts = [];
+  if (sh) {
+    var txt = sh.label;
+    if (sh.time) txt += ' ' + sh.time;
+    if (sh.label === UNKNOWN_LABEL) txt = '不明(読み取れなかった日。紙のシフト表で確認してください)';
+    parts.push(txt);
+    if (sh.memo) parts.push('📝 ' + sh.memo);
+  }
+  if (st.length) parts.push('スタンプ: ' + st.join('・'));
+  if (!parts.length) parts.push('予定なし');
+  var body = $('di-body');
+  body.textContent = '';
+  parts.forEach(function (p) { addLine(body, p); });
+  $('di-stamp-btn').style.display = 'block';
+}
+
+/* 日付タップ = 詳細表示だけ。スタンプは「スタンプ」ボタンから(問題14) */
+function selectDay(d) {
+  selected = { y: cur.y, m: cur.m, d: d };
+  render();
+}
+
+/* ================= 月移動 ================= */
+$('prev').addEventListener('click', function () {
+  cur.m--; if (cur.m < 1) { cur.m = 12; cur.y--; }
+  render();
+});
+$('next').addEventListener('click', function () {
+  cur.m++; if (cur.m > 12) { cur.m = 1; cur.y++; }
+  render();
+});
+$('today-btn').addEventListener('click', function () {
+  var t = new Date();
+  cur = { y: t.getFullYear(), m: t.getMonth() + 1 };
+  selected = { y: cur.y, m: cur.m, d: t.getDate() };
+  render();
+});
+
+/* ================= シートの開け閉め ================= */
+function openSheet(name) {
+  document.querySelector('.sheet-back[data-close="' + name + '"]').classList.add('open');
+  $('sheet-' + name).classList.add('open');
+}
+function closeSheet(name) {
+  document.querySelector('.sheet-back[data-close="' + name + '"]').classList.remove('open');
+  $('sheet-' + name).classList.remove('open');
+}
+Array.prototype.forEach.call(document.querySelectorAll('[data-close]'), function (el) {
+  el.addEventListener('click', function (ev) {
+    if (ev.target === el) closeSheet(el.getAttribute('data-close'));
+  });
+});
+
+$('nav-import').addEventListener('click', function () {
+  $('import-result').className = 'result-box';
+  $('do-import').disabled = false;
+  openSheet('import');
+});
+$('nav-settings').addEventListener('click', function () {
+  $('user-name').value = state.settings.userName;
+  renderTypeList();
+  $('backup-result').className = 'result-box';
+  openSheet('settings');
+});
+$('di-stamp-btn').addEventListener('click', openStampSheet);
+
+/* ================= スタンプ ================= */
+function openStampSheet() {
+  if (!selected) return;
+  var w = WEEK_JA[new Date(selected.y, selected.m - 1, selected.d).getDay()];
+  $('stamp-title').textContent = selected.m + '/' + selected.d + '(' + w + ')のスタンプ';
+  var ym = ymKey(selected.y, selected.m);
+  var sh = normShift((state.shifts[ym] || {})[String(selected.d)]);
+  var info = '';
+  if (sh) {
+    info = 'この日のシフト: ' + sh.label + (sh.time ? ' ' + sh.time : '') + (sh.memo ? ' / 📝 ' + sh.memo : '');
+  } else {
+    info = 'この日のシフト: まだ入っていません';
+  }
+  $('stamp-shift-info').textContent = info;
+  renderStampChips();
+  openSheet('stamp');
+}
+
+function renderStampChips() {
+  var ym = ymKey(selected.y, selected.m);
+  var curStamps = (state.stamps[ym] || {})[String(selected.d)] || [];
+  if (!Array.isArray(curStamps)) curStamps = [];
+  var list = $('stamp-list');
+  list.textContent = '';
+  STAMPS.forEach(function (s) {
+    var b = document.createElement('button');
+    b.className = 'stamp-chip' + (curStamps.indexOf(s.label) >= 0 ? ' on' : '');
+    b.textContent = s.icon + ' ' + s.label;
+    b.addEventListener('click', function () { toggleStamp(s.label); });
+    list.appendChild(b);
+  });
+}
+
+function toggleStamp(label) {
+  var ym = ymKey(selected.y, selected.m);
+  if (!state.stamps[ym]) state.stamps[ym] = {};
+  var key = String(selected.d);
+  var arr = state.stamps[ym][key];
+  if (!Array.isArray(arr)) arr = [];
+  var idx = arr.indexOf(label);
+  if (idx >= 0) arr.splice(idx, 1);
+  else arr.push(label);
+  if (arr.length) state.stamps[ym][key] = arr;
+  else delete state.stamps[ym][key];
+  if (Object.keys(state.stamps[ym]).length === 0) delete state.stamps[ym];
+  saveState();
+  renderStampChips();
+  render();
+}
+
+/* ================= AIへのお願い文 ================= */
+function buildPrompt(name) {
+  return 'シフト表(Excel・PDF・写真のどれか)を読み取って、' + name + ' さんのシフトだけを下の形式のコードにしてください。\n' +
+'\n' +
+'【表の構成】\n' +
+'- 職場全員分の一覧表です。行1=日付(1〜31)、行2=曜日、その下に従業員ごとの行が並びます\n' +
+'- 1人につき2行あります。上段=シフト本体、下段=補足(開始時刻・「遅」「早」・会議名など)\n' +
+'- 必ず ' + name + ' さんの上段と下段の2行だけを読み取り、他の人の行は無視してください\n' +
+'\n' +
+'【返してほしい形式(コードだけを ```json のブロックで)】\n' +
+'{\n' +
+'  "kind": "shift-import",\n' +
+'  "version": 2,\n' +
+'  "year": 対象の年(4桁の数字),\n' +
+'  "month": 対象の月(1〜12の数字),\n' +
+'  "name": "読み取った行の氏名",\n' +
+'  "shifts": {\n' +
+'    "日にち": { "label": "シフト名", "time": "開始時刻(あれば)", "memo": "補足(あれば)" }\n' +
+'  },\n' +
+'  "unclear": [読み取れなかった日にちの一覧]\n' +
+'}\n' +
+'\n' +
+'【言葉の変換ルール】\n' +
+'- 「休」→「休み」、「希」→「希休」、「有」→「有休」、「半9時」→「半9」\n' +
+'- 下段が「遅」なら label は「遅番」、「早」なら label は「早番」にして、上段の時刻は time に入れる\n' +
+'- 店舗名(横浜西口・新横・小田原など)や略語(Ｌ・オリ・定例①・マイスターなど)は、無理に当てはめず書いてあるままの言葉を label に入れる\n' +
+'- 会議名・勉強会名などの補足は memo に入れる\n' +
+'\n' +
+'【数値の扱い(重要)】\n' +
+'- 0.354166… のような 0〜1 の小数は Excel の時刻です。24 を掛けて「8:30」のような時:分に直し、time に入れてください\n' +
+'- 46306 のような大きな整数は Excel の日付のゴミです。シフトとして書かず、その日を unclear に入れてください\n' +
+'- 意味の分からない値の日も、勝手に推測せず unclear に入れてください\n' +
+'\n' +
+'【そのほかのルール】\n' +
+'- 空欄の日は shifts に入れない\n' +
+'- 画像が複数枚に分かれている場合は、全部を合わせて1つのコードにしてください\n' +
+'- シフト表が2つの月にまたがっている場合(例: 8/21〜9/20)は、月ごとに分けて2個のコードを返してください\n' +
+'- コードの後に、必ず読み取り結果の要約を添えてください:\n' +
+'  「◯月・' + name + 'さんの行を読み取りました。出勤◯日・休み◯日。読み取れなかった日: ◯日・◯日。自信がない日: ◯日(「遅番」かも)」';
+}
+
+$('copy-prompt').addEventListener('click', function () {
+  var name = state.settings.userName.trim();
+  if (!name) {
+    toast('先に「設定」でシフト表上のお名前を登録してください');
+    closeSheet('import');
+    $('user-name').value = '';
+    renderTypeList();
+    openSheet('settings');
+    $('user-name').focus();
+    return;
+  }
+  copyText(buildPrompt(name), 'お願い文をコピーしました。Claudeにシフト表と一緒に送ってください');
+});
+
+/* ================= 取り込み ================= */
+function showImportError(text) {
+  var box = resetResult('import-result', true);
+  addLine(box, text);
+}
+
+/* 貼り付けテキストから、括弧の対応が取れた {…} ブロックを全部拾う(問題3・4)。
+   JSON文字列の中の { } は数えない。拾った候補は呼び出し側で JSON.parse を試す */
+function extractJsonBlocks(text) {
+  var blocks = [], depth = 0, start = -1, inStr = false, esc = false;
+  for (var i = 0; i < text.length; i++) {
+    var c = text.charAt(i);
+    if (inStr) {
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"' && depth > 0) { inStr = true; continue; }
+    if (c === '{') { if (depth === 0) start = i; depth++; }
+    else if (c === '}' && depth > 0) {
+      depth--;
+      if (depth === 0) { blocks.push(text.slice(start, i + 1)); start = -1; }
+    }
+  }
+  return blocks;
+}
+
+/* 1件ぶんの取り込み処理。結果は box に文字として追記。成功なら {ok:true, y, m} */
+function importOne(data, box) {
+  var y = data.year, m = data.month;
+  if (typeof y !== 'number' || y < 2000 || y > 2100 || typeof m !== 'number' || m < 1 || m > 12) {
+    addLine(box, '⚠️ 年月が読み取れないコードがありました(year は 2000〜2100、month は 1〜12 の数字が必要です)');
+    return { ok: false, error: true };
+  }
+  if (!data.shifts || typeof data.shifts !== 'object' || Array.isArray(data.shifts)) {
+    addLine(box, '⚠️ ' + y + '年' + m + '月分: シフトのデータ(shifts)が入っていません');
+    return { ok: false, error: true };
+  }
+
+  /* 名前の照合(他人の行の誤読み防止) */
+  var myName = state.settings.userName.trim();
+  if (myName && typeof data.name === 'string' && data.name.trim() && data.name.trim() !== myName) {
+    var okName = confirm('⚠️ 注意: このコード(' + y + '年' + m + '月分)は「' + data.name + '」さんの行を読んだもののようです。\nあなたの登録名は「' + myName + '」です。\n\n別の人のシフトかもしれません。それでも取り込みますか?');
+    if (!okName) {
+      addLine(box, y + '年' + m + '月分: 取り込みを中止しました(データは変更されていません)');
+      return { ok: false };
+    }
+  }
+
+  var dim = daysInMonth(y, m);
+  var newShifts = {};
+  var skipped = [];
+  var newTypes = [];
+  var count = 0;
+
+  Object.keys(data.shifts).forEach(function (k) {
+    var t = String(k).trim();
+    if (!/^\d{1,2}$/.test(t)) { skipped.push(t); return; }        /* 「1abc」等は弾く(問題5) */
+    var d = parseInt(t, 10);
+    if (!(d >= 1 && d <= dim)) { skipped.push(t); return; }
+    if (newShifts[String(d)]) { skipped.push(t + '(同じ日が2回)'); return; }  /* 「01」と「1」の衝突 */
+    var v = data.shifts[k];
+    var entry = null;
+    if (typeof v === 'string' && v.trim()) {
+      entry = { label: v.trim() }; /* 旧形式(文字列だけ)も受け付ける */
+    } else if (v && typeof v === 'object' && typeof v.label === 'string' && v.label.trim()) {
+      entry = { label: v.label.trim() };
+      /* 時は0〜29時まで許容(25:00=翌1時のような深夜表記に対応)、分は00〜59のみ(問題11) */
+      if (typeof v.time === 'string' && /^([0-2]?\d):([0-5]\d)$/.test(v.time.trim())) {
+        entry.time = v.time.trim();
+      } else if (typeof v.time === 'string' && v.time.trim()) {
+        /* 時刻の形になっていないものは memo に回す */
+        entry.memo = v.time.trim();
+      }
+      if (typeof v.memo === 'string' && v.memo.trim()) {
+        entry.memo = entry.memo ? entry.memo + ' / ' + v.memo.trim() : v.memo.trim();
+      }
+    } else {
+      skipped.push(t);
+      return;
+    }
+    if (ensureType(entry.label)) newTypes.push(entry.label);
+    newShifts[String(d)] = entry;
+    count++;
+  });
+
+  var unclearDays = [];
+  if (Array.isArray(data.unclear)) {
+    data.unclear.forEach(function (u) {
+      var d = parseInt(u, 10);
+      if (d >= 1 && d <= dim && !newShifts[String(d)]) {
+        newShifts[String(d)] = { label: UNKNOWN_LABEL };
+        unclearDays.push(d);
+      }
+    });
+  }
+
+  if (count === 0 && unclearDays.length === 0) {
+    addLine(box, '⚠️ ' + y + '年' + m + '月分: 取り込める日が1日もありませんでした。コードの中身を確認してください');
+    return { ok: false, error: true };
+  }
+
+  var ym = ymKey(y, m);
+
+  /* 上書き確認(今の件数と新しい件数を両方見せる。問題12) */
+  if (state.shifts[ym] && Object.keys(state.shifts[ym]).length > 0) {
+    var oldCount = Object.keys(state.shifts[ym]).length;
+    var okOw = confirm(y + '年' + m + '月にはすでに ' + oldCount + ' 日ぶんのシフトが入っています。\n新しい内容(' + (count + unclearDays.length) + '日ぶん)で丸ごと入れ替えます。よろしいですか?');
+    if (!okOw) {
+      addLine(box, y + '年' + m + '月分: 取り込みを中止しました(データは変更されていません)');
+      return { ok: false };
+    }
+  } else {
+    var okIn = confirm(y + '年' + m + '月分・' + (count + unclearDays.length) + '日ぶんを取り込みます。よろしいですか?');
+    if (!okIn) {
+      addLine(box, y + '年' + m + '月分: 取り込みを中止しました(データは変更されていません)');
+      return { ok: false };
+    }
+  }
+
+  state.shifts[ym] = newShifts;
+
+  /* スタンプとの重なり */
+  var overlap = [];
+  var ymStamps = state.stamps[ym] || {};
+  Object.keys(ymStamps).forEach(function (k) {
+    if (newShifts[k]) overlap.push(parseInt(k, 10));
+  });
+  overlap.sort(function (a, b) { return a - b; });
+
+  saveState();
+
+  /* 小さい日にち順に並べてから表示(問題18) */
+  unclearDays.sort(function (a, b) { return a - b; });
+  skipped.sort(function (a, b) {
+    var na = parseInt(a, 10), nb = parseInt(b, 10);
+    if (isNaN(na) && isNaN(nb)) return String(a) < String(b) ? -1 : 1;
+    if (isNaN(na)) return 1;   /* 数字でないもの(1abc等)は後ろへ */
+    if (isNaN(nb)) return -1;
+    return na - nb;
+  });
+
+  /* 結果表示(すべて文字として追加。問題1) */
+  addLine(box, '✅ ' + y + '年' + m + '月のシフトを取り込みました(' + count + '日ぶん)');
+  if (newTypes.length) {
+    addLine(box, '🆕 新しいシフトを追加しました: ' + newTypes.join('・') + '(色は自動で付けました)');
+  }
+  if (unclearDays.length) {
+    addLine(box, '⚠️ 読み取れなかった日: ' + unclearDays.join('日・') + '日 → 「?」で表示しています。紙のシフト表で確認してください');
+  }
+  if (skipped.length) {
+    addLine(box, '⚠️ 取り込めなかった項目: ' + skipped.join('、') + '(この月にない日にちなど)');
+  }
+  if (overlap.length) {
+    addLine(box, '📌 ' + overlap.map(function (d) { return m + '/' + d; }).join('・') +
+      ' にスタンプが残っています(希望が通ったか見比べられます)');
+    var btn = document.createElement('button');
+    btn.className = 'btn sub small';
+    btn.style.marginTop = '6px';
+    btn.textContent = 'この月(' + y + '年' + m + '月)のスタンプをまとめて消す';
+    btn.addEventListener('click', function () {
+      delete state.stamps[ym];
+      saveState();
+      render();
+      btn.textContent = '消しました';
+      btn.disabled = true;
+    });
+    box.appendChild(document.createElement('br'));
+    box.appendChild(btn);
+  }
+  return { ok: true, y: y, m: m };
+}
+
+$('do-import').addEventListener('click', function () {
+  var raw = $('import-text').value;
+  if (!raw.trim()) {
+    showImportError('コードが貼られていません。Claude の返事のコードを貼り付けてください。');
+    return;
+  }
+  var blocks = extractJsonBlocks(raw);
+  var parsed = [];
+  blocks.forEach(function (b) {
+    try {
+      var o = JSON.parse(b);
+      if (o && typeof o === 'object') parsed.push(o);
+    } catch (e) { /* JSONとして読めない候補(要約文の {…} など)は無視 */ }
+  });
+  var imports = parsed.filter(function (o) { return o.kind === 'shift-import'; });
+
+  if (imports.length === 0) {
+    if (parsed.some(function (o) { return o.kind === 'shift-backup'; })) {
+      showImportError('これはバックアップ用のテキストのようです。復元は「設定・バックアップ」の読み込み欄に貼ってください。');
+    } else if (parsed.length > 0) {
+      showImportError('シフト用のコードではないようです。Claude が返した shift-import のコードを貼ってください。');
+    } else if (blocks.length > 0) {
+      showImportError('コードが読み取れませんでした(途中で切れている可能性があります)。Claude の返事のうち、{ から } までを全部コピーして貼り直してください。');
+    } else {
+      showImportError('コードが読み取れませんでした。Claude の返事のうち、{ から } までを全部コピーして貼り直してください。');
+    }
+    return;
+  }
+
+  /* 月ごとに順番に取り込む(2個のコードにも対応。問題3) */
+  var box = resetResult('import-result', false);
+  var okList = [];
+  var hadError = false;
+  imports.forEach(function (data) {
+    var r = importOne(data, box);
+    if (r.ok) okList.push(r);
+    else if (r.error) hadError = true;
+  });
+
+  if (okList.length === 0 && hadError) {
+    box.className = 'result-box show error';
+  }
+  if (okList.length > 0) {
+    $('import-text').value = '';
+    $('do-import').disabled = true; /* 連打で結果が消えるのを防ぐ(問題10)。新しい貼り付けで復帰 */
+    cur = { y: okList[0].y, m: okList[0].m };
+    selected = null;
+    render();
+  }
+});
+
+/* 入力欄に新しい文字が入ったら「取り込み」ボタンを復帰させる(問題10) */
+$('import-text').addEventListener('input', function () {
+  $('do-import').disabled = false;
+});
+
+/* ================= 設定 ================= */
+function renderTypeList() {
+  var list = $('type-list');
+  list.textContent = '';
+  state.shiftTypes.forEach(function (t) {
+    var el = document.createElement('span');
+    el.className = 'type-item';
+    el.textContent = t.label;
+    el.style.background = t.color;
+    list.appendChild(el);
+  });
+}
+
+$('save-name').addEventListener('click', function () {
+  state.settings.userName = $('user-name').value.trim();
+  saveState();
+  toast(state.settings.userName ? '名前を保存しました: ' + state.settings.userName : '名前を空にしました');
+});
+
+/* ================= バックアップ ================= */
+function showBackupResult(text, isError) {
+  var box = resetResult('backup-result', isError);
+  addLine(box, text);
+}
+
+$('backup-out').addEventListener('click', function () {
+  var payload = {
+    kind: 'shift-backup',
+    version: 1,
+    savedAt: new Date().toISOString(),
+    data: state
+  };
+  copyText(JSON.stringify(payload), 'バックアップをコピーしました。メモアプリなど安全な場所に貼って保存してください');
+});
+
+$('backup-restore').addEventListener('click', function () {
+  var raw = $('backup-in').value;
+  if (!raw.trim()) {
+    showBackupResult('バックアップのテキストが貼られていません。', true);
+    return;
+  }
+  var blocks = extractJsonBlocks(raw);
+  var parsed = [];
+  blocks.forEach(function (b) {
+    try {
+      var o = JSON.parse(b);
+      if (o && typeof o === 'object') parsed.push(o);
+    } catch (e) {}
+  });
+  var backup = null, hasImport = false;
+  parsed.forEach(function (o) {
+    if (!backup && o.kind === 'shift-backup' && o.data && typeof o.data === 'object') backup = o;
+    if (o.kind === 'shift-import') hasImport = true;
+  });
+  if (!backup) {
+    if (hasImport) {
+      showBackupResult('これはシフト取り込み用のコードのようです。「AI取り込み」の欄に貼ってください。', true);
+    } else if (parsed.length > 0) {
+      showBackupResult('バックアップのテキストではないようです。', true);
+    } else {
+      showBackupResult('読み取れませんでした。書き出したテキストを全部コピーして貼ってください。', true);
+    }
+    return;
+  }
+  var ok = confirm('バックアップから復元します。今のデータは上書きされます。よろしいですか?');
+  if (!ok) {
+    showBackupResult('復元を中止しました。', false);
+    return;
+  }
+
+  var d = backup.data;
+  var s = defaultState();
+  if (Array.isArray(d.shiftTypes) && d.shiftTypes.length) {
+    var types = d.shiftTypes.filter(function (t) {
+      return t && typeof t.label === 'string' && typeof t.color === 'string';
+    });
+    if (types.length) s.shiftTypes = migrateTypeColors(types);
+  }
+  /* 壊れた日・月は捨てて残りだけ復元する(問題2) */
+  s.shifts = sanitizeShifts(d.shifts);
+  s.stamps = sanitizeStamps(d.stamps);
+  if (d.settings && typeof d.settings === 'object' && typeof d.settings.userName === 'string') {
+    s.settings.userName = d.settings.userName;
+  }
+  state = s;
+  saveState();
+  $('backup-in').value = '';
+  $('user-name').value = state.settings.userName;
+  renderTypeList();
+  showBackupResult('✅ 復元しました。', false);
+  render();
+});
+
+/* ================= 全データ消去(問題13) ================= */
+$('reset-all').addEventListener('click', function () {
+  if (!confirm('本当に全データ(シフト・スタンプ・名前)を消しますか?')) return;
+  if (!confirm('バックアップは取りましたか?\n「OK」を押すと元に戻せません。')) return;
+  try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+  state = defaultState();
+  selected = null;
+  $('user-name').value = '';
+  $('backup-in').value = '';
+  renderTypeList();
+  showBackupResult('全データを消去しました。最初の状態に戻っています。', false);
+  render();
+});
+
+/* ================= 起動 ================= */
+(function init() {
+  selected = null;
+  render();
+  /* 名前が未登録なら設定シートを自動で開いて入力を促す(問題8) */
+  if (!state.settings.userName) {
+    $('user-name').value = '';
+    renderTypeList();
+    $('backup-result').className = 'result-box';
+    openSheet('settings');
+    $('user-name').focus();
+    toast('最初にシフト表上のお名前を登録してください(この端末の中だけに保存されます)');
+  }
+})();
+</script>
+</body>
+</html>
