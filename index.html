@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- shift-calendar build 2026-07-27-03 -->
+<!-- shift-calendar build 2026-07-27-04 -->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -114,12 +114,13 @@
   .cell .num {
     font-size: 12px;
     font-weight: bold;
-    line-height: 18px;
-    width: 20px;
-    height: 18px;
-    border-radius: 9px;
+    line-height: 16px;
+    width: 18px;
+    height: 16px;
+    border-radius: 8px;
     align-self: flex-start;
     margin-left: 2px;
+    flex-shrink: 0;
   }
   .cell.sat .num { color: var(--sat); }
   .cell.sun .num { color: var(--sun); }
@@ -128,17 +129,29 @@
   .cell.today { background: #fff9c4; }  /* 今日は淡い黄色でひと目で分かる */
   .cell.today .num { background: var(--navy); color: #fff; text-align: center; }
   .cell.selected { outline: 2px solid var(--navy); outline-offset: -2px; }
+  /* シフト名はカレンダーの主役。文字数に応じて入る最大サイズにする(実測で調整) */
   .cell .shift {
-    font-weight: 800;
-    font-size: 16px;
+    font-weight: 900;
+    font-size: 22px;
+    line-height: 1.25;   /* 太い書体の上下がはみ出して切れないよう余裕を持たせる */
+    letter-spacing: -0.5px;
+    -webkit-text-stroke: 0.3px currentColor;  /* 線を太らせてさらに濃く見せる */
     margin-top: 1px;
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    flex-shrink: 0;   /* 縦に潰れて文字が切れるのを防ぐ */
   }
-  .cell .shift.long { font-size: 12px; }
-  .cell .time { font-size: 10px; color: #666; }
+  .cell .shift.mid { font-size: 17px; letter-spacing: -1px; }    /* 3文字 */
+  .cell .shift.long { font-size: 13px; letter-spacing: -0.8px; } /* 4文字以上 */
+  /* 幅の狭い端末(iPhone SE 第1世代など)は、はみ出さないよう一段小さく */
+  @media (max-width: 360px) {
+    .cell .shift { font-size: 20px; }
+    .cell .shift.mid { font-size: 14px; }
+    .cell .shift.long { font-size: 11px; }
+  }
+  .cell .time { font-size: 10px; line-height: 1.1; color: #666; flex-shrink: 0; }
   .cell .cell-stamps {
     position: absolute;
     top: 1px;
@@ -151,7 +164,7 @@
     text-align: right;
     pointer-events: none;   /* アイコンの上でも日付タップが効くように */
   }
-  .cell .memo-dot { font-size: 8px; color: #e08600; }
+  .cell .memo-dot { font-size: 8px; line-height: 1; color: #e08600; flex-shrink: 0; }
 
   /* ===== シフト入力バー+スタンプチップ ===== */
   #di-bar {
@@ -817,7 +830,9 @@ function render() {
         var sh = normShift(monthShifts[String(dayNum)]);
         if (sh) {
           var shiftEl = document.createElement('div');
-          shiftEl.className = 'shift' + (sh.label.length >= 4 ? ' long' : '');
+          /* 文字数で大きさを切り替え(2文字までは最大、3文字は中、4文字以上は小) */
+          var labelLen = (Array.from ? Array.from(sh.label) : sh.label.split('')).length;
+          shiftEl.className = 'shift' + (labelLen >= 4 ? ' long' : (labelLen === 3 ? ' mid' : ''));
           shiftEl.textContent = sh.label === UNKNOWN_LABEL ? '?' : sh.label;
           shiftEl.style.color = typeColor(sh.label);
           cell.appendChild(shiftEl);
