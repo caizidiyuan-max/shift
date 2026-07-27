@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- shift-calendar build 2026-07-26-02 -->
+<!-- shift-calendar build 2026-07-27-02 -->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -90,16 +90,18 @@
   #grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
+    grid-auto-rows: 1fr;    /* 行の高さを均等にして空き高さいっぱいに広げる */
     flex: 1 1 auto;
     min-height: 0;          /* flexの中で縮めるための必須指定 */
-    overflow-y: auto;       /* はみ出す月はカレンダー部分だけスクロール */
+    overflow-y: auto;       /* 収まらない小画面ではカレンダー部分だけスクロール */
     border-top: 1px solid var(--line);
     border-left: 1px solid var(--line);
   }
   .cell {
+    position: relative;
     border-right: 1px solid var(--line);
     border-bottom: 1px solid var(--line);
-    min-height: 56px;
+    min-height: 44px;
     padding: 2px 1px;
     font-size: 11px;
     text-align: center;
@@ -123,41 +125,79 @@
   .cell.sun .num { color: var(--sun); }
   .cell.other { background: #fafafa; }
   .cell.other .num { color: var(--dim); font-weight: normal; }
+  .cell.today { background: #fff9c4; }  /* 今日は淡い黄色でひと目で分かる */
   .cell.today .num { background: var(--navy); color: #fff; text-align: center; }
   .cell.selected { outline: 2px solid var(--navy); outline-offset: -2px; }
   .cell .shift {
-    font-weight: bold;
-    font-size: 13px;
-    margin-top: 2px;
+    font-weight: 800;
+    font-size: 16px;
+    margin-top: 1px;
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .cell .shift.long { font-size: 10px; }
-  .cell .time { font-size: 9px; color: #666; }
-  .cell .stamps { font-size: 10px; line-height: 1.1; margin-top: 1px; word-break: break-all; }
+  .cell .shift.long { font-size: 12px; }
+  .cell .time { font-size: 10px; color: #666; }
+  .cell .cell-stamps {
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    font-size: 9px;
+    line-height: 1;
+    max-width: 62%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-align: right;
+    pointer-events: none;   /* アイコンの上でも日付タップが効くように */
+  }
   .cell .memo-dot { font-size: 8px; color: #e08600; }
 
-  /* ===== 選択日の詳細 ===== */
-  #dayinfo {
+  /* ===== シフト入力バー+スタンプチップ ===== */
+  #di-bar {
     background: var(--navy);
     color: #fff;
-    padding: 8px 12px calc(env(safe-area-inset-bottom) + 8px);
-    min-height: 66px;
-    flex-shrink: 0;
-  }
-  #dayinfo .di-date { font-weight: bold; font-size: 14px; }
-  #dayinfo .di-body { font-size: 13px; margin-top: 3px; line-height: 1.5; }
-  #dayinfo .di-stamp-btn {
-    float: right;
-    background: #fff;
-    color: var(--navy);
-    border: none;
-    border-radius: 6px;
     padding: 7px 12px;
     font-size: 13px;
-    font-weight: bold;
+    flex-shrink: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  #di-bar .di-date { font-weight: bold; white-space: nowrap; }
+  #di-bar .di-info {
+    font-size: 12px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  #chip-area {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px;
+    background: #fff;
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+  }
+  #stamp-chip-row {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;               /* チップが多いときは横スクロール */
+    -webkit-overflow-scrolling: touch;
+  }
+  .chip-hint { font-size: 12px; color: #666; }
+  #edit-stamps-btn {
+    flex: 0 0 auto;
+    background: #f0f1f7;
+    color: var(--navy);
+    border: 1px solid var(--navy);
+    border-radius: 8px;
+    padding: 9px 10px;
+    font-size: 12px;
     cursor: pointer;
   }
 
@@ -277,21 +317,22 @@
   .result-box.error { background: #ffefef; border-color: #e2a8a8; }
   .result-box.show { display: block; }
 
-  /* スタンプ選択 */
-  .stamp-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  /* スタンプのチップ(枠線付きの四角。ON中は塗りつぶし) */
   .stamp-chip {
-    border: 2px solid #ccc;
-    border-radius: 20px;
+    flex: 0 0 auto;
+    border: 2px solid var(--navy);
+    border-radius: 8px;
     background: #fff;
-    padding: 9px 14px;
-    font-size: 14px;
+    color: var(--navy);
+    padding: 8px 10px;
+    font-size: 13px;
+    font-weight: bold;
     cursor: pointer;
+    white-space: nowrap;
   }
   .stamp-chip.on {
-    border-color: var(--navy);
     background: var(--navy);
     color: #fff;
-    font-weight: bold;
   }
 
   /* 種類一覧 */
@@ -303,6 +344,27 @@
     font-weight: bold;
     color: #fff;
   }
+
+  /* スタンプの編集(設定シート内) */
+  .stampdef-row { display: flex; align-items: center; gap: 6px; margin: 6px 0; }
+  .stampdef-row .sd-name {
+    flex: 1 1 auto;
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .stampdef-row button {
+    flex: 0 0 auto;
+    background: #fff;
+    color: var(--navy);
+    border: 1px solid var(--navy);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .stampdef-row button.sd-del { color: #b71c1c; border-color: #b71c1c; }
 
   /* トースト */
   #toast {
@@ -338,10 +400,13 @@
 
 <div id="grid"></div>
 
-<div id="dayinfo">
-  <button class="di-stamp-btn" id="di-stamp-btn">スタンプ</button>
-  <div class="di-date" id="di-date">--</div>
-  <div class="di-body" id="di-body">日付をタップすると詳細が見られます</div>
+<div id="di-bar">
+  <span class="di-date" id="di-date">--</span>
+  <span class="di-info" id="di-info"></span>
+</div>
+<div id="chip-area">
+  <div id="stamp-chip-row"></div>
+  <button id="edit-stamps-btn">編集</button>
 </div>
 
 <nav>
@@ -356,22 +421,12 @@
   <h2>📥 AI取り込み</h2>
   <div class="step">① お願い文をコピーする</div>
   <button class="btn" id="copy-prompt">AIへのお願い文をコピー</button>
-  <div class="step">② Claude にシフト表と一緒に送る</div>
-  <div class="hint">シフト表の Excel・PDF・写真(複数枚OK)と、①のお願い文をそのまま Claude に送ってください。</div>
+  <div class="step">② AI(Claude・Gemini など)にシフト表と一緒に送る</div>
+  <div class="hint">シフト表の Excel・PDF・写真(複数枚OK)と、①のお願い文を、いつも使っている AI(Claude・Gemini など)にそのまま送ってください。</div>
   <div class="step">③ 返ってきた返事をここに貼る</div>
-  <textarea id="import-text" placeholder="Claude の返事をまるごと貼り付けてOK(コードが2個あっても取り込めます)"></textarea>
+  <textarea id="import-text" placeholder="AI の返事をまるごと貼り付けてOK(コードが2個あっても取り込めます)"></textarea>
   <button class="btn" id="do-import">取り込み</button>
   <div class="result-box" id="import-result"></div>
-</div>
-
-<!-- ===== スタンプシート ===== -->
-<div class="sheet-back" data-close="stamp"></div>
-<div class="sheet" id="sheet-stamp">
-  <button class="close-x" data-close="stamp">✕</button>
-  <h2 id="stamp-title">スタンプ</h2>
-  <div id="stamp-shift-info" class="hint"></div>
-  <div class="stamp-list" id="stamp-list"></div>
-  <div class="hint">タップで付く/もう一度タップで消えます。シフトが入っている日にも付けられます。</div>
 </div>
 
 <!-- ===== 設定シート ===== -->
@@ -388,6 +443,11 @@
   <div class="step">シフトの種類と色</div>
   <div class="hint">取り込みで新しい種類(店舗名など)が来ると、自動でここに追加されます。</div>
   <div class="type-list" id="type-list"></div>
+
+  <div class="step">スタンプの編集</div>
+  <div class="hint">名前を変えると、すでに押してある日のスタンプも新しい名前になります。</div>
+  <div id="stamp-def-list"></div>
+  <button class="btn sub small" id="add-stamp">+ スタンプを追加</button>
 
   <div class="step">バックアップ</div>
   <div class="notice">データはこのスマホのこのブラウザだけに保存されます。機種変更・履歴の削除で消えることがあるので、<b>月1回(シフト取り込みのついで)のバックアップをおすすめします。</b></div>
@@ -430,11 +490,14 @@ var AUTO_PALETTE = ['#905a8d', '#1d2d78', '#1c3c15', '#e5192d', '#7b5641',
                     '#6a0836', '#d61f9b', '#7d65c5', '#627b5a', '#5d115d',
                     '#ae5b6d', '#533049', '#a3670a', '#656b90'];
 
-var STAMPS = [
+/* 初期スタンプ6種(スタンプはユーザーが設定で追加・名前変更・削除できる。
+   実際の定義は state.stampDefs に保存され、これは初期値・旧データ補完用) */
+var DEFAULT_STAMPS = [
   { label: '希望休', icon: '🙏' },
   { label: '研修',   icon: '📚' },
   { label: '有休申請', icon: '📝' },
   { label: '通院',   icon: '🏥' },
+  { label: '健診',   icon: '🩺' },
   { label: '予定あり', icon: '⭐' }
 ];
 
@@ -447,6 +510,7 @@ function defaultState() {
     shiftTypes: DEFAULT_TYPES.map(function (t) { return { label: t.label, color: t.color }; }),
     shifts: {},
     stamps: {},
+    stampDefs: DEFAULT_STAMPS.map(function (s) { return { label: s.label, icon: s.icon }; }),
     settings: { userName: '' }
   };
 }
@@ -469,6 +533,7 @@ function loadState() {
     }
     s.shifts = sanitizeShifts(d.shifts);
     s.stamps = sanitizeStamps(d.stamps);
+    s.stampDefs = sanitizeStampDefs(d.stampDefs);
     if (d.settings && typeof d.settings === 'object' && typeof d.settings.userName === 'string') {
       s.settings.userName = d.settings.userName;
     }
@@ -542,6 +607,42 @@ function sanitizeStamps(src) {
     if (Object.keys(cleanMo).length) out[ym] = cleanMo;
   });
   return out;
+}
+
+/* スタンプ定義を洗浄。stampDefs の無い旧データ・旧バックアップは初期6種で補う。
+   配列がある場合は「label が空でない・重複しない」ものだけ残す(空配列=全部削除済みは尊重) */
+function sanitizeStampDefs(src) {
+  if (!Array.isArray(src)) {
+    return DEFAULT_STAMPS.map(function (s) { return { label: s.label, icon: s.icon }; });
+  }
+  var out = [], seen = {};
+  src.forEach(function (v) {
+    if (!v || typeof v !== 'object' || typeof v.label !== 'string') return;
+    var label = v.label.trim();
+    if (!label || seen[label]) return;
+    seen[label] = true;
+    out.push({ label: label, icon: typeof v.icon === 'string' ? v.icon : '' });
+  });
+  return out;
+}
+
+function findStampDef(label) {
+  for (var i = 0; i < state.stampDefs.length; i++) {
+    if (state.stampDefs[i].label === label) return state.stampDefs[i];
+  }
+  return null;
+}
+
+/* そのラベルのスタンプが押されている日数を数える */
+function countStampDays(label) {
+  var n = 0;
+  Object.keys(state.stamps).forEach(function (ym) {
+    var mo = state.stamps[ym];
+    Object.keys(mo).forEach(function (dk) {
+      if (Array.isArray(mo[dk]) && mo[dk].indexOf(label) >= 0) n++;
+    });
+  });
+  return n;
 }
 
 /* 色の移行処理(2026-07-26 色再設計に対応):
@@ -729,17 +830,23 @@ function render() {
           }
         }
 
+        /* スタンプはマス右上に絵文字アイコンだけ小さく表示(3個超は「…」)。
+           絵文字の無いスタンプは名前の1文字目で代用 */
         var stArr = monthStamps[String(dayNum)];
         if (Array.isArray(stArr) && stArr.length) {
-          var stEl = document.createElement('div');
-          stEl.className = 'stamps';
-          stEl.textContent = stArr.filter(function (s) { return typeof s === 'string'; })
+          var icons = stArr.filter(function (s) { return typeof s === 'string'; })
             .map(function (s) {
-              var def = null;
-              for (var k = 0; k < STAMPS.length; k++) if (STAMPS[k].label === s) def = STAMPS[k];
-              return def ? def.icon + s : s;
-            }).join(' ');
-          cell.appendChild(stEl);
+              var def = findStampDef(s);
+              if (def && def.icon) return def.icon;
+              var chars = Array.from ? Array.from(s) : s.split('');
+              return chars[0] || '';
+            });
+          if (icons.length) {
+            var stEl = document.createElement('div');
+            stEl.className = 'cell-stamps';
+            stEl.textContent = icons.slice(0, 3).join('') + (icons.length > 3 ? '…' : '');
+            cell.appendChild(stEl);
+          }
         }
       } catch (e) { /* このマスは日付だけ表示して続行 */ }
 
@@ -758,30 +865,23 @@ var WEEK_JA = ['日', '月', '火', '水', '木', '金', '土'];
 function renderDayInfo() {
   if (!selected || selected.y !== cur.y || selected.m !== cur.m) {
     $('di-date').textContent = cur.y + '年' + cur.m + '月';
-    $('di-body').textContent = '日付をタップすると詳細が見られます';
-    $('di-stamp-btn').style.display = 'none';
-    return;
+    $('di-info').textContent = '日付をタップするとスタンプを押せます';
+  } else {
+    var w = WEEK_JA[new Date(selected.y, selected.m - 1, selected.d).getDay()];
+    $('di-date').textContent = selected.m + '/' + selected.d + '(' + w + ')のシフト入力';
+    var ym = ymKey(selected.y, selected.m);
+    var sh = normShift((state.shifts[ym] || {})[String(selected.d)]);
+    var parts = [];
+    if (sh) {
+      if (sh.label === UNKNOWN_LABEL) parts.push('不明(読み取れなかった日。紙のシフト表で確認)');
+      else parts.push(sh.label + (sh.time ? ' ' + sh.time : ''));
+      if (sh.memo) parts.push('📝 ' + sh.memo);
+    } else {
+      parts.push('予定なし');
+    }
+    $('di-info').textContent = parts.join(' / ');
   }
-  var w = WEEK_JA[new Date(selected.y, selected.m - 1, selected.d).getDay()];
-  $('di-date').textContent = selected.m + '/' + selected.d + '(' + w + ')';
-  var ym = ymKey(selected.y, selected.m);
-  var sh = normShift((state.shifts[ym] || {})[String(selected.d)]);
-  var st = (state.stamps[ym] || {})[String(selected.d)];
-  if (!Array.isArray(st)) st = [];
-  var parts = [];
-  if (sh) {
-    var txt = sh.label;
-    if (sh.time) txt += ' ' + sh.time;
-    if (sh.label === UNKNOWN_LABEL) txt = '不明(読み取れなかった日。紙のシフト表で確認してください)';
-    parts.push(txt);
-    if (sh.memo) parts.push('📝 ' + sh.memo);
-  }
-  if (st.length) parts.push('スタンプ: ' + st.join('・'));
-  if (!parts.length) parts.push('予定なし');
-  var body = $('di-body');
-  body.textContent = '';
-  parts.forEach(function (p) { addLine(body, p); });
-  $('di-stamp-btn').style.display = 'block';
+  renderStampChipRow();
 }
 
 /* 日付タップ = 詳細表示だけ。スタンプは「スタンプ」ボタンから(問題14) */
@@ -829,43 +929,57 @@ $('nav-import').addEventListener('click', function () {
 $('nav-settings').addEventListener('click', function () {
   $('user-name').value = state.settings.userName;
   renderTypeList();
+  renderStampDefList();
   $('backup-result').className = 'result-box';
   openSheet('settings');
 });
-$('di-stamp-btn').addEventListener('click', openStampSheet);
-
-/* ================= スタンプ ================= */
-function openStampSheet() {
-  if (!selected) return;
-  var w = WEEK_JA[new Date(selected.y, selected.m - 1, selected.d).getDay()];
-  $('stamp-title').textContent = selected.m + '/' + selected.d + '(' + w + ')のスタンプ';
-  var ym = ymKey(selected.y, selected.m);
-  var sh = normShift((state.shifts[ym] || {})[String(selected.d)]);
-  var info = '';
-  if (sh) {
-    info = 'この日のシフト: ' + sh.label + (sh.time ? ' ' + sh.time : '') + (sh.memo ? ' / 📝 ' + sh.memo : '');
-  } else {
-    info = 'この日のシフト: まだ入っていません';
+/* ================= スタンプ(下部のチップ横並び) ================= */
+function renderStampChipRow() {
+  var row = $('stamp-chip-row');
+  row.textContent = '';
+  var hasSel = selected && selected.y === cur.y && selected.m === cur.m;
+  var curStamps = [];
+  if (hasSel) {
+    var arr = (state.stamps[ymKey(selected.y, selected.m)] || {})[String(selected.d)];
+    if (Array.isArray(arr)) curStamps = arr;
   }
-  $('stamp-shift-info').textContent = info;
-  renderStampChips();
-  openSheet('stamp');
+  function addChip(label, icon, on) {
+    var b = document.createElement('button');
+    b.className = 'stamp-chip' + (on ? ' on' : '');
+    b.textContent = (icon ? icon + ' ' : '') + label;
+    b.addEventListener('click', function () {
+      if (!selected || selected.y !== cur.y || selected.m !== cur.m) {
+        toast('先に日付をタップしてください');
+        return;
+      }
+      toggleStamp(label);
+    });
+    row.appendChild(b);
+  }
+  state.stampDefs.forEach(function (s) {
+    addChip(s.label, s.icon, curStamps.indexOf(s.label) >= 0);
+  });
+  /* 定義から削除済みでも、この日に残っているスタンプは外せるようにチップを出す */
+  curStamps.forEach(function (s) {
+    if (typeof s === 'string' && !findStampDef(s)) addChip(s, '', true);
+  });
+  if (!row.childNodes.length) {
+    var hint = document.createElement('span');
+    hint.className = 'chip-hint';
+    hint.textContent = 'スタンプがありません(「編集」で追加できます)';
+    row.appendChild(hint);
+  }
 }
 
-function renderStampChips() {
-  var ym = ymKey(selected.y, selected.m);
-  var curStamps = (state.stamps[ym] || {})[String(selected.d)] || [];
-  if (!Array.isArray(curStamps)) curStamps = [];
-  var list = $('stamp-list');
-  list.textContent = '';
-  STAMPS.forEach(function (s) {
-    var b = document.createElement('button');
-    b.className = 'stamp-chip' + (curStamps.indexOf(s.label) >= 0 ? ' on' : '');
-    b.textContent = s.icon + ' ' + s.label;
-    b.addEventListener('click', function () { toggleStamp(s.label); });
-    list.appendChild(b);
-  });
-}
+/* チップ列の右端「編集」→ 設定シートのスタンプ編集欄へ */
+$('edit-stamps-btn').addEventListener('click', function () {
+  $('user-name').value = state.settings.userName;
+  renderTypeList();
+  renderStampDefList();
+  $('backup-result').className = 'result-box';
+  openSheet('settings');
+  $('stamp-def-list').scrollIntoView();
+});
 
 function toggleStamp(label) {
   var ym = ymKey(selected.y, selected.m);
@@ -880,8 +994,7 @@ function toggleStamp(label) {
   else delete state.stamps[ym][key];
   if (Object.keys(state.stamps[ym]).length === 0) delete state.stamps[ym];
   saveState();
-  renderStampChips();
-  render();
+  render(); /* render → renderDayInfo → renderStampChipRow でチップも更新される */
 }
 
 /* ================= AIへのお願い文 ================= */
@@ -917,12 +1030,22 @@ function buildPrompt(name) {
 '- 46306 のような大きな整数は Excel の日付のゴミです。シフトとして書かず、その日を unclear に入れてください\n' +
 '- 意味の分からない値の日も、勝手に推測せず unclear に入れてください\n' +
 '\n' +
+'【時刻だけの日の扱い(重要)】\n' +
+'- 上段がシフト名なしで時刻だけ(0〜1の小数、「8:30」「10時」などの表記)の日は、絶対に空欄扱いにしないでください\n' +
+'- そのような日は label を必ず「MT」にして、time にその時刻を入れてください\n' +
+'- その日の下段や同じ日の近くに会議名(「〜会議」「〜報告会」「〜勉強会」など)があれば、memo に入れてください\n' +
+'\n' +
 '【そのほかのルール】\n' +
-'- 空欄の日は shifts に入れない\n' +
+'- 表にあるのに空欄の日は、{ "label": "日勤" } として shifts に入れてください(時刻・メモは付けない)\n' +
+'- 空欄として扱ってよいのは、セルに本当に何も書かれていない日だけです。何かしら値がある日を落とすのは禁止。変換に迷ったら unclear に入れてください(勝手に省略しない)\n' +
+'- 表にその日自体が無い場合(月またぎで範囲外の日など)は shifts に入れないでください\n' +
 '- 画像が複数枚に分かれている場合は、全部を合わせて1つのコードにしてください\n' +
 '- シフト表が2つの月にまたがっている場合(例: 8/21〜9/20)は、月ごとに分けて2個のコードを返してください\n' +
+'- shifts のキー(日にち)は半角数字だけにしてください(例: "5"。"05" や "5日" にはしない)\n' +
+'- コードブロックの中にはコメントや説明文を書かず、正しい JSON だけを入れてください\n' +
+'- JSON の末尾に余分なカンマを付けないでください(「,」のすぐ後に「}」や「]」が来る書き方はエラーになります)\n' +
 '- コードの後に、必ず読み取り結果の要約を添えてください:\n' +
-'  「◯月・' + name + 'さんの行を読み取りました。出勤◯日・休み◯日。読み取れなかった日: ◯日・◯日。自信がない日: ◯日(「遅番」かも)」';
+'  「◯月・' + name + 'さんの行を読み取りました。出勤◯日(うち空欄→日勤 ◯日)・休み◯日。時刻だけだった日: ◯日(MTとして扱いました)。読み取れなかった日: ◯日・◯日。自信がない日: ◯日(「遅番」かも)」';
 }
 
 $('copy-prompt').addEventListener('click', function () {
@@ -936,7 +1059,7 @@ $('copy-prompt').addEventListener('click', function () {
     $('user-name').focus();
     return;
   }
-  copyText(buildPrompt(name), 'お願い文をコピーしました。Claudeにシフト表と一緒に送ってください');
+  copyText(buildPrompt(name), 'お願い文をコピーしました。AI(Claude・Gemini など)にシフト表と一緒に送ってください');
 });
 
 /* ================= 取り込み ================= */
@@ -965,6 +1088,49 @@ function extractJsonBlocks(text) {
     }
   }
   return blocks;
+}
+
+/* JSON文字列リテラルの外にある「末尾カンマ」(, のすぐ後に } か ] が来るもの)だけを取り除く。
+   文字列の中の「, }」は数えないので、正常なJSONを壊さない */
+function stripTrailingCommas(text) {
+  var out = '', inStr = false, esc = false;
+  for (var i = 0; i < text.length; i++) {
+    var c = text.charAt(i);
+    if (inStr) {
+      out += c;
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
+      else if (c === '"') inStr = false;
+      continue;
+    }
+    if (c === '"') { inStr = true; out += c; continue; }
+    if (c === ',') {
+      /* 次の「空白でない文字」が } または ] なら、このカンマは余分なので捨てる */
+      var j = i + 1;
+      while (j < text.length && /\s/.test(text.charAt(j))) j++;
+      var nx = text.charAt(j);
+      if (nx === '}' || nx === ']') continue;
+    }
+    out += c;
+  }
+  return out;
+}
+
+/* 候補文字列を JSON として読む。まず素直に parse し、失敗したときだけ
+   末尾カンマを取り除いて1回だけ再挑戦する。戻り値 {obj, repaired} / 読めなければ null */
+function parseJsonBlock(text) {
+  try {
+    var o = JSON.parse(text);
+    if (o && typeof o === 'object') return { obj: o, repaired: false };
+    return null;
+  } catch (e) { /* 下の自動修復へ */ }
+  var fixed = stripTrailingCommas(text);
+  if (fixed === text) return null;
+  try {
+    var o2 = JSON.parse(fixed);
+    if (o2 && typeof o2 === 'object') return { obj: o2, repaired: true };
+  } catch (e2) { /* 直しても読めないものは諦める */ }
+  return null;
 }
 
 /* 1件ぶんの取り込み処理。結果は box に文字として追記。成功なら {ok:true, y, m} */
@@ -1116,16 +1282,17 @@ function importOne(data, box) {
 $('do-import').addEventListener('click', function () {
   var raw = $('import-text').value;
   if (!raw.trim()) {
-    showImportError('コードが貼られていません。Claude の返事のコードを貼り付けてください。');
+    showImportError('コードが貼られていません。AI の返事のコードを貼り付けてください。');
     return;
   }
   var blocks = extractJsonBlocks(raw);
   var parsed = [];
+  var repairedAny = false;
   blocks.forEach(function (b) {
-    try {
-      var o = JSON.parse(b);
-      if (o && typeof o === 'object') parsed.push(o);
-    } catch (e) { /* JSONとして読めない候補(要約文の {…} など)は無視 */ }
+    var res = parseJsonBlock(b); /* JSONとして読めない候補(要約文の {…} など)は null */
+    if (!res) return;
+    if (res.repaired) repairedAny = true;
+    parsed.push(res.obj);
   });
   var imports = parsed.filter(function (o) { return o.kind === 'shift-import'; });
 
@@ -1133,17 +1300,20 @@ $('do-import').addEventListener('click', function () {
     if (parsed.some(function (o) { return o.kind === 'shift-backup'; })) {
       showImportError('これはバックアップ用のテキストのようです。復元は「設定・バックアップ」の読み込み欄に貼ってください。');
     } else if (parsed.length > 0) {
-      showImportError('シフト用のコードではないようです。Claude が返した shift-import のコードを貼ってください。');
+      showImportError('シフト用のコードではないようです。AI が返した shift-import のコードを貼ってください。');
     } else if (blocks.length > 0) {
-      showImportError('コードが読み取れませんでした(途中で切れている可能性があります)。Claude の返事のうち、{ から } までを全部コピーして貼り直してください。');
+      showImportError('コードが読み取れませんでした(途中で切れている可能性があります)。AI の返事のうち、{ から } までを全部コピーして貼り直してください。');
     } else {
-      showImportError('コードが読み取れませんでした。Claude の返事のうち、{ から } までを全部コピーして貼り直してください。');
+      showImportError('コードが読み取れませんでした。AI の返事のうち、{ から } までを全部コピーして貼り直してください。');
     }
     return;
   }
 
   /* 月ごとに順番に取り込む(2個のコードにも対応。問題3) */
   var box = resetResult('import-result', false);
+  if (repairedAny) {
+    addLine(box, '🔧 コードの小さな書き間違い(末尾のカンマ)を自動で直して取り込みました');
+  }
   var okList = [];
   var hadError = false;
   imports.forEach(function (data) {
@@ -1188,6 +1358,123 @@ $('save-name').addEventListener('click', function () {
   toast(state.settings.userName ? '名前を保存しました: ' + state.settings.userName : '名前を空にしました');
 });
 
+/* ================= スタンプの編集 ================= */
+function renderStampDefList() {
+  var list = $('stamp-def-list');
+  list.textContent = '';
+  state.stampDefs.forEach(function (def, idx) {
+    var row = document.createElement('div');
+    row.className = 'stampdef-row';
+    var name = document.createElement('span');
+    name.className = 'sd-name';
+    name.textContent = (def.icon ? def.icon + ' ' : '') + def.label;
+    row.appendChild(name);
+    var ren = document.createElement('button');
+    ren.textContent = '名前変更';
+    ren.addEventListener('click', function () { renameStampDef(idx); });
+    row.appendChild(ren);
+    var del = document.createElement('button');
+    del.className = 'sd-del';
+    del.textContent = '削除';
+    del.addEventListener('click', function () { deleteStampDef(idx); });
+    row.appendChild(del);
+    list.appendChild(row);
+  });
+  if (!state.stampDefs.length) {
+    var hint = document.createElement('div');
+    hint.className = 'hint';
+    hint.textContent = 'スタンプがありません。「+ スタンプを追加」で作れます。';
+    list.appendChild(hint);
+  }
+}
+
+/* 空・重複をチェック。OKなら trim 済みの名前、ダメなら null(理由はトーストで知らせる) */
+function validStampName(input, ignoreIndex) {
+  if (input === null) return null; /* prompt のキャンセル */
+  var t = String(input).trim();
+  if (!t) { toast('名前が空です。登録しませんでした'); return null; }
+  for (var i = 0; i < state.stampDefs.length; i++) {
+    if (i !== ignoreIndex && state.stampDefs[i].label === t) {
+      toast('同じ名前のスタンプがすでにあります');
+      return null;
+    }
+  }
+  return t;
+}
+
+$('add-stamp').addEventListener('click', function () {
+  var t = validStampName(prompt('新しいスタンプの名前(絵文字を先頭に付けてもOK)'), -1);
+  if (t === null) return;
+  state.stampDefs.push({ label: t, icon: '' });
+  saveState();
+  renderStampDefList();
+  renderStampChipRow(); /* 下部のチップ列にもすぐ反映 */
+  toast('スタンプ「' + t + '」を追加しました');
+});
+
+function renameStampDef(idx) {
+  var def = state.stampDefs[idx];
+  var t = validStampName(prompt('スタンプの新しい名前(絵文字を先頭に付けてもOK)', def.label), idx);
+  if (t === null || t === def.label) return;
+  var count = countStampDays(def.label);
+  if (count > 0) {
+    var ok = confirm('「' + def.label + '」を「' + t + '」に変更します。\nすでに押してある ' + count + ' 日ぶんの予定も新しい名前になります。よろしいですか?');
+    if (!ok) return;
+  }
+  var old = def.label;
+  def.label = t;
+  /* 過去に押した日も一括で新しい名前に(同じ日に両方あった場合は1つにまとめる) */
+  Object.keys(state.stamps).forEach(function (ym) {
+    var mo = state.stamps[ym];
+    Object.keys(mo).forEach(function (dk) {
+      var arr = mo[dk];
+      if (!Array.isArray(arr) || arr.indexOf(old) < 0) return;
+      var out = [];
+      arr.forEach(function (s) {
+        var v = s === old ? t : s;
+        if (out.indexOf(v) < 0) out.push(v);
+      });
+      mo[dk] = out;
+    });
+  });
+  saveState();
+  renderStampDefList();
+  render();
+  toast('「' + old + '」を「' + t + '」に変更しました');
+}
+
+function deleteStampDef(idx) {
+  var def = state.stampDefs[idx];
+  var count = countStampDays(def.label);
+  var alsoClear = false;
+  if (count > 0) {
+    /* 1つ目: 削除するかどうか(キャンセル = 何もしない) */
+    if (!confirm('スタンプ「' + def.label + '」を削除します。\nすでに押してある日が ' + count + ' 日あります。\n\n「OK」= 削除に進む(次に、押してある日をどうするか選べます)\n「キャンセル」= やめる(何も変わりません)')) return;
+    /* 2つ目: 押してある日の扱い(どちらを選んでも削除は進む) */
+    alsoClear = confirm('「' + def.label + '」は削除します。押してある ' + count + ' 日ぶんの記録はどうしますか?\n\n「OK」= 日付側からも消す\n「キャンセル」= 日付には残す(カレンダーの表示は続きます)\n\n※ここでキャンセルを選んでも、スタンプの削除は取り消せません(やめる場合は1つ前の画面でキャンセルしてください)');
+  } else {
+    if (!confirm('スタンプ「' + def.label + '」を削除しますか?\n(このスタンプを押してある日はありません)')) return;
+  }
+  state.stampDefs.splice(idx, 1);
+  if (alsoClear) {
+    Object.keys(state.stamps).forEach(function (ym) {
+      var mo = state.stamps[ym];
+      Object.keys(mo).forEach(function (dk) {
+        var arr = mo[dk];
+        if (!Array.isArray(arr)) return;
+        var out = arr.filter(function (s) { return s !== def.label; });
+        if (out.length) mo[dk] = out;
+        else delete mo[dk];
+      });
+      if (Object.keys(mo).length === 0) delete state.stamps[ym];
+    });
+  }
+  saveState();
+  renderStampDefList();
+  render();
+  toast('スタンプ「' + def.label + '」を削除しました');
+}
+
 /* ================= バックアップ ================= */
 function showBackupResult(text, isError) {
   var box = resetResult('backup-result', isError);
@@ -1213,10 +1500,8 @@ $('backup-restore').addEventListener('click', function () {
   var blocks = extractJsonBlocks(raw);
   var parsed = [];
   blocks.forEach(function (b) {
-    try {
-      var o = JSON.parse(b);
-      if (o && typeof o === 'object') parsed.push(o);
-    } catch (e) {}
+    var res = parseJsonBlock(b);
+    if (res) parsed.push(res.obj);
   });
   var backup = null, hasImport = false;
   parsed.forEach(function (o) {
@@ -1247,9 +1532,10 @@ $('backup-restore').addEventListener('click', function () {
     });
     if (types.length) s.shiftTypes = migrateTypeColors(types);
   }
-  /* 壊れた日・月は捨てて残りだけ復元する(問題2) */
+  /* 壊れた日・月は捨てて残りだけ復元する(問題2)。stampDefs の無い旧バックアップは初期6種で補う */
   s.shifts = sanitizeShifts(d.shifts);
   s.stamps = sanitizeStamps(d.stamps);
+  s.stampDefs = sanitizeStampDefs(d.stampDefs);
   if (d.settings && typeof d.settings === 'object' && typeof d.settings.userName === 'string') {
     s.settings.userName = d.settings.userName;
   }
@@ -1258,6 +1544,7 @@ $('backup-restore').addEventListener('click', function () {
   $('backup-in').value = '';
   $('user-name').value = state.settings.userName;
   renderTypeList();
+  renderStampDefList();
   showBackupResult('✅ 復元しました。', false);
   render();
 });
@@ -1272,18 +1559,22 @@ $('reset-all').addEventListener('click', function () {
   $('user-name').value = '';
   $('backup-in').value = '';
   renderTypeList();
+  renderStampDefList();
   showBackupResult('全データを消去しました。最初の状態に戻っています。', false);
   render();
 });
 
 /* ================= 起動 ================= */
 (function init() {
-  selected = null;
+  /* 起動時は今日を選択した状態にする(下のシフト入力バーがすぐ使える) */
+  var t = new Date();
+  selected = { y: cur.y, m: cur.m, d: t.getDate() };
   render();
   /* 名前が未登録なら設定シートを自動で開いて入力を促す(問題8) */
   if (!state.settings.userName) {
     $('user-name').value = '';
     renderTypeList();
+    renderStampDefList();
     $('backup-result').className = 'result-box';
     openSheet('settings');
     $('user-name').focus();
