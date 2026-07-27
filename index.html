@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- shift-calendar build 2026-07-27-07 -->
+<!-- shift-calendar build 2026-07-28-03 -->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -9,13 +9,16 @@
 <title>シフトカレンダー</title>
 <style>
   :root {
-    --navy: #2b3990;
-    --navy-dark: #1f2a6e;
-    --sat: #1a6fc9;
-    --sun: #d43c3c;
-    --line: #d9d9d9;
-    --bg: #ffffff;
-    --dim: #b9b9c4;
+    /* クリーム色の紙のような配色(2026-07-27 デザイン調整。シフト名の文字色は変更していない) */
+    --navy: #3a4470;        /* ヘッダー: クリームに馴染む、少し落ち着いた紺 */
+    --navy-dark: #2b3355;
+    --sat: #2f6ba8;
+    --sun: #c0453f;
+    --line: #e5ded0;        /* 枠線: 細く淡いグレーベージュ */
+    --bg: #faf6ee;          /* 背景: クリーム色の紙 */
+    --cell-bg: #fffdf8;     /* マスの地色(背景よりわずかに明るい) */
+    --ink: #3a3630;         /* 文字: 真っ黒ではない濃いグレー */
+    --dim: #b6ae9e;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   /* 画面の高さにアプリを固定(dvh = アドレスバーの出入りに追従する高さ。古い端末は 100vh で代用) */
@@ -23,7 +26,7 @@
   body {
     font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
     background: var(--bg);
-    color: #222;
+    color: var(--ink);
     display: flex;
     flex-direction: column;
     overscroll-behavior: none;
@@ -99,10 +102,11 @@
   }
   .cell {
     position: relative;
+    background: var(--cell-bg);
     border-right: 1px solid var(--line);
     border-bottom: 1px solid var(--line);
     min-height: 44px;
-    padding: 2px 1px;
+    padding: 3px 2px 4px;   /* マス内に余白を持たせる */
     font-size: 11px;
     text-align: center;
     cursor: pointer;
@@ -124,33 +128,35 @@
   }
   .cell.sat .num { color: var(--sat); }
   .cell.sun .num { color: var(--sun); }
-  .cell.other { background: #fafafa; }
+  .cell.other { background: #f4efe3; }
   .cell.other .num { color: var(--dim); font-weight: normal; }
-  .cell.today { background: #fff9c4; }  /* 今日は淡い黄色でひと目で分かる */
+  /* 今日はクリーム背景に埋もれないよう、やや濃いめの黄色にする */
+  .cell.today { background: #ffef9f; }
   .cell.today .num { background: var(--navy); color: #fff; text-align: center; }
   .cell.selected { outline: 2px solid var(--navy); outline-offset: -2px; }
   /* シフト名はカレンダーの主役。文字数に応じて入る最大サイズにする(実測で調整) */
   .cell .shift {
     font-weight: 900;
-    font-size: 22px;
+    font-size: 22px;      /* 極太表示は維持(サイズ・太さは変更しない) */
     line-height: 1.25;   /* 太い書体の上下がはみ出して切れないよう余裕を持たせる */
     letter-spacing: -0.5px;
+    margin-top: auto;     /* 日付の数字との間にゆとりを作り、シフト名を中央寄りに置く */
+    margin-bottom: auto;
     -webkit-text-stroke: 0.3px currentColor;  /* 線を太らせてさらに濃く見せる */
-    margin-top: 1px;
     max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     flex-shrink: 0;   /* 縦に潰れて文字が切れるのを防ぐ */
+    /* 文字の背景に帯を敷いて視認性を上げる(帯の色は JS でシフト色の淡色を設定)。
+       横幅はマスいっぱいまで使えるよう、左右の余白は最小限にする */
+    border-radius: 4px;
+    padding: 0 2px;
+    box-sizing: border-box;
   }
-  .cell .shift.mid { font-size: 17px; letter-spacing: -1px; }    /* 3文字 */
-  .cell .shift.long { font-size: 13px; letter-spacing: -0.8px; } /* 4文字以上 */
-  /* 幅の狭い端末(iPhone SE 第1世代など)は、はみ出さないよう一段小さく */
-  @media (max-width: 360px) {
-    .cell .shift { font-size: 20px; }
-    .cell .shift.mid { font-size: 14px; }
-    .cell .shift.long { font-size: 11px; }
-  }
+  /* 3文字以上は横幅がぎりぎりなので、帯の左右余白を詰めて文字の場所を確保する */
+  .cell .shift.mid { font-size: 17px; letter-spacing: -1px; padding: 0 1px; }  /* 3文字 */
+  .cell .shift.long { font-size: 13px; letter-spacing: -0.8px; padding: 0; }   /* 4文字以上は余白なしで幅を確保 */
   .cell .time { font-size: 10px; line-height: 1.1; color: #666; flex-shrink: 0; }
   .cell .cell-stamps {
     position: absolute;
@@ -165,6 +171,33 @@
     pointer-events: none;   /* アイコンの上でも日付タップが効くように */
   }
   .cell .memo-dot { font-size: 8px; line-height: 1; color: #e08600; flex-shrink: 0; }
+  /* マス下部の運動予定(🚴回数・💪)。シフト名の表示を邪魔しない小さな1行 */
+  .cell .cell-ex {
+    font-size: 9px;
+    line-height: 1.05;
+    color: #6b6355;
+    letter-spacing: -0.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 100%;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  /* 幅の狭い端末(iPhone SE 第1世代など)は全体を一段小さくして、
+     運動予定の行がマスに入る高さを作る(問題42)。
+     ※ 上の .cell 系の指定を上書きするため、必ずそれらより後に置くこと */
+  @media (max-width: 360px) {
+    .cell { padding: 1px; }
+    .cell .shift { font-size: 18px; line-height: 1.1; }
+    .cell .shift.mid { font-size: 13px; }
+    .cell .shift.long { font-size: 10px; }
+    .cell .num { font-size: 10px; line-height: 12px; height: 12px; width: 14px; }
+    .cell .time { font-size: 8px; line-height: 1; }
+    .cell .memo-dot { font-size: 7px; }
+    .cell .cell-stamps { font-size: 8px; }
+    .cell .cell-ex { font-size: 7px; line-height: 1; margin-top: 0; }
+  }
 
   /* ===== シフト入力バー+スタンプチップ ===== */
   #di-bar {
@@ -190,7 +223,7 @@
     align-items: center;
     gap: 6px;
     padding: 8px;
-    background: #fff;
+    background: var(--cell-bg);
     border-bottom: 1px solid var(--line);
     flex-shrink: 0;
   }
@@ -205,7 +238,7 @@
   .chip-hint { font-size: 12px; color: #666; }
   #edit-stamps-btn {
     flex: 0 0 auto;
-    background: #f0f1f7;
+    background: #f1ece0;
     color: var(--navy);
     border: 1px solid var(--navy);
     border-radius: 8px;
@@ -219,7 +252,7 @@
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
     border-top: 1px solid var(--line);
-    background: #f6f6f8;
+    background: #f3ede1;
     flex-shrink: 0;
     padding-bottom: env(safe-area-inset-bottom);
   }
@@ -229,7 +262,7 @@
     padding: 10px 4px 8px;
     font-size: 12px;
     cursor: pointer;
-    color: #333;
+    color: var(--ink);
   }
   nav button .ico { display: block; font-size: 20px; margin-bottom: 2px; }
 
@@ -245,7 +278,7 @@
   .sheet {
     position: fixed;
     left: 0; right: 0; bottom: 0;
-    background: #fff;
+    background: var(--cell-bg);
     border-radius: 14px 14px 0 0;
     max-height: 88%;
     overflow-y: auto;
@@ -378,9 +411,58 @@
     cursor: pointer;
   }
   .stampdef-row button.sd-del { color: #b71c1c; border-color: #b71c1c; }
+  /* 並べ替えの取っ手(ここだけドラッグに反応する) */
+  .sd-handle {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    min-height: 40px;
+    font-size: 18px;
+    color: #a79f8d;
+    cursor: grab;
+    touch-action: none;      /* 取っ手の上ではブラウザのスクロールを渡さない */
+    user-select: none;
+  }
+  .stampdef-row button.sd-move {
+    padding: 0 6px;
+    min-height: 40px;
+    min-width: 32px;
+    font-size: 12px;
+    color: #6b6355;
+    border-color: #d8d0c0;
+  }
+  .stampdef-row button.sd-move:disabled { opacity: .35; }
+  /* つまんでいる行: 浮き上がって見せる */
+  .stampdef-row.sd-dragging {
+    position: relative;
+    z-index: 5;
+    opacity: .9;
+    box-shadow: 0 6px 14px rgba(0,0,0,.25);
+    background: var(--cell-bg);
+    border-radius: 8px;
+  }
+  /* 場所を空ける他の行はなめらかに動かす(つまんでいる行は指に追従させるので除く) */
+  .stampdef-row { transition: transform .12s ease; }
+  .stampdef-row.sd-dragging { transition: none; }
 
   /* ===== 運動予定 ===== */
-  .ex-month { font-size: 14px; color: #666; margin-bottom: 8px; }
+  .ex-month-bar { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 8px; }
+  .ex-month { font-size: 15px; font-weight: bold; color: var(--ink); min-width: 7em; text-align: center; }
+  .ex-nav-btn {
+    background: var(--cell-bg);
+    border: 1px solid #cfc7b5;
+    color: var(--navy);
+    border-radius: 8px;
+    min-width: 44px;
+    min-height: 40px;
+    font-size: 15px;
+    cursor: pointer;
+  }
+  /* 今日の行はひと目で分かるようにする(問題45) */
+  .ex-row.ex-row-today { background: #fff9e0; border-left: 3px solid var(--navy); padding-left: 6px; }
+  .ex-row.ex-row-today .ex-date::after { content: ' 今日'; font-size: 11px; color: var(--navy); }
   .ex-count-box {
     background: #eef3ff;
     border: 1px solid #b9c6ee;
@@ -392,6 +474,21 @@
   .ex-count-line { font-size: 14px; margin: 3px 0; }
   .ex-count-box.achieved #ex-feel-count { color: #b8860b; font-weight: bold; }
   .ex-feel-msg { font-size: 13px; color: #b8860b; font-weight: bold; margin-top: 2px; min-height: 1.2em; }
+  /* 休んだ記録は控えめに(責める見た目にしない)。ただし読める濃さは確保する */
+  .ex-rest-note { font-size: 11px; color: #6f6a5c; font-weight: normal; }
+  /* 予定の回数に収まらない記録のお知らせ(事実だけを穏やかに伝える) */
+  .ex-orphan-note { display: none; }
+  .ex-orphan-note.show {
+    display: block;
+    background: #fff6e0;
+    border: 1px solid #eccd85;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #6b5a30;
+    margin-bottom: 8px;
+  }
   @keyframes ex-flash {
     0% { background-color: #fff7dc; }
     35% { background-color: #ffe58a; }
@@ -399,34 +496,145 @@
   }
   .ex-count-box.flash { animation: ex-flash .6s ease; }
   .ex-muscle-line { margin-bottom: 10px; }
-  #ex-list { max-height: 52vh; overflow-y: auto; }
-  .ex-row { border-bottom: 1px solid var(--line); padding: 8px 2px; }
+  #ex-list { max-height: 62vh; overflow-y: auto; }
+  .ex-row { border-bottom: 1px solid var(--line); padding: 5px 2px; }
   .ex-row.ex-row-off { background: #f2f2f2; }
-  .ex-row-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; gap: 6px; }
+  .ex-row-head { display: flex; align-items: center; font-size: 13px; gap: 6px; flex-wrap: nowrap; }
+  .ex-row-head .ex-feel-tag { margin-left: auto; }
   .ex-date { font-weight: bold; white-space: nowrap; }
   .ex-shift-label { font-size: 12px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ex-row-body { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
+  .ex-row-body { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }
   .ex-feel-tag { font-size: 13px; font-weight: bold; color: #1a6fc9; }
   .ex-feel-tag.ex-tag-gray { color: #999; font-weight: normal; }
+  /* 休館ボタンは視覚的ノイズにならないよう控えめに。ただし当たり判定は40px確保 */
   .ex-closure-btn {
     flex-shrink: 0;
     font-size: 11px;
-    background: #fff;
-    border: 1px solid #999;
-    color: #666;
+    background: transparent;
+    border: 1px solid #d8d0c0;
+    color: #948c7d;
     border-radius: 6px;
-    padding: 5px 8px;
+    padding: 0 8px;
+    min-height: 40px;
     cursor: pointer;
   }
-  .ex-closure-btn.on { background: #333; color: #fff; border-color: #333; }
+  .ex-closure-btn.on { background: #ebe6da; color: #6b6355; border-color: #bdb4a2; }
   .ex-muscle-badge {
-    margin-top: 5px;
-    font-size: 11px;
+    margin-top: 3px;
+    font-size: 10px;
     background: #ffe9d6;
     color: #a34700;
     border-radius: 6px;
-    padding: 4px 6px;
-    display: inline-block;
+    padding: 3px 6px;
+    display: block;
+    white-space: nowrap;   /* 1行に収めて行の高さを抑える */
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ===== 実施の記録(済 / 休む) ===== */
+  .rec-group { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; margin-top: 4px; }
+  .rec-label { font-size: 11px; color: #6b6355; flex: 0 0 auto; margin-left: 1px; }
+  .rec-btn {
+    position: relative;
+    flex: 0 0 auto;
+    font-size: 12px;
+    font-weight: bold;
+    background: var(--cell-bg);
+    color: var(--navy);
+    border: 1.5px solid #c9c1b0;
+    border-radius: 8px;
+    padding: 0 8px;
+    min-height: 40px;   /* 指で押しやすい大きさを確保 */
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease, color .15s ease;
+  }
+  .rec-btn.is-done { background: #e8f5e9; border-color: #2e7d32; color: #1b5e20; }
+  .rec-btn.is-rest { background: #eef0fb; border-color: #6b74b8; color: #3f4790; }
+  /* 🌙(休み)は控えめに小さく。ただしタップ領域は40px以上を確保する */
+  .rec-btn-moon {
+    font-size: 13px;
+    font-weight: normal;
+    padding: 0 6px;
+    min-width: 40px;
+    border-style: dashed;
+    border-color: #d3cbb9;
+    opacity: .85;
+  }
+  .rec-btn-moon.is-rest { border-style: solid; opacity: 1; }
+  /* 予定外に行った記録(+追加)。前向きな操作なので済と同系の色 */
+  .rec-btn-add {
+    font-size: 12px;
+    font-weight: normal;
+    color: #2e7d32;
+    border-color: #a5cfa8;
+    border-style: dashed;
+    padding: 0 6px;
+    min-width: 40px;
+  }
+  .rec-btn-extra { font-size: 11px; padding: 0 8px; }
+
+  /* 済: 小さい状態から「ぐわっと」大きく育って現れ、最後に等倍へ落ち着く */
+  @keyframes rec-stamp-pop {
+    0%   { transform: scale(.25) rotate(-16deg); opacity: .35; }
+    30%  { transform: scale(.85) rotate(-6deg);  opacity: 1; }
+    55%  { transform: scale(1.4) rotate(5deg); }
+    75%  { transform: scale(1.12) rotate(-2deg); }
+    90%  { transform: scale(.98) rotate(1deg); }
+    100% { transform: scale(1) rotate(0); }
+  }
+  .rec-btn.pop { animation: rec-stamp-pop .65s cubic-bezier(.22,.8,.3,1.2); }
+
+  /* 済: 周囲にパッと弾ける粒(CSSのみ。疑似要素2つ+リングで簡易パーティクル) */
+  @keyframes rec-spark-ring {
+    0%   { opacity: .9; transform: scale(.4); border-width: 6px; }
+    100% { opacity: 0;  transform: scale(1.9); border-width: 0; }
+  }
+  .rec-btn.pop::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 12px;
+    border: 3px solid #66bb6a;
+    /* 文字が大きく育ちきるタイミング(0.25秒あたり)で弾ける */
+    animation: rec-spark-ring .4s ease-out .25s forwards;
+    opacity: 0;
+    pointer-events: none;
+  }
+  @keyframes rec-spark-dots {
+    0%   { opacity: 1; transform: scale(.2); }
+    100% { opacity: 0; transform: scale(1.6); }
+  }
+  .rec-btn.pop::before {
+    content: '';
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 6px; height: 6px;
+    margin: -3px 0 0 -3px;
+    border-radius: 50%;
+    background: transparent;
+    /* 6方向に飛ぶ粒を box-shadow で表現(画像素材なし) */
+    box-shadow:
+      0 -22px 0 0 #43a047, 19px -11px 0 0 #7cb342, 19px 11px 0 0 #43a047,
+      0 22px 0 0 #7cb342, -19px 11px 0 0 #43a047, -19px -11px 0 0 #7cb342;
+    animation: rec-spark-dots .4s ease-out .25s forwards;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* 休む(🌙): ふわっと優しく浮かび上がり、淡く光る穏やかな演出 */
+  @keyframes rec-moon-rise {
+    0%   { opacity: .25; transform: translateY(7px) scale(.94); }
+    55%  { opacity: 1;   transform: translateY(-2px) scale(1.04); }
+    100% { opacity: 1;   transform: translateY(0) scale(1); }
+  }
+  @keyframes rec-moon-glow {
+    0%   { box-shadow: 0 0 0 0 rgba(126,134,201,.55); }
+    60%  { box-shadow: 0 0 14px 6px rgba(126,134,201,.30); }
+    100% { box-shadow: 0 0 0 0 rgba(126,134,201,0); }
+  }
+  .rec-btn.moon {
+    animation: rec-moon-rise .75s ease-out, rec-moon-glow 1.15s ease-out;
   }
 
   /* トースト */
@@ -498,16 +706,22 @@
 <div class="sheet" id="sheet-exercise">
   <button class="close-x" data-close="exercise">✕</button>
   <h2>💪 運動予定</h2>
-  <div class="ex-month" id="ex-month">--</div>
+  <div class="ex-month-bar">
+    <button class="ex-nav-btn" id="ex-prev" aria-label="前の月">◀</button>
+    <span class="ex-month" id="ex-month">--</span>
+    <button class="ex-nav-btn" id="ex-next" aria-label="次の月">▶</button>
+  </div>
 
   <div class="ex-count-box" id="ex-feel-box">
-    <div class="ex-count-line">フィールサイクル: <span id="ex-feel-count">0 / 30回</span></div>
+    <div class="ex-count-line">フィールサイクル: <span id="ex-feel-count">予定 0回 / 済 0回</span></div>
     <div class="ex-feel-msg" id="ex-feel-msg"></div>
+    <div class="ex-rest-note" id="ex-feel-rest"></div>
   </div>
-  <div class="ex-count-line ex-muscle-line">筋トレ: <span id="ex-muscle-count">0</span>回</div>
+  <div class="ex-count-line ex-muscle-line">筋トレ: <span id="ex-muscle-count">予定 0回 / 済 0回</span> <span class="ex-rest-note" id="ex-muscle-rest"></span></div>
+  <div class="ex-orphan-note" id="ex-orphan-note"></div>
 
   <div id="ex-list"></div>
-  <div class="hint">休館日は金曜以外の日に「休館にする」ボタンで設定できます。筋トレ予定は2日休んで3日目、希休・半9の日は次の日以降にずれます。</div>
+  <div class="hint">「記録」を押すたびに 済 → 🌙休み → 未記録 と切り替わります。</div>
 </div>
 
 <!-- ===== 設定シート ===== -->
@@ -602,7 +816,9 @@ function defaultState() {
        confirmedMonths = 「その月は最後まで計算し終えた」ことを示す確定済み月のリスト。
        muscle[月] にキーがあるだけでは「確定済み」と判定しない(繰り越しで1件だけこぼれた
        月を誤って確定扱いするバグを防ぐため。2026-07-27 修正) */
-    exercise: { closureDays: {}, muscle: {}, muscleAnchor: null, confirmedMonths: [] }
+    /* records = 実施の記録。月→日→{ feel: ["done"|"rest"|null,...], muscle: "done"|"rest"|null }
+       フィールサイクルは予定回数ぶんの配列で1回ずつ独立に記録できる(2026-07-27 追加) */
+    exercise: { closureDays: {}, muscle: {}, muscleAnchor: null, confirmedMonths: [], records: {} }
   };
 }
 
@@ -727,7 +943,7 @@ function findStampDef(label) {
 
 /* 運動予定(exercise)を洗浄。壊れた形は初期値(空)に戻す(問題2と同じ二段構えの入口洗浄) */
 function sanitizeExercise(src) {
-  var out = { closureDays: {}, muscle: {}, muscleAnchor: null, confirmedMonths: [] };
+  var out = { closureDays: {}, muscle: {}, muscleAnchor: null, confirmedMonths: [], records: {} };
   if (!src || typeof src !== 'object' || Array.isArray(src)) return out;
   function sanitizeDayMap(v) {
     var o = {};
@@ -767,7 +983,113 @@ function sanitizeExercise(src) {
       }
     });
   }
+  /* records の洗浄: 月→日→{ feel:[...], muscle:... }。値は "done"/"rest" だけを認める */
+  var recSrc = src.records;
+  if (recSrc && typeof recSrc === 'object' && !Array.isArray(recSrc)) {
+    Object.keys(recSrc).forEach(function (ym) {
+      if (!/^\d{4}-\d{2}$/.test(ym)) return;
+      var mo = recSrc[ym];
+      if (!mo || typeof mo !== 'object' || Array.isArray(mo)) return;
+      var y = parseInt(ym.slice(0, 4), 10);
+      var mm = parseInt(ym.slice(5, 7), 10);
+      if (!(mm >= 1 && mm <= 12)) return;
+      var dim = daysInMonth(y, mm);
+      var cleanMo = {};
+      Object.keys(mo).forEach(function (dk) {
+        if (!/^\d{1,2}$/.test(dk)) return;
+        var n = parseInt(dk, 10);
+        if (n < 1 || n > dim) return;
+        var rec = mo[dk];
+        if (!rec || typeof rec !== 'object' || Array.isArray(rec)) return;
+        var clean = {};
+        if (Array.isArray(rec.feel)) {
+          var feel = rec.feel.slice(0, 10).map(function (v) {
+            return (v === 'done' || v === 'rest') ? v : null;
+          });
+          while (feel.length && feel[feel.length - 1] === null) feel.pop(); /* 末尾の空きは詰める */
+          if (feel.length) clean.feel = feel;
+        }
+        if (rec.muscle === 'done' || rec.muscle === 'rest') clean.muscle = rec.muscle;
+        /* extra = 予定外に行った回数(2026-07-28 追加)。0〜20の整数だけ認める。
+           このキーが無い旧データを読んでも壊れない(単に追加0回として扱う) */
+        var ex = rec.extra;
+        if (typeof ex === 'number' && isFinite(ex)) {
+          ex = Math.floor(ex);
+          if (ex > 0) clean.extra = Math.min(ex, 20);
+        }
+        if (clean.feel || clean.muscle || clean.extra) cleanMo[String(n)] = clean;
+      });
+      if (Object.keys(cleanMo).length) out.records[ym] = cleanMo;
+    });
+  }
   return out;
+}
+
+/* ===== 実施の記録(済 / 休む)のヘルパー =====
+   状態は "done"(済)/ "rest"(休む)/ null(未記録)の3つ。
+   「休む」は自分で選んだ前向きな選択として扱い、責める表現は使わない */
+function getDayRecord(ym, d) {
+  var mo = state.exercise.records[ym];
+  if (!mo) return null;
+  return mo[String(d)] || null;
+}
+function getFeelState(ym, d, index) {
+  var rec = getDayRecord(ym, d);
+  if (!rec || !Array.isArray(rec.feel)) return null;
+  var v = rec.feel[index];
+  return (v === 'done' || v === 'rest') ? v : null;
+}
+function getMuscleState(ym, d) {
+  var rec = getDayRecord(ym, d);
+  return rec && (rec.muscle === 'done' || rec.muscle === 'rest') ? rec.muscle : null;
+}
+
+/* 予定外に行った回数(2026-07-28 追加)。予定が無い日でも記録できる */
+function getExtraCount(ym, d) {
+  var rec = getDayRecord(ym, d);
+  return rec && typeof rec.extra === 'number' && rec.extra > 0 ? rec.extra : 0;
+}
+function setExtraCount(ym, d, n) {
+  if (n < 0) n = 0;
+  if (n > 20) n = 20;
+  if (!state.exercise.records[ym]) state.exercise.records[ym] = {};
+  var mo = state.exercise.records[ym];
+  var key = String(d);
+  if (!mo[key]) mo[key] = {};
+  var rec = mo[key];
+  if (n > 0) rec.extra = n; else delete rec.extra;
+  if (!rec.feel && !rec.muscle && !rec.extra) delete mo[key];
+  if (!Object.keys(mo).length) delete state.exercise.records[ym];
+  saveState();
+}
+/* 同じ状態をもう一度選んだら取り消し(未記録に戻す) */
+function setFeelState(ym, d, index, next) {
+  if (!state.exercise.records[ym]) state.exercise.records[ym] = {};
+  var mo = state.exercise.records[ym];
+  var key = String(d);
+  if (!mo[key]) mo[key] = {};
+  var rec = mo[key];
+  if (!Array.isArray(rec.feel)) rec.feel = [];
+  while (rec.feel.length <= index) rec.feel.push(null);
+  /* next が null なら未記録に戻す。同じ値をもう一度指定したときも未記録に戻す */
+  rec.feel[index] = (next === null || rec.feel[index] === next) ? null : next;
+  while (rec.feel.length && rec.feel[rec.feel.length - 1] === null) rec.feel.pop();
+  if (!rec.feel.length) delete rec.feel;
+  if (!rec.feel && !rec.muscle) delete mo[key];
+  if (!Object.keys(mo).length) delete state.exercise.records[ym];
+  saveState();
+}
+function setMuscleState(ym, d, next) {
+  if (!state.exercise.records[ym]) state.exercise.records[ym] = {};
+  var mo = state.exercise.records[ym];
+  var key = String(d);
+  if (!mo[key]) mo[key] = {};
+  var rec = mo[key];
+  if (next === null || rec.muscle === next) delete rec.muscle;  /* null = 未記録に戻す */
+  else rec.muscle = next;
+  if (!rec.feel && !rec.muscle) delete mo[key];
+  if (!Object.keys(mo).length) delete state.exercise.records[ym];
+  saveState();
 }
 
 /* そのラベルのスタンプが押されている日数を数える */
@@ -844,6 +1166,23 @@ function ensureType(label) {
   return true;
 }
 
+/* シフト色から「白に寄せた淡色の帯」を作る。文字色はそのままで背景だけ薄く色づける。
+   不透明色にしているので、今日の黄色マスや前後月のマスでも帯の上の読みやすさが一定になる */
+function bandColor(hex, mix) {
+  if (typeof hex !== 'string') return null;
+  var h = hex.trim();
+  if (/^#[0-9a-fA-F]{3}$/.test(h)) {          /* #333 のような3桁も受け付ける */
+    h = '#' + h[1] + h[1] + h[2] + h[2] + h[3] + h[3];
+  }
+  if (!/^#[0-9a-fA-F]{6}$/.test(h)) return null;
+  var base = [255, 253, 248];  /* --cell-bg #fffdf8(クリーム白) */
+  var r = parseInt(h.slice(1, 3), 16);
+  var g = parseInt(h.slice(3, 5), 16);
+  var b = parseInt(h.slice(5, 7), 16);
+  function mixc(c, i) { return Math.round(c * mix + base[i] * (1 - mix)); }
+  return 'rgb(' + mixc(r, 0) + ',' + mixc(g, 1) + ',' + mixc(b, 2) + ')';
+}
+
 function typeColor(label) {
   if (label === UNKNOWN_LABEL) return UNKNOWN_COLOR;
   var t = findType(label);
@@ -880,6 +1219,101 @@ function copyText(text, okMsg) {
   }
 }
 
+/* カレンダーのマス下部に出す運動予定の1行を作る。予定が無ければ null
+   ・フィールサイクル: 「🚴2」のように予定回数を出す(0回の日は出さない)
+   ・筋トレ予定日: 「💪」
+   ・記録済みなら状態を添える(全部済=✓ / 休むを含む=🌙) */
+/* マスの幅に収まる中で「いちばん言葉が多い」書き方を選ぶ。
+   候補は「言葉つき」から順に並べ、収まらなければ短い書き方へ落とす */
+var exTextProbe = null, exTextCache = {};
+function textFitsWidth(text, maxW) {
+  var key = maxW + '|' + text;
+  if (exTextCache.hasOwnProperty(key)) return exTextCache[key];
+  if (!exTextProbe) {
+    exTextProbe = document.createElement('span');
+    exTextProbe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;' +
+      'font-size:9px;letter-spacing:-0.5px;left:-9999px;top:0;';
+    document.body.appendChild(exTextProbe);
+  }
+  exTextProbe.textContent = text;
+  var ok = exTextProbe.getBoundingClientRect().width <= maxW;
+  exTextCache[key] = ok;
+  return ok;
+}
+function pickFitting(cands, maxW) {
+  for (var i = 0; i < cands.length; i++) {
+    if (textFitsWidth(cands[i], maxW)) return cands[i];
+  }
+  return cands[cands.length - 1];
+}
+
+function buildCellExerciseLine(ym, d, shEntry, maxW) {
+  var closure = state.exercise.closureDays[ym] || [];
+  var ds = dateStrOf(cur.y, cur.m, d);
+  var res = getFeelcycleCount(ds, shEntry, closure.indexOf(String(d)) >= 0);
+
+  var extraN = getExtraCount(ym, d);
+  var feelMark = '', feelMarkShort = '', hasFeel = res.count > 0 || extraN > 0;
+  if (hasFeel) {
+    var doneN = 0, restN = 0;
+    for (var i = 0; i < res.count; i++) {
+      var st = getFeelState(ym, d, i);
+      if (st === 'done') doneN++;
+      else if (st === 'rest') restN++;
+    }
+    doneN += extraN;   /* 予定外に行った回数も「済」として数える */
+    if (doneN > 0) { feelMark += '✓' + doneN; feelMarkShort += '✓'; }
+    if (restN > 0) { feelMark += '🌙'; feelMarkShort += '🌙'; }
+  }
+  var muscleDays = state.exercise.muscle[ym] || [];
+  var hasMuscle = muscleDays.indexOf(String(d)) >= 0;
+  var mMark = '';
+  if (hasMuscle) {
+    var ms = getMuscleState(ym, d);
+    mMark = ms === 'done' ? '✓' : (ms === 'rest' ? '🌙' : '');
+  }
+  if (!hasFeel && !hasMuscle) return null;
+
+  /* 「ジム」= フィールサイクル(呼び名が長いので略)、「筋トレ」= 筋トレ予定。
+     予定外に行った回数は予定回数に足して表示する(予定0回の日でも「🚴ジム1」と出る) */
+  var n = res.count + extraN, cands;
+  if (hasFeel && hasMuscle) {
+    cands = [
+      '🚴ジム' + n + feelMark + ' 💪筋トレ' + mMark,
+      'ジム' + n + feelMark + ' 筋トレ' + mMark,
+      'ジム' + n + feelMark + ' 筋' + mMark,
+      '🚴' + n + feelMark + ' 💪' + mMark,
+      '🚴' + n + feelMark + '💪' + mMark,
+      '🚴' + n + feelMarkShort + '💪' + mMark,
+      '🚴' + feelMarkShort + '💪' + mMark,   /* 回数を落として記録の印を優先 */
+      '🚴💪'                                  /* 最後の受け皿(必ず収まる短さ) */
+    ];
+  } else if (hasFeel) {
+    cands = [
+      '🚴ジム' + n + feelMark,
+      'ジム' + n + feelMark,
+      '🚴' + n + feelMark,
+      '🚴' + n + feelMarkShort,
+      '🚴' + n
+    ];
+  } else {
+    cands = [
+      '💪筋トレ' + mMark,
+      '筋トレ' + mMark,
+      '💪筋' + mMark,
+      '💪' + mMark,
+      '💪'
+    ];
+  }
+  var el = document.createElement('div');
+  el.className = 'cell-ex';
+  el.textContent = pickFitting(cands, maxW - 1);  /* 1px の余裕を見て切れを防ぐ */
+  return el;
+}
+
+/* 実施記録のボタンを押した直後だけ true。運動予定の一覧の作り直しを1回だけ見送る */
+var skipExerciseRerender = false;
+
 /* ================= カレンダー描画 ================= */
 var now = new Date();
 var cur = { y: now.getFullYear(), m: now.getMonth() + 1 };
@@ -900,7 +1334,16 @@ function render() {
 
   var today = new Date();
   var tY = today.getFullYear(), tM = today.getMonth() + 1, tD = today.getDate();
+  /* マス1個の内側の幅(運動予定の言葉が収まるかの判定に使う) */
+  var cellInnerW = Math.max(20, Math.floor(grid.clientWidth / 7) - 6);
   var ym = ymKey(cur.y, cur.m);
+  /* 運動予定タブを開いていなくてもカレンダーに筋トレ予定を出せるよう、ここでも計算しておく
+     (基準日が未設定のときは何もしない。確定済みの月は再計算されない) */
+  try {
+    if (state.exercise.muscleAnchor || Object.keys(state.exercise.muscle).length) {
+      ensureMuscleScheduleUpTo(ym);
+    }
+  } catch (e) { /* 失敗してもカレンダー描画は続ける */ }
   var monthShifts = state.shifts[ym] || {};
   var monthStamps = state.stamps[ym] || {};
 
@@ -932,6 +1375,7 @@ function render() {
       /* 前月・翌月のグレーの日をタップ → その月へ移動して選択(問題15) */
       (function (d, isPrev) {
         cell.addEventListener('click', function () {
+          if (justSwiped()) return; /* スワイプ直後の誤爆を防ぐ */
           if (isPrev) { cur.m--; if (cur.m < 1) { cur.m = 12; cur.y--; } }
           else        { cur.m++; if (cur.m > 12) { cur.m = 1; cur.y++; } }
           selected = { y: cur.y, m: cur.m, d: d };
@@ -953,15 +1397,22 @@ function render() {
           var labelLen = (Array.from ? Array.from(sh.label) : sh.label.split('')).length;
           shiftEl.className = 'shift' + (labelLen >= 4 ? ' long' : (labelLen === 3 ? ' mid' : ''));
           shiftEl.textContent = sh.label === UNKNOWN_LABEL ? '?' : sh.label;
-          shiftEl.style.color = typeColor(sh.label);
+          var shColor = typeColor(sh.label);
+          shiftEl.style.color = shColor;
+          /* 「不明」(灰色)以外は、同系色の淡い帯を敷いて視認性を上げる */
+          if (sh.label !== UNKNOWN_LABEL) {
+            var band = bandColor(shColor, 0.10);
+            if (band) shiftEl.style.background = band;
+          }
           cell.appendChild(shiftEl);
+          /* 時刻とメモ印は1行にまとめる(運動予定の行を出す高さを確保するため。
+             メモの全文は従来どおり日付タップで読める) */
           if (sh.time) {
             var timeEl = document.createElement('div');
             timeEl.className = 'time';
-            timeEl.textContent = sh.time;
+            timeEl.textContent = sh.time + (sh.memo ? ' ●' : '');
             cell.appendChild(timeEl);
-          }
-          if (sh.memo) {
+          } else if (sh.memo) {
             var dot = document.createElement('div');
             dot.className = 'memo-dot';
             dot.textContent = '●メモ';
@@ -973,7 +1424,17 @@ function render() {
            絵文字の無いスタンプは名前の1文字目で代用 */
         var stArr = monthStamps[String(dayNum)];
         if (Array.isArray(stArr) && stArr.length) {
+          /* 表示は3個までなので、設定で並べ替えた「優先順(stampDefs の並び)」の上位から選ぶ。
+             定義に無いスタンプ(削除済み)は最後に回す。押してある記録そのものは変えない */
+          var order = {};
+          state.stampDefs.forEach(function (def, i) { order[def.label] = i; });
           var icons = stArr.filter(function (s) { return typeof s === 'string'; })
+            .slice()
+            .sort(function (a, b) {
+              var ia = order.hasOwnProperty(a) ? order[a] : 9999;
+              var ib = order.hasOwnProperty(b) ? order[b] : 9999;
+              return ia - ib;
+            })
             .map(function (s) {
               var def = findStampDef(s);
               if (def && def.icon) return def.icon;
@@ -987,18 +1448,27 @@ function render() {
             cell.appendChild(stEl);
           }
         }
+
+        /* 運動予定をマス下部に小さく1行で表示(🚴回数・💪)。
+           記録済みなら状態も添える(済=✓ / 休む=🌙)。シフト名の表示には影響させない */
+        var exLine = buildCellExerciseLine(ym, dayNum, sh, cellInnerW);
+        if (exLine) cell.appendChild(exLine);
       } catch (e) { /* このマスは日付だけ表示して続行 */ }
 
       (function (d) {
-        cell.addEventListener('click', function () { selectDay(d); });
+        cell.addEventListener('click', function () {
+          if (justSwiped()) return; /* スワイプ直後の誤爆を防ぐ */
+          selectDay(d);
+        });
       })(dayNum);
     }
     grid.appendChild(cell);
   }
 
   renderDayInfo();
-  /* 運動予定シートが開いていれば、月移動に連動して中身も更新する(表示中の月を共有) */
-  if ($('sheet-exercise').classList.contains('open')) renderExercise();
+  /* 運動予定シートが開いていれば、月移動に連動して中身も更新する(表示中の月を共有)。
+     記録ボタンを押した直後だけは一覧を作り直さない(アニメーションを消さないため) */
+  if (!skipExerciseRerender && $('sheet-exercise').classList.contains('open')) renderExercise();
 }
 
 var WEEK_JA = ['日', '月', '火', '水', '木', '金', '土'];
@@ -1032,14 +1502,56 @@ function selectDay(d) {
 }
 
 /* ================= 月移動 ================= */
-$('prev').addEventListener('click', function () {
+/* スワイプで月を移動した直後の時刻。直後の click(日付選択)を無視するために使う */
+var lastSwipeAt = 0;
+function justSwiped() { return Date.now() - lastSwipeAt < 400; }
+
+function goPrevMonth() {
   cur.m--; if (cur.m < 1) { cur.m = 12; cur.y--; }
   render();
-});
-$('next').addEventListener('click', function () {
+}
+function goNextMonth() {
   cur.m++; if (cur.m > 12) { cur.m = 1; cur.y++; }
   render();
-});
+}
+$('prev').addEventListener('click', goPrevMonth);
+$('next').addEventListener('click', goNextMonth);
+
+/* カレンダーを左右にスワイプして月を移動(2026-07-27 追加)。
+   左スワイプ(指を右→左)=翌月、右スワイプ(指を左→右)=前月。
+   本のページをめくる感覚・iOSカレンダーと同じ向き。
+   縦スクロールを邪魔しないよう preventDefault は呼ばず、touchend の座標差だけで判定する */
+(function enableSwipe() {
+  var SWIPE_MIN_X = 50;   /* この距離以上動いたときだけ月移動 */
+  var startX = null, startY = null, multiTouch = false;
+  var grid = $('grid');
+
+  grid.addEventListener('touchstart', function (ev) {
+    if (ev.touches.length !== 1) { multiTouch = true; return; }
+    multiTouch = false;
+    startX = ev.touches[0].clientX;
+    startY = ev.touches[0].clientY;
+  }, { passive: true });
+
+  grid.addEventListener('touchend', function (ev) {
+    if (multiTouch || startX === null) { startX = startY = null; return; }
+    var t = ev.changedTouches && ev.changedTouches[0];
+    if (!t) { startX = startY = null; return; }
+    var dx = t.clientX - startX;
+    var dy = t.clientY - startY;
+    startX = startY = null;
+    /* 横移動が十分大きく、かつ縦移動より大きいときだけ月移動(縦スクロールの誤爆防止)。
+       指をほとんど動かさないタップ(dx が小さい)では何もしないので、日付タップは今までどおり働く */
+    if (Math.abs(dx) < SWIPE_MIN_X || Math.abs(dx) <= Math.abs(dy)) return;
+    /* スワイプ直後に click が続けて飛ぶ端末があるため、日付選択を一瞬だけ無効にする */
+    lastSwipeAt = Date.now();
+    if (dx < 0) goNextMonth(); else goPrevMonth();
+  }, { passive: true });
+
+  grid.addEventListener('touchcancel', function () {
+    startX = startY = null;
+  }, { passive: true });
+})();
 $('today-btn').addEventListener('click', function () {
   var t = new Date();
   cur = { y: t.getFullYear(), m: t.getMonth() + 1 };
@@ -1085,7 +1597,38 @@ $('nav-exercise').addEventListener('click', function () {
   ensureMuscleAnchorIfNeeded();
   renderExercise();
   openSheet('exercise');
+  /* 筋トレ予定がここで確定することがあるので、カレンダー側の表示も合わせて更新する(問題43) */
+  skipExerciseRerender = true;
+  render();
+  skipExerciseRerender = false;
+  scrollExerciseToToday();
 });
+
+/* 運動予定シート内の月移動(問題44)。表示中の月はカレンダーと共有しているので
+   ここで動かすとカレンダー側も一緒に変わる */
+$('ex-prev').addEventListener('click', function () {
+  cur.m--; if (cur.m < 1) { cur.m = 12; cur.y--; }
+  render();            /* render の中で renderExercise も呼ばれる */
+  renderExercise();
+  scrollExerciseToToday();
+});
+$('ex-next').addEventListener('click', function () {
+  cur.m++; if (cur.m > 12) { cur.m = 1; cur.y++; }
+  render();
+  renderExercise();
+  scrollExerciseToToday();
+});
+
+/* 今日の行が見える位置まで一覧をスクロールする(問題45) */
+function scrollExerciseToToday() {
+  var t = new Date();
+  if (t.getFullYear() !== cur.y || (t.getMonth() + 1) !== cur.m) {
+    $('ex-list').scrollTop = 0;
+    return;
+  }
+  var row = $('ex-list').querySelector('.ex-row-today');
+  if (row) $('ex-list').scrollTop = Math.max(0, row.offsetTop - 8);
+}
 
 /* ================= 運動予定(2026-07-27 追加。計画.md 10章) ================= */
 /* 日付ユーティリティ(YYYY-MM-DD 形式の文字列で扱う) */
@@ -1254,7 +1797,10 @@ var exercisePrevTotal = {};
 
 function buildExerciseRow(row, ym) {
   var el = document.createElement('div');
-  el.className = 'ex-row' + ((row.isFriday || row.isManual) ? ' ex-row-off' : '');
+  var t = new Date();
+  var isToday = (t.getFullYear() === cur.y && (t.getMonth() + 1) === cur.m && t.getDate() === row.d);
+  el.className = 'ex-row' + ((row.isFriday || row.isManual) ? ' ex-row-off' : '') +
+    (isToday ? ' ex-row-today' : '');
 
   var head = document.createElement('div');
   head.className = 'ex-row-head';
@@ -1277,30 +1823,190 @@ function buildExerciseRow(row, ym) {
   }
   el.appendChild(head);
 
-  var body = document.createElement('div');
-  body.className = 'ex-row-body';
+  /* 回数と休館ボタンは日付と同じ1行にまとめる(行を低くして一覧を見やすくする) */
   var countSpan = document.createElement('span');
   var isOff = row.res.count === 0;
   countSpan.className = 'ex-feel-tag' + (isOff ? ' ex-tag-gray' : '');
   countSpan.textContent = row.res.count > 0 ? row.res.count + '回' : row.res.reason;
-  body.appendChild(countSpan);
+  head.appendChild(countSpan);
 
   if (!row.isFriday) {
     var toggleBtn = document.createElement('button');
     toggleBtn.className = 'ex-closure-btn' + (row.isManual ? ' on' : '');
-    toggleBtn.textContent = row.isManual ? '休館(手動)解除' : '休館にする';
+    toggleBtn.textContent = row.isManual ? '休館を解除' : '休館';
     toggleBtn.addEventListener('click', function () { toggleClosureDay(ym, row.d); });
-    body.appendChild(toggleBtn);
+    head.appendChild(toggleBtn);
   }
-  el.appendChild(body);
 
   if (row.isMuscleDay) {
     var badge = document.createElement('div');
     badge.className = 'ex-muscle-badge';
-    badge.textContent = '💪 筋トレ: ダンベルフライ / ベントオーバーロー / ラットプルダウン';
+    badge.textContent = '💪 ダンベルフライ / ベントオーバーロー / ラットプルダウン';
     el.appendChild(badge);
   }
+
+  /* 実施の記録。フィールサイクル各回と筋トレを1つのまとまりに入れて余白を減らす。
+     予定が無い日でも「+追加」は出す(急に行った日を記録できるように) */
+  el.appendChild(buildRecordGroup({
+    ym: ym, d: row.d,
+    count: row.res.count > 0 ? row.res.count : 0,
+    withMuscle: row.isMuscleDay
+  }));
   return el;
+}
+
+/* 記録ボタンのまとまりを作る。
+   feel: 予定回数ぶん「1回目/2回目…」を独立して記録できる
+   muscle: その日の筋トレを1つ記録できる
+   どちらも [済] と [今日は休む] の2ボタン。もう一度押すと取り消し(訂正できる) */
+function buildRecordGroup(opt) {
+  var wrap = document.createElement('div');
+  wrap.className = 'rec-group';
+
+  /* 項目ごとに「済」ボタンと、その横に控えめな「🌙」ボタンを並べる(2026-07-28 問題39)。
+     済を押せば済、🌙を押せば休み。どちらを記録するにも、もう一方の状態を経由しない。
+     同じボタンをもう一度押すと未記録に戻る(取り消し)。相互の切り替えも1タップでできる */
+  function addPair(labelText, getState, setState) {
+    var lab = document.createElement('span');
+    lab.className = 'rec-label';
+    lab.textContent = labelText;
+    wrap.appendChild(lab);
+
+    var doneBtn = document.createElement('button');
+    var restBtn = document.createElement('button');
+
+    function paint() {
+      var st = getState();
+      doneBtn.className = 'rec-btn' + (st === 'done' ? ' is-done' : '');
+      doneBtn.textContent = st === 'done' ? '✓ 済' : '済';
+      restBtn.className = 'rec-btn rec-btn-moon' + (st === 'rest' ? ' is-rest' : '');
+      restBtn.textContent = '🌙';
+      /* どの日のボタンか分かるように、読み上げ用のラベルに日付を入れる(問題45) */
+      var dayTxt = cur.m + '/' + opt.d + ' ';
+      doneBtn.setAttribute('aria-label', dayTxt + labelText + ' を済にする');
+      restBtn.setAttribute('aria-label', dayTxt + labelText + ' を休みにする');
+    }
+    doneBtn.addEventListener('click', function () {
+      var st = getState();
+      var next = (st === 'done') ? null : 'done';  /* 済→取り消し / それ以外→済(休みからも直接) */
+      setState(next);
+      paint();
+      if (next === 'done') playPop(doneBtn);   /* 済になった瞬間だけ躍動 */
+      afterRecordChange();
+    });
+    restBtn.addEventListener('click', function () {
+      var st = getState();
+      var next = (st === 'rest') ? null : 'rest'; /* 休み→取り消し / それ以外→休み(済からも直接) */
+      setState(next);
+      paint();
+      if (next === 'rest') playMoon(restBtn);  /* 休みになった瞬間だけ穏やか。祝う演出は出さない */
+      afterRecordChange();
+    });
+    paint();
+    wrap.appendChild(doneBtn);
+    wrap.appendChild(restBtn);
+  }
+
+  for (var i = 0; i < opt.count; i++) {
+    (function (idx) {
+      var label = opt.count > 1 ? '🚴' + (idx + 1) : '🚴';
+      addPair(label,
+        function () { return getFeelState(opt.ym, opt.d, idx); },
+        function (next) { setFeelState(opt.ym, opt.d, idx, next); });
+    })(i);
+  }
+  if (opt.withMuscle) {
+    addPair('💪',
+      function () { return getMuscleState(opt.ym, opt.d); },
+      function (next) { setMuscleState(opt.ym, opt.d, next); });
+  }
+
+  /* 予定外に行った回数(2026-07-28)。押した瞬間に1回ぶんの「済」として記録される(タップ1回で完了)。
+     記録済みのぶんは「🚴+1 ✕」のように出て、✕でその1回を取り消せる */
+  var extra = getExtraCount(opt.ym, opt.d);
+  for (var e = 0; e < extra; e++) {
+    (function (num) {
+      var chip = document.createElement('button');
+      chip.className = 'rec-btn is-done rec-btn-extra';
+      chip.textContent = '🚴追加' + (extra > 1 ? num : '') + ' ✕';
+      chip.setAttribute('aria-label', cur.m + '/' + opt.d + ' の追加' + num + '回目を取り消す');
+      chip.addEventListener('click', function () {
+        setExtraCount(opt.ym, opt.d, getExtraCount(opt.ym, opt.d) - 1);
+        renderExercise();
+        skipExerciseRerender = true; render(); skipExerciseRerender = false;
+        toast('追加の記録を1回ぶん取り消しました');
+      });
+      wrap.appendChild(chip);
+    })(e + 1);
+  }
+  var addBtn = document.createElement('button');
+  addBtn.className = 'rec-btn rec-btn-add';
+  addBtn.textContent = '+ 追加';
+  addBtn.setAttribute('aria-label', cur.m + '/' + opt.d + ' に予定外で行った1回を記録する');
+  addBtn.addEventListener('click', function () {
+    setExtraCount(opt.ym, opt.d, getExtraCount(opt.ym, opt.d) + 1);
+    playPop(addBtn);            /* 済と同じ躍動アニメ(前向きな体験にする) */
+    updateExerciseCounts();
+    skipExerciseRerender = true; render(); skipExerciseRerender = false;
+    /* 押したボタンのアニメを見せてから一覧を作り直す */
+    setTimeout(function () {
+      if ($('sheet-exercise').classList.contains('open')) renderExercise();
+    }, 700);
+  });
+  wrap.appendChild(addBtn);
+  return wrap;
+}
+
+/* 済: ドンッと弾む躍動感 / 休む: ふわっと浮かぶ穏やかな演出(どちらもCSSアニメの再生) */
+function playPop(el) {
+  el.classList.remove('pop');
+  void el.offsetWidth; /* reflow で最初から再生させる */
+  el.classList.add('pop');
+  setTimeout(function () { el.classList.remove('pop'); }, 750);
+}
+function playMoon(el) {
+  el.classList.remove('moon');
+  void el.offsetWidth;
+  el.classList.add('moon');
+  setTimeout(function () { el.classList.remove('moon'); }, 1200);
+}
+
+/* 予定の回数に収まらなくなった記録を消して、表示と数を合わせる(問題40の整理ボタン用) */
+function trimOrphanRecords(ym) {
+  var mo = state.exercise.records[ym];
+  if (!mo) return;
+  var p = ym.split('-');
+  var y = parseInt(p[0], 10), m = parseInt(p[1], 10);
+  var dim = daysInMonth(y, m);
+  var monthShifts = state.shifts[ym] || {};
+  var closure = state.exercise.closureDays[ym] || [];
+  var muscleDays = state.exercise.muscle[ym] || [];
+  for (var d = 1; d <= dim; d++) {
+    var rec = mo[String(d)];
+    if (!rec) continue;
+    var res = getFeelcycleCount(dateStrOf(y, m, d), normShift(monthShifts[String(d)]),
+      closure.indexOf(String(d)) >= 0);
+    if (Array.isArray(rec.feel)) {
+      rec.feel = rec.feel.slice(0, res.count);
+      while (rec.feel.length && rec.feel[rec.feel.length - 1] === null) rec.feel.pop();
+      if (!rec.feel.length) delete rec.feel;
+    }
+    if (rec.muscle && muscleDays.indexOf(String(d)) < 0) delete rec.muscle;
+    if (!rec.feel && !rec.muscle) delete mo[String(d)];
+  }
+  if (!Object.keys(mo).length) delete state.exercise.records[ym];
+  saveState();
+}
+
+/* 記録を変えたら、月間カウントとカレンダーのマス表示を更新する
+   (一覧そのものは作り直さない = 押したボタンのアニメーションが消えないように) */
+function afterRecordChange() {
+  updateExerciseCounts();
+  /* カレンダー側のマス表示も更新する。ただし運動予定の一覧は作り直さない
+     (作り直すと押したボタンが差し替わってアニメーションが消えてしまうため) */
+  skipExerciseRerender = true;
+  render();
+  skipExerciseRerender = false;
 }
 
 function renderExercise() {
@@ -1330,23 +2036,96 @@ function renderExercise() {
     }, ym));
   }
 
-  /* 月間カウント表示+30回達成演出 */
-  var achieved = total >= 30;
+  updateExerciseCounts();
+}
+
+/* 月間カウント(予定と済)の表示だけを更新する。
+   一覧を作り直さないので、押したボタンのアニメーションが途中で消えない */
+function updateExerciseCounts() {
+  var ym = ymKey(cur.y, cur.m);
+  var dim = daysInMonth(cur.y, cur.m);
+  var monthShifts = state.shifts[ym] || {};
+  var closure = state.exercise.closureDays[ym] || [];
+
+  var total = 0, feelDone = 0, feelRest = 0, feelExtra = 0;
+  var orphanDays = [];   /* 予定より多く記録が残っている日(問題40) */
+  for (var d = 1; d <= dim; d++) {
+    var ds = dateStrOf(cur.y, cur.m, d);
+    var shEntry = normShift(monthShifts[String(d)]);
+    var res = getFeelcycleCount(ds, shEntry, closure.indexOf(String(d)) >= 0);
+    if (!res.excludedFromTotal) total += res.count;
+    for (var i = 0; i < res.count; i++) {
+      var st = getFeelState(ym, d, i);
+      if (st === 'done') feelDone++;
+      else if (st === 'rest') feelRest++;
+    }
+    feelExtra += getExtraCount(ym, d);   /* 予定外に行った回数 */
+    /* 予定の回数を超えて残っている記録がないか調べる(シフトが変わって予定が減った日) */
+    var rec = getDayRecord(ym, d);
+    if (rec && Array.isArray(rec.feel)) {
+      for (var j = res.count; j < rec.feel.length; j++) {
+        if (rec.feel[j] === 'done' || rec.feel[j] === 'rest') { orphanDays.push(d); break; }
+      }
+    }
+    if (rec && rec.muscle && (state.exercise.muscle[ym] || []).indexOf(String(d)) < 0) {
+      if (orphanDays.indexOf(d) < 0) orphanDays.push(d);
+    }
+  }
+
+  /* 達成の判定は「実際に行った数(予定ぶんの済 + 予定外の追加)」で見る */
+  var doneAll = feelDone + feelExtra;
+  var achieved = doneAll >= 30;
   var prev = exercisePrevTotal.hasOwnProperty(ym) ? exercisePrevTotal[ym] : null;
   var justAchieved = achieved && prev !== null && prev < 30;
-  exercisePrevTotal[ym] = total;
+  exercisePrevTotal[ym] = doneAll;
 
   var box = $('ex-feel-box');
   box.classList.toggle('achieved', achieved);
-  $('ex-feel-count').textContent = total + ' / 30回' + (achieved ? ' 🎉' : '');
+  $('ex-feel-count').textContent = '予定 ' + total + '回 / 済 ' + doneAll + '回' +
+    (feelExtra > 0 ? '(うち追加 ' + feelExtra + '回)' : '') + (achieved ? ' 🎉' : '');
   $('ex-feel-msg').textContent = achieved ? '🎉 今月の目標達成!' : '';
   if (justAchieved) {
     box.classList.remove('flash');
     void box.offsetWidth; /* reflow でアニメーションを最初から再生させる */
     box.classList.add('flash');
   }
+  /* 休んだ数は控えめに(目立たせない)。0のときは何も出さない */
+  var restEl = $('ex-feel-rest');
+  restEl.textContent = feelRest > 0 ? '🌙 休むことにした回数: ' + feelRest + '回' : '';
 
-  $('ex-muscle-count').textContent = (state.exercise.muscle[ym] || []).length;
+  /* シフトが変わって予定が減り、数えられなくなった記録があれば知らせる(問題40)。
+     責める書き方はせず、事実と選べる操作だけを示す */
+  var noteEl = $('ex-orphan-note');
+  noteEl.textContent = '';
+  noteEl.className = 'ex-orphan-note';
+  if (orphanDays.length) {
+    noteEl.className = 'ex-orphan-note show';
+    var msg = document.createElement('span');
+    msg.textContent = 'シフトが変わったため、' + orphanDays.join('日・') + '日 の記録の一部が予定の回数に収まらなくなっています(数には入っていません)。';
+    noteEl.appendChild(msg);
+    var btn = document.createElement('button');
+    btn.className = 'btn sub small';
+    btn.style.marginTop = '6px';
+    btn.textContent = '収まらない記録を整理する';
+    btn.addEventListener('click', function () {
+      if (!confirm('予定の回数に収まらない記録を消して、表示と数を合わせます。\n(' + orphanDays.join('日・') + '日)\n\nよろしいですか?')) return;
+      trimOrphanRecords(ym);
+      renderExercise();
+      toast('記録を整理しました');
+    });
+    noteEl.appendChild(btn);
+  }
+
+  /* 筋トレ: 予定と済 */
+  var muscleDays = state.exercise.muscle[ym] || [];
+  var mDone = 0, mRest = 0;
+  muscleDays.forEach(function (dk) {
+    var st = getMuscleState(ym, parseInt(dk, 10));
+    if (st === 'done') mDone++;
+    else if (st === 'rest') mRest++;
+  });
+  $('ex-muscle-count').textContent = '予定 ' + muscleDays.length + '回 / 済 ' + mDone + '回';
+  $('ex-muscle-rest').textContent = mRest > 0 ? '🌙 ' + mRest + '回' : '';
 }
 
 /* ================= スタンプ(下部のチップ横並び) ================= */
@@ -1775,16 +2554,111 @@ $('save-name').addEventListener('click', function () {
 });
 
 /* ================= スタンプの編集 ================= */
+/* 取っ手を指でつまんで並べ替える(ライブラリなし・素のJS)。
+   ・取っ手の上でだけ反応するので、一覧の縦スクロールは妨げない
+   ・つまんだ行は浮き上がり(影+少し拡大+半透明)、他の行はすき間を空けて動く
+   ・指を離した位置で確定して保存する */
+function attachStampDragHandle(handle, row) {
+  var dragging = false, startY = 0, fromIdx = 0, toIdx = 0;
+  var rows = [], placeholderH = 0, list = null;
+
+  function rowsSnapshot() {
+    return Array.prototype.slice.call($('stamp-def-list').querySelectorAll('.stampdef-row'));
+  }
+
+  handle.addEventListener('touchstart', function (ev) {
+    if (ev.touches.length !== 1) return;
+    dragging = true;
+    list = $('stamp-def-list');
+    rows = rowsSnapshot();
+    fromIdx = toIdx = rows.indexOf(row);
+    startY = ev.touches[0].clientY;
+    placeholderH = row.getBoundingClientRect().height + 6; /* 行の高さ+すき間 */
+    row.classList.add('sd-dragging');
+  }, { passive: true });
+
+  handle.addEventListener('touchmove', function (ev) {
+    if (!dragging) return;
+    ev.preventDefault();   /* 並べ替え中だけスクロールを止める(取っ手の上のみ) */
+    var dy = ev.touches[0].clientY - startY;
+    row.style.transform = 'translateY(' + dy + 'px) scale(1.03)';
+    var shift = Math.round(dy / placeholderH);
+    var next = Math.max(0, Math.min(rows.length - 1, fromIdx + shift));
+    if (next !== toIdx) {
+      toIdx = next;
+      /* 動いた先に合わせて、他の行を上下にずらして場所を空ける */
+      rows.forEach(function (el, i) {
+        if (el === row) return;
+        var move = 0;
+        if (fromIdx < toIdx && i > fromIdx && i <= toIdx) move = -placeholderH;
+        else if (fromIdx > toIdx && i >= toIdx && i < fromIdx) move = placeholderH;
+        el.style.transform = move ? 'translateY(' + move + 'px)' : '';
+      });
+    }
+  }, { passive: false });
+
+  function finish() {
+    if (!dragging) return;
+    dragging = false;
+    row.classList.remove('sd-dragging');
+    row.style.transform = '';
+    rows.forEach(function (el) { el.style.transform = ''; });
+    if (toIdx !== fromIdx) moveStampDef(fromIdx, toIdx);
+    else renderStampDefList();
+  }
+  handle.addEventListener('touchend', finish, { passive: true });
+  handle.addEventListener('touchcancel', finish, { passive: true });
+}
+
+/* スタンプの並び順を1つ動かす(▲▼ボタン用)。押してある記録(state.stamps)は変わらない */
+function moveStampDef(from, to) {
+  if (to < 0 || to >= state.stampDefs.length || from === to) return;
+  var item = state.stampDefs.splice(from, 1)[0];
+  state.stampDefs.splice(to, 0, item);
+  saveState();
+  renderStampDefList();
+  renderStampChipRow();
+  render();   /* マス右上の「上位3個」の選ばれ方も変わるため描き直す */
+}
+
 function renderStampDefList() {
   var list = $('stamp-def-list');
   list.textContent = '';
   state.stampDefs.forEach(function (def, idx) {
     var row = document.createElement('div');
     row.className = 'stampdef-row';
+    row.setAttribute('data-idx', String(idx));
+
+    /* 指でつまんで並べ替えるための取っ手。ここだけがドラッグに反応する
+       (行全体を対象にすると縦スクロールを邪魔するため) */
+    var handle = document.createElement('span');
+    handle.className = 'sd-handle';
+    handle.textContent = '⠿';
+    handle.setAttribute('aria-hidden', 'true');
+    attachStampDragHandle(handle, row);
+    row.appendChild(handle);
+
     var name = document.createElement('span');
     name.className = 'sd-name';
     name.textContent = (def.icon ? def.icon + ' ' : '') + def.label;
     row.appendChild(name);
+
+    /* 指が使いにくい環境用の1つずつ移動(アクセシビリティの保険) */
+    var up = document.createElement('button');
+    up.className = 'sd-move';
+    up.textContent = '▲';
+    up.setAttribute('aria-label', def.label + ' を1つ上へ');
+    up.disabled = (idx === 0);
+    up.addEventListener('click', function () { moveStampDef(idx, idx - 1); });
+    row.appendChild(up);
+    var down = document.createElement('button');
+    down.className = 'sd-move';
+    down.textContent = '▼';
+    down.setAttribute('aria-label', def.label + ' を1つ下へ');
+    down.disabled = (idx === state.stampDefs.length - 1);
+    down.addEventListener('click', function () { moveStampDef(idx, idx + 1); });
+    row.appendChild(down);
+
     var ren = document.createElement('button');
     ren.textContent = '名前変更';
     ren.addEventListener('click', function () { renameStampDef(idx); });
