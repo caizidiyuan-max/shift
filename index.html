@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- shift-calendar build 2026-07-27-04 -->
+<!-- shift-calendar build 2026-07-27-07 -->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -217,7 +217,7 @@
   /* ===== 下部メニュー ===== */
   nav {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     border-top: 1px solid var(--line);
     background: #f6f6f8;
     flex-shrink: 0;
@@ -379,6 +379,56 @@
   }
   .stampdef-row button.sd-del { color: #b71c1c; border-color: #b71c1c; }
 
+  /* ===== 運動予定 ===== */
+  .ex-month { font-size: 14px; color: #666; margin-bottom: 8px; }
+  .ex-count-box {
+    background: #eef3ff;
+    border: 1px solid #b9c6ee;
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 4px;
+  }
+  .ex-count-box.achieved { background: #fff7dc; border-color: #c9a227; }
+  .ex-count-line { font-size: 14px; margin: 3px 0; }
+  .ex-count-box.achieved #ex-feel-count { color: #b8860b; font-weight: bold; }
+  .ex-feel-msg { font-size: 13px; color: #b8860b; font-weight: bold; margin-top: 2px; min-height: 1.2em; }
+  @keyframes ex-flash {
+    0% { background-color: #fff7dc; }
+    35% { background-color: #ffe58a; }
+    100% { background-color: #fff7dc; }
+  }
+  .ex-count-box.flash { animation: ex-flash .6s ease; }
+  .ex-muscle-line { margin-bottom: 10px; }
+  #ex-list { max-height: 52vh; overflow-y: auto; }
+  .ex-row { border-bottom: 1px solid var(--line); padding: 8px 2px; }
+  .ex-row.ex-row-off { background: #f2f2f2; }
+  .ex-row-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; gap: 6px; }
+  .ex-date { font-weight: bold; white-space: nowrap; }
+  .ex-shift-label { font-size: 12px; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ex-row-body { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
+  .ex-feel-tag { font-size: 13px; font-weight: bold; color: #1a6fc9; }
+  .ex-feel-tag.ex-tag-gray { color: #999; font-weight: normal; }
+  .ex-closure-btn {
+    flex-shrink: 0;
+    font-size: 11px;
+    background: #fff;
+    border: 1px solid #999;
+    color: #666;
+    border-radius: 6px;
+    padding: 5px 8px;
+    cursor: pointer;
+  }
+  .ex-closure-btn.on { background: #333; color: #fff; border-color: #333; }
+  .ex-muscle-badge {
+    margin-top: 5px;
+    font-size: 11px;
+    background: #ffe9d6;
+    color: #a34700;
+    border-radius: 6px;
+    padding: 4px 6px;
+    display: inline-block;
+  }
+
   /* トースト */
   #toast {
     position: fixed;
@@ -424,6 +474,7 @@
 
 <nav>
   <button id="nav-import"><span class="ico">📥</span>AI取り込み</button>
+  <button id="nav-exercise"><span class="ico">💪</span>運動予定</button>
   <button id="nav-settings"><span class="ico">⚙️</span>設定・バックアップ</button>
 </nav>
 
@@ -440,6 +491,23 @@
   <textarea id="import-text" placeholder="AI の返事をまるごと貼り付けてOK(コードが2個あっても取り込めます)"></textarea>
   <button class="btn" id="do-import">取り込み</button>
   <div class="result-box" id="import-result"></div>
+</div>
+
+<!-- ===== 運動予定シート ===== -->
+<div class="sheet-back" data-close="exercise"></div>
+<div class="sheet" id="sheet-exercise">
+  <button class="close-x" data-close="exercise">✕</button>
+  <h2>💪 運動予定</h2>
+  <div class="ex-month" id="ex-month">--</div>
+
+  <div class="ex-count-box" id="ex-feel-box">
+    <div class="ex-count-line">フィールサイクル: <span id="ex-feel-count">0 / 30回</span></div>
+    <div class="ex-feel-msg" id="ex-feel-msg"></div>
+  </div>
+  <div class="ex-count-line ex-muscle-line">筋トレ: <span id="ex-muscle-count">0</span>回</div>
+
+  <div id="ex-list"></div>
+  <div class="hint">休館日は金曜以外の日に「休館にする」ボタンで設定できます。筋トレ予定は2日休んで3日目、希休・半9の日は次の日以降にずれます。</div>
 </div>
 
 <!-- ===== 設定シート ===== -->
@@ -529,7 +597,12 @@ function defaultState() {
     shifts: {},
     stamps: {},
     stampDefs: DEFAULT_STAMPS.map(function (s) { return { label: s.label, icon: s.icon }; }),
-    settings: { userName: '' }
+    settings: { userName: '' },
+    /* 運動予定(2026-07-27 追加)。既存の shiftTypes/shifts/stamps/settings とは独立した箱。
+       confirmedMonths = 「その月は最後まで計算し終えた」ことを示す確定済み月のリスト。
+       muscle[月] にキーがあるだけでは「確定済み」と判定しない(繰り越しで1件だけこぼれた
+       月を誤って確定扱いするバグを防ぐため。2026-07-27 修正) */
+    exercise: { closureDays: {}, muscle: {}, muscleAnchor: null, confirmedMonths: [] }
   };
 }
 
@@ -552,6 +625,7 @@ function loadState() {
     s.shifts = sanitizeShifts(d.shifts);
     s.stamps = sanitizeStamps(d.stamps);
     s.stampDefs = sanitizeStampDefs(d.stampDefs);
+    s.exercise = sanitizeExercise(d.exercise);
     if (d.settings && typeof d.settings === 'object' && typeof d.settings.userName === 'string') {
       s.settings.userName = d.settings.userName;
     }
@@ -649,6 +723,51 @@ function findStampDef(label) {
     if (state.stampDefs[i].label === label) return state.stampDefs[i];
   }
   return null;
+}
+
+/* 運動予定(exercise)を洗浄。壊れた形は初期値(空)に戻す(問題2と同じ二段構えの入口洗浄) */
+function sanitizeExercise(src) {
+  var out = { closureDays: {}, muscle: {}, muscleAnchor: null, confirmedMonths: [] };
+  if (!src || typeof src !== 'object' || Array.isArray(src)) return out;
+  function sanitizeDayMap(v) {
+    var o = {};
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return o;
+    Object.keys(v).forEach(function (ym) {
+      if (!/^\d{4}-\d{2}$/.test(ym)) return;
+      var arr = v[ym];
+      if (!Array.isArray(arr)) return;
+      /* その月に実在する日にちだけ残す(sanitizeShifts と同じ水準の範囲チェック。
+         "40" のような実在しない日が保存され続けるのを防ぐ) */
+      var y = parseInt(ym.slice(0, 4), 10);
+      var mo = parseInt(ym.slice(5, 7), 10);
+      if (!(mo >= 1 && mo <= 12)) return;
+      var dim = daysInMonth(y, mo);
+      var clean = [];
+      arr.forEach(function (d) {
+        var s = String(d);
+        if (!/^\d{1,2}$/.test(s)) return;
+        var n = parseInt(s, 10);
+        if (n < 1 || n > dim) return;
+        var norm = String(n);              /* "05" のようなゼロ埋めも "5" に正規化 */
+        if (clean.indexOf(norm) < 0) clean.push(norm);
+      });
+      if (clean.length) o[ym] = clean;
+    });
+    return o;
+  }
+  out.closureDays = sanitizeDayMap(src.closureDays);
+  out.muscle = sanitizeDayMap(src.muscle);
+  if (typeof src.muscleAnchor === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(src.muscleAnchor)) {
+    out.muscleAnchor = src.muscleAnchor;
+  }
+  if (Array.isArray(src.confirmedMonths)) {
+    src.confirmedMonths.forEach(function (ym) {
+      if (typeof ym === 'string' && /^\d{4}-\d{2}$/.test(ym) && out.confirmedMonths.indexOf(ym) < 0) {
+        out.confirmedMonths.push(ym);
+      }
+    });
+  }
+  return out;
 }
 
 /* そのラベルのスタンプが押されている日数を数える */
@@ -878,6 +997,8 @@ function render() {
   }
 
   renderDayInfo();
+  /* 運動予定シートが開いていれば、月移動に連動して中身も更新する(表示中の月を共有) */
+  if ($('sheet-exercise').classList.contains('open')) renderExercise();
 }
 
 var WEEK_JA = ['日', '月', '火', '水', '木', '金', '土'];
@@ -928,6 +1049,13 @@ $('today-btn').addEventListener('click', function () {
 
 /* ================= シートの開け閉め ================= */
 function openSheet(name) {
+  /* 先に開いているシートを全部閉じて、必ず1枚だけが開いている状態にする(問題37) */
+  Array.prototype.forEach.call(document.querySelectorAll('.sheet.open'), function (el) {
+    el.classList.remove('open');
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.sheet-back.open'), function (el) {
+    el.classList.remove('open');
+  });
   document.querySelector('.sheet-back[data-close="' + name + '"]').classList.add('open');
   $('sheet-' + name).classList.add('open');
 }
@@ -953,6 +1081,274 @@ $('nav-settings').addEventListener('click', function () {
   $('backup-result').className = 'result-box';
   openSheet('settings');
 });
+$('nav-exercise').addEventListener('click', function () {
+  ensureMuscleAnchorIfNeeded();
+  renderExercise();
+  openSheet('exercise');
+});
+
+/* ================= 運動予定(2026-07-27 追加。計画.md 10章) ================= */
+/* 日付ユーティリティ(YYYY-MM-DD 形式の文字列で扱う) */
+function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+function dateStrOf(y, m, d) { return y + '-' + pad2(m) + '-' + pad2(d); }
+function parseDateStr(s) {
+  var p = s.split('-');
+  return { y: parseInt(p[0], 10), m: parseInt(p[1], 10), d: parseInt(p[2], 10) };
+}
+function dowOfDateStr(s) {
+  var p = parseDateStr(s);
+  return new Date(p.y, p.m - 1, p.d).getDay(); /* 0=日,1=月,...,5=金,6=土 */
+}
+function addDaysToDateStr(s, n) {
+  var p = parseDateStr(s);
+  var dt = new Date(p.y, p.m - 1, p.d);
+  dt.setDate(dt.getDate() + n);
+  return dateStrOf(dt.getFullYear(), dt.getMonth() + 1, dt.getDate());
+}
+function ymOfDateStr(s) { return s.slice(0, 7); }
+function dayOfDateStr(s) { return String(parseInt(s.slice(8, 10), 10)); }
+
+/* その日の確定シフトの label を返す(state.shifts は読み取り専用として使う。書き換えない) */
+function shiftLabelOfDate(s) {
+  var mo = state.shifts[ymOfDateStr(s)];
+  if (!mo) return null;
+  var sh = normShift(mo[dayOfDateStr(s)]);
+  return sh ? sh.label : null;
+}
+
+/* 10-4-1: フィールサイクル回数判定(優先順位厳守) */
+function getFeelcycleCount(dateStr, shiftEntry, isManualClosure) {
+  var dow = dowOfDateStr(dateStr);
+
+  if (dow === 5) return { count: 0, reason: '金曜休館' };
+  if (isManualClosure) return { count: 0, reason: '休館(手動)' };
+  if (!shiftEntry) return { count: 0, reason: 'シフト未確定', excludedFromTotal: true };
+
+  var label = shiftEntry.label;
+  var memo = shiftEntry.memo || '';
+
+  if (label === UNKNOWN_LABEL) return { count: 0, reason: '不明', excludedFromTotal: true };
+  if (label === '希休') return { count: 0, reason: '希休' };
+  if (label === '日勤' || label === '休み') return { count: 2, reason: label };
+
+  if (label === '遅番') {
+    if (dow >= 1 && dow <= 4) return { count: 2, reason: '遅番(平日)' };
+    return { count: 1, reason: '遅番(週末)' };
+  }
+  if (label === 'MT' || label === '早番' || label === '有休' || label === '半9') {
+    return { count: 1, reason: label };
+  }
+
+  /* 応援・健診・未知ラベル(店舗名など) → memo で判定、無ければデフォルト2回 */
+  if (memo.indexOf('遅番') >= 0) {
+    if (dow >= 1 && dow <= 4) return { count: 2, reason: label + '(memo:遅番/平日)' };
+    return { count: 1, reason: label + '(memo:遅番/週末)' };
+  }
+  if (memo.indexOf('早番') >= 0) return { count: 1, reason: label + '(memo:早番)' };
+  if (memo.indexOf('日勤') >= 0) return { count: 2, reason: label + '(memo:日勤)' };
+  return { count: 2, reason: label + '(デフォルト2回)' };
+}
+
+/* 10-4-2: 筋トレ予定日の計算(月またぎ継続・繰り越し)。一度確定した月は再計算しない */
+function findLatestMuscleDate() {
+  var months = Object.keys(state.exercise.muscle)
+    .filter(function (k) { return state.exercise.muscle[k] && state.exercise.muscle[k].length; })
+    .sort();
+  if (!months.length) return null;
+  var lastMonth = months[months.length - 1];
+  var days = state.exercise.muscle[lastMonth].map(function (d) { return parseInt(d, 10); });
+  var maxDay = Math.max.apply(null, days);
+  return lastMonth + '-' + pad2(maxDay);
+}
+
+function ensureMuscleScheduleUpTo(targetYM) {
+  /* 「確定済み」は confirmedMonths リストだけで判定する(2026-07-27 修正)。
+     以前は「muscle[targetYM] にキーがあるか」だけで見ていたため、繰り越しで翌月に
+     1件だけこぼれた場合に、その月がまだ計算し終わっていないのに「確定済み」と
+     誤判定してしまうバグがあった(7月→8月と順番に呼ぶと8月が1件で止まる) */
+  if (state.exercise.confirmedMonths.indexOf(targetYM) >= 0) {
+    return state.exercise.muscle[targetYM] || [];
+  }
+
+  var anchor = findLatestMuscleDate();
+  if (!anchor) {
+    if (!state.exercise.muscleAnchor) return null; /* 呼び出し側が先に基準日を確認する */
+    anchor = state.exercise.muscleAnchor;
+  }
+
+  var current = anchor;
+  var lastMonthTouched = ymOfDateStr(current);
+  var guard = 0;
+  while (ymOfDateStr(current) <= targetYM && guard < 3000) {
+    guard++;
+    var candidate = addDaysToDateStr(current, 3); /* 2日休んで3日目 */
+    var loopGuard = 0;
+    while (loopGuard < 60) {
+      var lab = shiftLabelOfDate(candidate);
+      if (lab === '希休' || lab === '半9') { candidate = addDaysToDateStr(candidate, 1); loopGuard++; }
+      else break;
+    }
+    var month = ymOfDateStr(candidate);
+    if (!state.exercise.muscle[month]) state.exercise.muscle[month] = [];
+    var dayStr = dayOfDateStr(candidate);
+    if (state.exercise.muscle[month].indexOf(dayStr) < 0) state.exercise.muscle[month].push(dayStr);
+
+    /* 月をまたいだ瞬間、直前まで作業していた月はもう二度と戻って来ないので確定させてよい */
+    if (month !== lastMonthTouched && state.exercise.confirmedMonths.indexOf(lastMonthTouched) < 0) {
+      state.exercise.confirmedMonths.push(lastMonthTouched);
+    }
+    lastMonthTouched = month;
+    current = candidate;
+  }
+
+  /* ループが(guard上限ではなく)条件どおり自然に終わっていれば、
+     current は targetYM より後ろの月に進んでいる=targetYM は最後まで計算し終えている */
+  if (ymOfDateStr(current) > targetYM && state.exercise.confirmedMonths.indexOf(targetYM) < 0) {
+    state.exercise.confirmedMonths.push(targetYM);
+  }
+  saveState();
+  return state.exercise.muscle[targetYM] || [];
+}
+
+/* 筋トレ記録が1件も無く、基準日も未設定なら、初回だけ質問する */
+function ensureMuscleAnchorIfNeeded() {
+  var hasAny = Object.keys(state.exercise.muscle).some(function (k) {
+    return state.exercise.muscle[k] && state.exercise.muscle[k].length;
+  });
+  if (hasAny || state.exercise.muscleAnchor) return;
+
+  var useToday = !confirm('筋トレの記録がまだありません。直近に筋トレをした日を教えてください。\n\n「OK」= 日付を入力する\n「キャンセル」= 今日から数える');
+  var anchorDate;
+  if (useToday) {
+    var t = new Date();
+    anchorDate = dateStrOf(t.getFullYear(), t.getMonth() + 1, t.getDate());
+  } else {
+    var input = prompt('直近に筋トレをした日を入力してください(例: 2026-07-30)');
+    if (input && /^\d{4}-\d{1,2}-\d{1,2}$/.test(input.trim())) {
+      var p = input.trim().split('-');
+      anchorDate = dateStrOf(parseInt(p[0], 10), parseInt(p[1], 10), parseInt(p[2], 10));
+    } else {
+      var t2 = new Date();
+      anchorDate = dateStrOf(t2.getFullYear(), t2.getMonth() + 1, t2.getDate());
+      if (input !== null) toast('日付の形式が正しくなかったため、今日を基準にしました');
+    }
+  }
+  state.exercise.muscleAnchor = anchorDate;
+  saveState();
+}
+
+function toggleClosureDay(ym, d) {
+  var arr = state.exercise.closureDays[ym];
+  if (!Array.isArray(arr)) arr = [];
+  var key = String(d);
+  var idx = arr.indexOf(key);
+  if (idx >= 0) arr.splice(idx, 1); else arr.push(key);
+  if (arr.length) state.exercise.closureDays[ym] = arr; else delete state.exercise.closureDays[ym];
+  saveState();
+  renderExercise();
+}
+
+/* 月ごとの「前回描画時の合計」を覚えておく一時変数(保存はしない)。
+   達成の瞬間だけフラッシュを再生し、ページ再読み込み直後は再生しないための仕組み */
+var exercisePrevTotal = {};
+
+function buildExerciseRow(row, ym) {
+  var el = document.createElement('div');
+  el.className = 'ex-row' + ((row.isFriday || row.isManual) ? ' ex-row-off' : '');
+
+  var head = document.createElement('div');
+  head.className = 'ex-row-head';
+  var dateSpan = document.createElement('span');
+  dateSpan.className = 'ex-date';
+  dateSpan.textContent = cur.m + '/' + row.d + '(' + WEEK_JA[row.dow] + ')';
+  head.appendChild(dateSpan);
+  if (row.shEntry) {
+    var shSpan = document.createElement('span');
+    shSpan.className = 'ex-shift-label';
+    shSpan.textContent = row.shEntry.label === UNKNOWN_LABEL ? '不明' : row.shEntry.label;
+    shSpan.style.color = typeColor(row.shEntry.label);
+    head.appendChild(shSpan);
+  } else {
+    var noSh = document.createElement('span');
+    noSh.className = 'ex-shift-label';
+    noSh.textContent = '(シフト未登録)';
+    noSh.style.color = '#999';
+    head.appendChild(noSh);
+  }
+  el.appendChild(head);
+
+  var body = document.createElement('div');
+  body.className = 'ex-row-body';
+  var countSpan = document.createElement('span');
+  var isOff = row.res.count === 0;
+  countSpan.className = 'ex-feel-tag' + (isOff ? ' ex-tag-gray' : '');
+  countSpan.textContent = row.res.count > 0 ? row.res.count + '回' : row.res.reason;
+  body.appendChild(countSpan);
+
+  if (!row.isFriday) {
+    var toggleBtn = document.createElement('button');
+    toggleBtn.className = 'ex-closure-btn' + (row.isManual ? ' on' : '');
+    toggleBtn.textContent = row.isManual ? '休館(手動)解除' : '休館にする';
+    toggleBtn.addEventListener('click', function () { toggleClosureDay(ym, row.d); });
+    body.appendChild(toggleBtn);
+  }
+  el.appendChild(body);
+
+  if (row.isMuscleDay) {
+    var badge = document.createElement('div');
+    badge.className = 'ex-muscle-badge';
+    badge.textContent = '💪 筋トレ: ダンベルフライ / ベントオーバーロー / ラットプルダウン';
+    el.appendChild(badge);
+  }
+  return el;
+}
+
+function renderExercise() {
+  var ym = ymKey(cur.y, cur.m);
+  $('ex-month').textContent = cur.y + '年' + cur.m + '月';
+
+  var dim = daysInMonth(cur.y, cur.m);
+  var monthShifts = state.shifts[ym] || {};
+  var closure = state.exercise.closureDays[ym] || [];
+  var muscleDays = ensureMuscleScheduleUpTo(ym);
+  if (muscleDays === null) muscleDays = []; /* 基準日未設定(通常はここに来る前に ensureMuscleAnchorIfNeeded で確定済み) */
+
+  var total = 0;
+  var list = $('ex-list');
+  list.textContent = '';
+  for (var d = 1; d <= dim; d++) {
+    var ds = dateStrOf(cur.y, cur.m, d);
+    var dow = dowOfDateStr(ds);
+    var shEntry = normShift(monthShifts[String(d)]);
+    var isManual = closure.indexOf(String(d)) >= 0;
+    var res = getFeelcycleCount(ds, shEntry, isManual);
+    if (!res.excludedFromTotal) total += res.count;
+    var isMuscleDay = muscleDays.indexOf(String(d)) >= 0;
+    list.appendChild(buildExerciseRow({
+      d: d, dow: dow, shEntry: shEntry, res: res, isManual: isManual,
+      isMuscleDay: isMuscleDay, isFriday: dow === 5
+    }, ym));
+  }
+
+  /* 月間カウント表示+30回達成演出 */
+  var achieved = total >= 30;
+  var prev = exercisePrevTotal.hasOwnProperty(ym) ? exercisePrevTotal[ym] : null;
+  var justAchieved = achieved && prev !== null && prev < 30;
+  exercisePrevTotal[ym] = total;
+
+  var box = $('ex-feel-box');
+  box.classList.toggle('achieved', achieved);
+  $('ex-feel-count').textContent = total + ' / 30回' + (achieved ? ' 🎉' : '');
+  $('ex-feel-msg').textContent = achieved ? '🎉 今月の目標達成!' : '';
+  if (justAchieved) {
+    box.classList.remove('flash');
+    void box.offsetWidth; /* reflow でアニメーションを最初から再生させる */
+    box.classList.add('flash');
+  }
+
+  $('ex-muscle-count').textContent = (state.exercise.muscle[ym] || []).length;
+}
+
 /* ================= スタンプ(下部のチップ横並び) ================= */
 function renderStampChipRow() {
   var row = $('stamp-chip-row');
@@ -1572,6 +1968,7 @@ $('backup-restore').addEventListener('click', function () {
   s.shifts = sanitizeShifts(d.shifts);
   s.stamps = sanitizeStamps(d.stamps);
   s.stampDefs = sanitizeStampDefs(d.stampDefs);
+  s.exercise = sanitizeExercise(d.exercise);
   if (d.settings && typeof d.settings === 'object' && typeof d.settings.userName === 'string') {
     s.settings.userName = d.settings.userName;
   }
@@ -1587,11 +1984,12 @@ $('backup-restore').addEventListener('click', function () {
 
 /* ================= 全データ消去(問題13) ================= */
 $('reset-all').addEventListener('click', function () {
-  if (!confirm('本当に全データ(シフト・スタンプ・名前)を消しますか?')) return;
+  if (!confirm('本当に全データ(シフト・スタンプ・名前・運動予定)を消しますか?\n運動予定(休館日・筋トレの記録)も消えます。')) return;
   if (!confirm('バックアップは取りましたか?\n「OK」を押すと元に戻せません。')) return;
   try { localStorage.removeItem(STORE_KEY); } catch (e) {}
   state = defaultState();
   selected = null;
+  exercisePrevTotal = {};
   $('user-name').value = '';
   $('backup-in').value = '';
   renderTypeList();
