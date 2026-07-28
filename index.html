@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- shift-calendar build 2026-07-28-06 -->
+<!-- shift-calendar build 2026-07-28-08 -->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -118,10 +118,10 @@
   .cell .num {
     font-size: 12px;
     font-weight: bold;
-    line-height: 16px;
+    line-height: 14px;
     width: 18px;
-    height: 16px;
-    border-radius: 8px;
+    height: 14px;
+    border-radius: 7px;
     align-self: flex-start;
     margin-left: 2px;
     flex-shrink: 0;
@@ -132,6 +132,19 @@
   .cell.other .num { color: var(--dim); font-weight: normal; }
   /* 今日はクリーム背景に埋もれないよう、やや濃いめの黄色にする */
   .cell.today { background: #ffef9f; }
+  /* 自分で書いたメモがある日の印(2026-07-28 変更)。
+     絵文字では分かりにくかったので、マス右下に色つきの折り目マークを出す。
+     シフト表の補足(時刻行の「●」)とは、色・位置・形で区別できる */
+  .cell.has-note::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    border-width: 0 0 11px 11px;
+    border-style: solid;
+    border-color: transparent transparent #1565c0 transparent;  /* 青系の三角 */
+    pointer-events: none;
+  }
   .cell.today .num { background: var(--navy); color: #fff; text-align: center; }
   .cell.selected { outline: 2px solid var(--navy); outline-offset: -2px; }
   /* シフト名はカレンダーの主役。文字数に応じて入る最大サイズにする(実測で調整) */
@@ -159,8 +172,8 @@
   .cell .shift.long { font-size: 13px; letter-spacing: -0.8px; padding: 0; }   /* 4文字以上は余白なしで幅を確保 */
   /* 時刻+印の行。絵文字が入っても折り返して高さが増えないよう1行に固定する */
   .cell .time {
-    font-size: 10px;
-    line-height: 1.1;
+    font-size: 9px;
+    line-height: 1;
     color: #666;
     flex-shrink: 0;
     max-width: 100%;
@@ -168,16 +181,23 @@
     overflow: hidden;
     text-overflow: clip;
   }
-  /* スタンプは下部の1行に文字で出す(運動予定と同じ行にまとめる) */
+  /* スタンプは専用の行に文字で出す。押したものは必ず全部出す(隠さない)。
+     入りきらない日は絵文字だけにして2行に折り返す */
   .cell .cell-stamps {
     font-size: 9px;
     line-height: 1.05;
-    color: #6b6355;
+    color: #4a4438;
     letter-spacing: -0.5px;
     white-space: nowrap;
-    overflow: hidden;
     max-width: 100%;
     flex-shrink: 0;
+    margin-top: 0;
+  }
+  .cell .cell-stamps.two-line {
+    white-space: normal;   /* 絵文字だけにして折り返す */
+    word-break: break-all;
+    line-height: .9;
+    font-size: 8px;        /* 2行になる日は少し小さくして必ずマス内に収める */
   }
   .cell .memo-dot {
     font-size: 8px;
@@ -191,7 +211,7 @@
   /* マス下部の運動予定(🚴回数・💪)。シフト名の表示を邪魔しない小さな1行 */
   .cell .cell-ex {
     font-size: 9px;
-    line-height: 1.05;
+    line-height: 1;
     color: #6b6355;
     letter-spacing: -0.5px;
     white-space: nowrap;
@@ -212,8 +232,10 @@
     .cell .num { font-size: 10px; line-height: 11px; height: 11px; width: 14px; }
     .cell .time { font-size: 8px; line-height: 1; }
     .cell .memo-dot { font-size: 7px; }
-    .cell .cell-stamps { font-size: 8px; }
-    .cell .cell-ex { font-size: 7px; line-height: 1; margin-top: 0; }
+    .cell .cell-stamps { font-size: 7px; line-height: .95; margin-top: 0; }
+    .cell .cell-stamps.two-line { font-size: 7px; line-height: .9; }
+    .cell .cell-ex { font-size: 7px; line-height: .95; margin-top: 0; }
+    .cell .shift { line-height: 1.05; }
   }
 
   /* ===== シフト入力バー+スタンプチップ ===== */
@@ -1378,11 +1400,13 @@ function pickFitting(cands, maxW) {
   return cands[cands.length - 1];
 }
 
-/* マスに出すスタンプの文字を作る(2026-07-28)。
-   幅に入るだけ「名前」で並べ、入らなければ短縮 → 先頭1文字 と段階的に落とし、
-   出せなかったぶんは「+2」のように件数で知らせる */
+/* マスに出すスタンプの文字を作る(2026-07-28 改定)。
+   ★ 押したスタンプは必ず全部出す。「+3」のような件数だけの省略はしない。
+   ★ 幅が足りないときは「絵文字を残して名前を落とす」方向に段階を下げる
+      (⚠️のように絵文字のほうが一目で伝わるため)。
+   1行に入らなければ2行に折り返して、それでも全部出す */
 function buildStampCellText(names, maxW) {
-  if (!names.length) return '';
+  if (!names.length) return { text: '', lines: 1 };
   var budget = maxW - 1;   /* 1px の余裕を見て切れを防ぐ */
 
   function icon(name) {
@@ -1393,29 +1417,22 @@ function buildStampCellText(names, maxW) {
     var chars = Array.from ? Array.from(name) : name.split('');
     return chars.slice(0, n).join('');
   }
-  /* 表記のパターンを「情報が多い順」に用意する */
+  /* 表記の段階(情報が多い順)。絵文字は最後まで残し、名前のほうを削っていく */
   var styles = [
     function (name) { return icon(name) + name; },          /* 🙏希望休 */
-    function (name) { return name; },                        /* 希望休 */
     function (name) { return icon(name) + head(name, 2); },  /* 🙏希望 */
-    function (name) { return head(name, 2); },               /* 希望 */
     function (name) { return icon(name) + head(name, 1); },  /* 🙏希 */
-    function (name) { return head(name, 1) || icon(name); }  /* 希 */
+    function (name) { return icon(name) || head(name, 1); }  /* 🙏(絵文字だけ) */
   ];
 
+  /* 1行に全部入る書き方を探す */
   for (var s = 0; s < styles.length; s++) {
-    /* この表記で、何個まで入るか数える(1個も入らなければ次の表記へ) */
-    for (var take = names.length; take >= 1; take--) {
-      var shown = names.slice(0, take).map(styles[s]).join(' ');
-      var rest = names.length - take;
-      var text = shown + (rest > 0 ? ' +' + rest : '');
-      if (textFitsWidth(text, budget)) return text;
-    }
+    var text = names.map(styles[s]).join(' ');
+    if (textFitsWidth(text, budget)) return { text: text, lines: 1 };
   }
-  /* どうしても入らないときは件数だけ。それも入らなければ何も出さない
-     (スタンプは優先度が下。名前は日付タップで読める) */
-  var countOnly = '+' + names.length;
-  return textFitsWidth(countOnly, budget) ? countOnly : '';
+  /* 1行に入らないときは、絵文字だけにして2行に折り返す(区切りの空白も詰める) */
+  var iconsOnly = names.map(styles[3]).join('');
+  return { text: iconsOnly, lines: textFitsWidth(iconsOnly, budget) ? 1 : 2 };
 }
 
 function buildCellExerciseLine(ym, d, shEntry, maxW, stampNames) {
@@ -1497,25 +1514,10 @@ function buildCellExerciseLine(ym, d, shEntry, maxW, stampNames) {
     }
   }
 
+  var exText = cands.length ? pickFitting(cands, maxW - 1) : '';  /* 1px の余裕を見て切れを防ぐ */
+  if (!exText) return null;
   var el = document.createElement('div');
   el.className = 'cell-ex';
-  var exText = cands.length ? pickFitting(cands, maxW - 1) : '';  /* 1px の余裕を見て切れを防ぐ */
-
-  /* スタンプの文字を同じ1行の後ろに足す(行を増やすとマスからはみ出すため)。
-     優先度は フィールサイクル > スタンプ。残り幅に入る書き方まで自動で落とす */
-  if (stampNames && stampNames.length) {
-    if (!exText) {
-      el.textContent = buildStampCellText(stampNames, maxW - 1);
-      return el;
-    }
-    var rest = maxW - 1 - measureCellText(exText + ' ');
-    var stampText = rest >= 6 ? buildStampCellText(stampNames, rest) : '';
-    /* 足した結果が幅を超えないか、必ず最後に確かめてから確定する */
-    if (stampText && textFitsWidth(exText + ' ' + stampText, maxW - 1)) {
-      exText += ' ' + stampText;
-    }
-  }
-  if (!exText) return null;
   el.textContent = exText;
   return el;
 }
@@ -1600,8 +1602,29 @@ function render() {
       /* 万一壊れたデータが混ざっても、その日のマスだけ空にして月全体は描き切る(問題2) */
       try {
         var hasNote = !!getNote(ym, dayNum);   /* 自分で書いたメモがあるか */
-        var noteMarkDone = false;
-        var stampNames = null;                 /* この日に押してあるスタンプ(表示順に並べたもの) */
+        if (hasNote) cell.className += ' has-note';   /* 右下に色つきの折り目マークが出る */
+
+        /* スタンプは「押したものを必ず全部出す」ため、先に何行必要かを決めておく。
+           2行必要な日(4〜5個以上)は、場所を作るために時刻の表示を省く
+           (時刻は日付をタップすれば読める) */
+        var stampNames = null, stampInfo = null;
+        (function () {
+          var arr = monthStamps[String(dayNum)];
+          if (!Array.isArray(arr) || !arr.length) return;
+          var order = {};
+          state.stampDefs.forEach(function (def, i) { order[def.label] = i; });
+          stampNames = arr.filter(function (s) { return typeof s === 'string'; })
+            .slice()
+            .sort(function (a, b) {
+              var ia = order.hasOwnProperty(a) ? order[a] : 9999;
+              var ib = order.hasOwnProperty(b) ? order[b] : 9999;
+              return ia - ib;
+            });
+          if (stampNames.length) stampInfo = buildStampCellText(stampNames, cellInnerW);
+        })();
+        /* スタンプがある日は、押したスタンプを必ず全部出す場所を作るために時刻を省く
+           (時刻は日付をタップすれば読める。ユーザーの最優先は「スタンプが全部見えること」) */
+        var manyStamps = !!(stampInfo && stampInfo.text);
         var sh = normShift(monthShifts[String(dayNum)]);
         if (sh) {
           var shiftEl = document.createElement('div');
@@ -1620,49 +1643,32 @@ function render() {
           /* 時刻とメモ印は1行にまとめる(運動予定の行を出す高さを確保するため。
              メモの全文は従来どおり日付タップで読める)。
              ● = シフト表の補足 / 📝 = 自分で書いたメモ(区別できるようにする) */
-          if (sh.time) {
+          /* シフト表の補足は時刻行の「●」で示す(自分のメモはマスの色つき三角で示す)。
+             スタンプが2行必要な日は、スタンプを全部出す場所を作るため時刻を省く */
+          if (sh.time && !manyStamps) {
             var timeEl = document.createElement('div');
             timeEl.className = 'time';
-            timeEl.textContent = sh.time + (sh.memo ? '●' : '') + (hasNote ? '📝' : '');
+            timeEl.textContent = sh.time + (sh.memo ? '●' : '');
             cell.appendChild(timeEl);
-            noteMarkDone = true;
-          } else if (sh.memo || hasNote) {
+          } else if (sh.memo && !manyStamps) {
             var dot = document.createElement('div');
             dot.className = 'memo-dot';
-            dot.textContent = (sh.memo ? '●メモ' : '') + (hasNote ? '📝' : '');
+            dot.textContent = '●メモ';
             cell.appendChild(dot);
-            noteMarkDone = true;
           }
         }
-        /* シフトが無い日に自分のメモだけある場合も印を出す */
-        if (hasNote && !noteMarkDone) {
-          var noteOnly = document.createElement('div');
-          noteOnly.className = 'memo-dot';
-          noteOnly.textContent = '📝';
-          cell.appendChild(noteOnly);
-        }
 
-        /* スタンプはマス下部に「文字」で表示する(2026-07-28 変更)。
-           設定で並べ替えた優先順(stampDefs の並び)の上位から入るだけ出す */
-        var stArr = monthStamps[String(dayNum)];
-        if (Array.isArray(stArr) && stArr.length) {
-          var order = {};
-          state.stampDefs.forEach(function (def, i) { order[def.label] = i; });
-          var names = stArr.filter(function (s) { return typeof s === 'string'; })
-            .slice()
-            .sort(function (a, b) {
-              var ia = order.hasOwnProperty(a) ? order[a] : 9999;
-              var ib = order.hasOwnProperty(b) ? order[b] : 9999;
-              return ia - ib;
-            });
-          stampNames = names;
-        }
-
-        /* 運動予定とスタンプをマス下部の1行にまとめて表示する。
-           行を増やすとマスからはみ出すため、幅に入る書き方を自動で選ぶ
-           (優先度: シフト名 > フィールサイクル朝晩 > スタンプ文字) */
+        /* 運動予定(🚴朝晩・💪・🚶)の行 */
         var exLine = buildCellExerciseLine(ym, dayNum, sh, cellInnerW, stampNames);
         if (exLine) cell.appendChild(exLine);
+
+        /* スタンプ専用の行。押したものは必ず全部出す(件数だけの省略はしない) */
+        if (stampInfo && stampInfo.text) {
+          var stEl = document.createElement('div');
+          stEl.className = 'cell-stamps' + (stampInfo.lines > 1 ? ' two-line' : '');
+          stEl.textContent = stampInfo.text;
+          cell.appendChild(stEl);
+        }
       } catch (e) { /* このマスは日付だけ表示して続行 */ }
 
       (function (d) {
