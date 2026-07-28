@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- shift-calendar build 2026-07-28-04 -->
+<!-- shift-calendar build 2026-07-28-06 -->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -106,7 +106,7 @@
     border-right: 1px solid var(--line);
     border-bottom: 1px solid var(--line);
     min-height: 44px;
-    padding: 3px 2px 4px;   /* マス内に余白を持たせる */
+    padding: 1px 2px;   /* マス内に少し余白を持たせる(高さは最小限に) */
     font-size: 11px;
     text-align: center;
     cursor: pointer;
@@ -157,20 +157,37 @@
   /* 3文字以上は横幅がぎりぎりなので、帯の左右余白を詰めて文字の場所を確保する */
   .cell .shift.mid { font-size: 17px; letter-spacing: -1px; padding: 0 1px; }  /* 3文字 */
   .cell .shift.long { font-size: 13px; letter-spacing: -0.8px; padding: 0; }   /* 4文字以上は余白なしで幅を確保 */
-  .cell .time { font-size: 10px; line-height: 1.1; color: #666; flex-shrink: 0; }
-  .cell .cell-stamps {
-    position: absolute;
-    top: 1px;
-    right: 1px;
-    font-size: 9px;
-    line-height: 1;
-    max-width: 62%;
-    overflow: hidden;
+  /* 時刻+印の行。絵文字が入っても折り返して高さが増えないよう1行に固定する */
+  .cell .time {
+    font-size: 10px;
+    line-height: 1.1;
+    color: #666;
+    flex-shrink: 0;
+    max-width: 100%;
     white-space: nowrap;
-    text-align: right;
-    pointer-events: none;   /* アイコンの上でも日付タップが効くように */
+    overflow: hidden;
+    text-overflow: clip;
   }
-  .cell .memo-dot { font-size: 8px; line-height: 1; color: #e08600; flex-shrink: 0; }
+  /* スタンプは下部の1行に文字で出す(運動予定と同じ行にまとめる) */
+  .cell .cell-stamps {
+    font-size: 9px;
+    line-height: 1.05;
+    color: #6b6355;
+    letter-spacing: -0.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 100%;
+    flex-shrink: 0;
+  }
+  .cell .memo-dot {
+    font-size: 8px;
+    line-height: 1;
+    color: #e08600;
+    flex-shrink: 0;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+  }
   /* マス下部の運動予定(🚴回数・💪)。シフト名の表示を邪魔しない小さな1行 */
   .cell .cell-ex {
     font-size: 9px;
@@ -188,11 +205,11 @@
      運動予定の行がマスに入る高さを作る(問題42)。
      ※ 上の .cell 系の指定を上書きするため、必ずそれらより後に置くこと */
   @media (max-width: 360px) {
-    .cell { padding: 1px; }
+    .cell { padding: 0 1px; }
     .cell .shift { font-size: 18px; line-height: 1.1; }
     .cell .shift.mid { font-size: 13px; }
     .cell .shift.long { font-size: 10px; }
-    .cell .num { font-size: 10px; line-height: 12px; height: 12px; width: 14px; }
+    .cell .num { font-size: 10px; line-height: 11px; height: 11px; width: 14px; }
     .cell .time { font-size: 8px; line-height: 1; }
     .cell .memo-dot { font-size: 7px; }
     .cell .cell-stamps { font-size: 8px; }
@@ -214,9 +231,28 @@
   #di-bar .di-info {
     font-size: 12px;
     min-width: 0;
+    flex: 1 1 auto;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  /* メモを書くボタン(日付を選んでいないときは隠す) */
+  #di-note-btn {
+    flex: 0 0 auto;
+    background: #fff;
+    color: var(--navy);
+    border: none;
+    border-radius: 6px;
+    padding: 0 10px;
+    min-height: 32px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  #di-bar .di-info { cursor: pointer; }   /* タップで全文を表示する */
+  @media (max-width: 360px) {
+    #di-bar { padding: 4px 12px; }
+    #di-note-btn { min-height: 28px; }
   }
   #chip-area {
     display: flex;
@@ -691,6 +727,7 @@
 <div id="di-bar">
   <span class="di-date" id="di-date">--</span>
   <span class="di-info" id="di-info"></span>
+  <button id="di-note-btn" aria-label="この日のメモを書く">📝 メモ</button>
 </div>
 <div id="chip-area">
   <div id="stamp-chip-row"></div>
@@ -773,7 +810,7 @@
   <div class="result-box" id="backup-result"></div>
 
   <div class="step" style="margin-top:14px;">全データを消す</div>
-  <div class="hint">シフト・スタンプ・名前をすべて消して最初の状態に戻します。消す前にバックアップの書き出しをおすすめします。</div>
+  <div class="hint">シフト・スタンプ・名前・運動予定・メモをすべて消して最初の状態に戻します。消す前にバックアップの書き出しをおすすめします。</div>
   <button class="btn small danger" id="reset-all">全データ消去(リセット)</button>
 </div>
 
@@ -830,6 +867,9 @@ function defaultState() {
     stamps: {},
     stampDefs: DEFAULT_STAMPS.map(function (s) { return { label: s.label, icon: s.icon }; }),
     settings: { userName: '' },
+    /* notes = 自分で書くメモ(2026-07-28 追加)。月→日→文字列。
+       AI取り込みで入る shifts[日].memo(シフト表の補足)とは別物 */
+    notes: {},
     /* 運動予定(2026-07-27 追加)。既存の shiftTypes/shifts/stamps/settings とは独立した箱。
        confirmedMonths = 「その月は最後まで計算し終えた」ことを示す確定済み月のリスト。
        muscle[月] にキーがあるだけでは「確定済み」と判定しない(繰り越しで1件だけこぼれた
@@ -860,6 +900,7 @@ function loadState() {
     s.stamps = sanitizeStamps(d.stamps);
     s.stampDefs = sanitizeStampDefs(d.stampDefs);
     s.exercise = sanitizeExercise(d.exercise);
+    s.notes = sanitizeNotes(d.notes);
     if (d.settings && typeof d.settings === 'object' && typeof d.settings.userName === 'string') {
       s.settings.userName = d.settings.userName;
     }
@@ -957,6 +998,49 @@ function findStampDef(label) {
     if (state.stampDefs[i].label === label) return state.stampDefs[i];
   }
   return null;
+}
+
+/* 自分で書くメモ(notes)を洗浄。月キー・実在する日にち・文字列だけを残す。
+   notes が無い旧データを読んでも壊れない(空として扱う) */
+function sanitizeNotes(src) {
+  var out = {};
+  if (!src || typeof src !== 'object' || Array.isArray(src)) return out;
+  Object.keys(src).forEach(function (ym) {
+    if (!/^\d{4}-\d{2}$/.test(ym)) return;
+    var mo = src[ym];
+    if (!mo || typeof mo !== 'object' || Array.isArray(mo)) return;
+    var y = parseInt(ym.slice(0, 4), 10), m = parseInt(ym.slice(5, 7), 10);
+    if (!(m >= 1 && m <= 12)) return;
+    var dim = daysInMonth(y, m);
+    var cleanMo = {};
+    Object.keys(mo).forEach(function (dk) {
+      if (!/^\d{1,2}$/.test(dk)) return;
+      var n = parseInt(dk, 10);
+      if (n < 1 || n > dim) return;
+      if (typeof mo[dk] !== 'string') return;
+      var t = mo[dk].trim();
+      if (!t) return;
+      cleanMo[String(n)] = t.slice(0, 2000);   /* 長すぎるメモは上限で切る */
+    });
+    if (Object.keys(cleanMo).length) out[ym] = cleanMo;
+  });
+  return out;
+}
+
+/* メモの読み書き。空文字を渡すと削除 */
+function getNote(ym, d) {
+  var mo = state.notes[ym];
+  var v = mo ? mo[String(d)] : null;
+  return (typeof v === 'string' && v) ? v : '';
+}
+function setNote(ym, d, text) {
+  var t = (typeof text === 'string') ? text.trim().slice(0, 2000) : '';
+  if (!state.notes[ym]) state.notes[ym] = {};
+  var mo = state.notes[ym];
+  if (t) mo[String(d)] = t;
+  else delete mo[String(d)];
+  if (!Object.keys(mo).length) delete state.notes[ym];
+  saveState();
 }
 
 /* 運動予定(exercise)を洗浄。壊れた形は初期値(空)に戻す(問題2と同じ二段構えの入口洗浄) */
@@ -1270,19 +1354,22 @@ function copyText(text, okMsg) {
 /* マスの幅に収まる中で「いちばん言葉が多い」書き方を選ぶ。
    候補は「言葉つき」から順に並べ、収まらなければ短い書き方へ落とす */
 var exTextProbe = null, exTextCache = {};
-function textFitsWidth(text, maxW) {
-  var key = maxW + '|' + text;
-  if (exTextCache.hasOwnProperty(key)) return exTextCache[key];
+function measureCellText(text) {
+  if (exTextCache.hasOwnProperty(text)) return exTextCache[text];
   if (!exTextProbe) {
     exTextProbe = document.createElement('span');
+    /* マス下部の1行(.cell-ex / .cell-stamps)と同じ文字設定で幅を測る */
     exTextProbe.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;' +
       'font-size:9px;letter-spacing:-0.5px;left:-9999px;top:0;';
     document.body.appendChild(exTextProbe);
   }
   exTextProbe.textContent = text;
-  var ok = exTextProbe.getBoundingClientRect().width <= maxW;
-  exTextCache[key] = ok;
-  return ok;
+  var w = exTextProbe.getBoundingClientRect().width;
+  exTextCache[text] = w;
+  return w;
+}
+function textFitsWidth(text, maxW) {
+  return measureCellText(text) <= maxW;
 }
 function pickFitting(cands, maxW) {
   for (var i = 0; i < cands.length; i++) {
@@ -1291,7 +1378,47 @@ function pickFitting(cands, maxW) {
   return cands[cands.length - 1];
 }
 
-function buildCellExerciseLine(ym, d, shEntry, maxW) {
+/* マスに出すスタンプの文字を作る(2026-07-28)。
+   幅に入るだけ「名前」で並べ、入らなければ短縮 → 先頭1文字 と段階的に落とし、
+   出せなかったぶんは「+2」のように件数で知らせる */
+function buildStampCellText(names, maxW) {
+  if (!names.length) return '';
+  var budget = maxW - 1;   /* 1px の余裕を見て切れを防ぐ */
+
+  function icon(name) {
+    var def = findStampDef(name);
+    return def && def.icon ? def.icon : '';
+  }
+  function head(name, n) {
+    var chars = Array.from ? Array.from(name) : name.split('');
+    return chars.slice(0, n).join('');
+  }
+  /* 表記のパターンを「情報が多い順」に用意する */
+  var styles = [
+    function (name) { return icon(name) + name; },          /* 🙏希望休 */
+    function (name) { return name; },                        /* 希望休 */
+    function (name) { return icon(name) + head(name, 2); },  /* 🙏希望 */
+    function (name) { return head(name, 2); },               /* 希望 */
+    function (name) { return icon(name) + head(name, 1); },  /* 🙏希 */
+    function (name) { return head(name, 1) || icon(name); }  /* 希 */
+  ];
+
+  for (var s = 0; s < styles.length; s++) {
+    /* この表記で、何個まで入るか数える(1個も入らなければ次の表記へ) */
+    for (var take = names.length; take >= 1; take--) {
+      var shown = names.slice(0, take).map(styles[s]).join(' ');
+      var rest = names.length - take;
+      var text = shown + (rest > 0 ? ' +' + rest : '');
+      if (textFitsWidth(text, budget)) return text;
+    }
+  }
+  /* どうしても入らないときは件数だけ。それも入らなければ何も出さない
+     (スタンプは優先度が下。名前は日付タップで読める) */
+  var countOnly = '+' + names.length;
+  return textFitsWidth(countOnly, budget) ? countOnly : '';
+}
+
+function buildCellExerciseLine(ym, d, shEntry, maxW, stampNames) {
   var closure = state.exercise.closureDays[ym] || [];
   var ds = dateStrOf(cur.y, cur.m, d);
   var res = getFeelcycleCount(ds, shEntry, closure.indexOf(String(d)) >= 0);
@@ -1317,28 +1444,32 @@ function buildCellExerciseLine(ym, d, shEntry, maxW) {
     mMark = ms === 'done' ? '✓' : (ms === 'rest' ? '🌙' : '');
   }
   var walkN = getWalkCount(ym, d);
-  if (!hasFeel && !hasMuscle && walkN === 0) return null;
+  var hasStamps = !!(stampNames && stampNames.length);
+  if (!hasFeel && !hasMuscle && walkN === 0 && !hasStamps) return null;
 
-  /* 「ジム」= フィールサイクル(呼び名が長いので略)、「筋トレ」= 筋トレ予定。
-     予定外に行った回数は予定回数に足して表示する(予定0回の日でも「🚴ジム1」と出る) */
+  /* フィールサイクルは「朝晩」「朝2」「朝」のように、いつ行くかが分かる書き方にする。
+     予定外に行った回数(extra)は「+n」で後ろに足す(予定0回の日でも出る) */
   var n = res.count + extraN, cands;
+  var slotTxt = feelSlotsLabel(res);
+  if (extraN > 0) slotTxt = slotTxt ? slotTxt + '+' + extraN : '追加' + extraN;
   if (hasFeel && hasMuscle) {
     cands = [
-      '🚴ジム' + n + feelMark + ' 💪筋トレ' + mMark,
-      'ジム' + n + feelMark + ' 筋トレ' + mMark,
-      'ジム' + n + feelMark + ' 筋' + mMark,
-      '🚴' + n + feelMark + ' 💪' + mMark,
-      '🚴' + n + feelMark + '💪' + mMark,
+      '🚴' + slotTxt + feelMark + ' 💪筋トレ' + mMark,
+      '🚴' + slotTxt + feelMark + ' 💪' + mMark,
+      slotTxt + feelMark + ' 筋' + mMark,
+      '🚴' + slotTxt + feelMark + '💪' + mMark,
+      '🚴' + slotTxt + feelMarkShort + '💪' + mMark,
+      '🚴' + slotTxt + '💪' + mMark,
       '🚴' + n + feelMarkShort + '💪' + mMark,
-      '🚴' + feelMarkShort + '💪' + mMark,   /* 回数を落として記録の印を優先 */
       '🚴💪'                                  /* 最後の受け皿(必ず収まる短さ) */
     ];
   } else if (hasFeel) {
     cands = [
-      '🚴ジム' + n + feelMark,
-      'ジム' + n + feelMark,
-      '🚴' + n + feelMark,
-      '🚴' + n + feelMarkShort,
+      '🚴' + slotTxt + feelMark,
+      slotTxt + feelMark,
+      '🚴' + slotTxt + feelMarkShort,
+      '🚴' + slotTxt,
+      slotTxt,
       '🚴' + n
     ];
   } else if (hasMuscle) {
@@ -1368,7 +1499,24 @@ function buildCellExerciseLine(ym, d, shEntry, maxW) {
 
   var el = document.createElement('div');
   el.className = 'cell-ex';
-  el.textContent = pickFitting(cands, maxW - 1);  /* 1px の余裕を見て切れを防ぐ */
+  var exText = cands.length ? pickFitting(cands, maxW - 1) : '';  /* 1px の余裕を見て切れを防ぐ */
+
+  /* スタンプの文字を同じ1行の後ろに足す(行を増やすとマスからはみ出すため)。
+     優先度は フィールサイクル > スタンプ。残り幅に入る書き方まで自動で落とす */
+  if (stampNames && stampNames.length) {
+    if (!exText) {
+      el.textContent = buildStampCellText(stampNames, maxW - 1);
+      return el;
+    }
+    var rest = maxW - 1 - measureCellText(exText + ' ');
+    var stampText = rest >= 6 ? buildStampCellText(stampNames, rest) : '';
+    /* 足した結果が幅を超えないか、必ず最後に確かめてから確定する */
+    if (stampText && textFitsWidth(exText + ' ' + stampText, maxW - 1)) {
+      exText += ' ' + stampText;
+    }
+  }
+  if (!exText) return null;
+  el.textContent = exText;
   return el;
 }
 
@@ -1451,6 +1599,9 @@ function render() {
 
       /* 万一壊れたデータが混ざっても、その日のマスだけ空にして月全体は描き切る(問題2) */
       try {
+        var hasNote = !!getNote(ym, dayNum);   /* 自分で書いたメモがあるか */
+        var noteMarkDone = false;
+        var stampNames = null;                 /* この日に押してあるスタンプ(表示順に並べたもの) */
         var sh = normShift(monthShifts[String(dayNum)]);
         if (sh) {
           var shiftEl = document.createElement('div');
@@ -1467,52 +1618,50 @@ function render() {
           }
           cell.appendChild(shiftEl);
           /* 時刻とメモ印は1行にまとめる(運動予定の行を出す高さを確保するため。
-             メモの全文は従来どおり日付タップで読める) */
+             メモの全文は従来どおり日付タップで読める)。
+             ● = シフト表の補足 / 📝 = 自分で書いたメモ(区別できるようにする) */
           if (sh.time) {
             var timeEl = document.createElement('div');
             timeEl.className = 'time';
-            timeEl.textContent = sh.time + (sh.memo ? ' ●' : '');
+            timeEl.textContent = sh.time + (sh.memo ? '●' : '') + (hasNote ? '📝' : '');
             cell.appendChild(timeEl);
-          } else if (sh.memo) {
+            noteMarkDone = true;
+          } else if (sh.memo || hasNote) {
             var dot = document.createElement('div');
             dot.className = 'memo-dot';
-            dot.textContent = '●メモ';
+            dot.textContent = (sh.memo ? '●メモ' : '') + (hasNote ? '📝' : '');
             cell.appendChild(dot);
+            noteMarkDone = true;
           }
         }
+        /* シフトが無い日に自分のメモだけある場合も印を出す */
+        if (hasNote && !noteMarkDone) {
+          var noteOnly = document.createElement('div');
+          noteOnly.className = 'memo-dot';
+          noteOnly.textContent = '📝';
+          cell.appendChild(noteOnly);
+        }
 
-        /* スタンプはマス右上に絵文字アイコンだけ小さく表示(3個超は「…」)。
-           絵文字の無いスタンプは名前の1文字目で代用 */
+        /* スタンプはマス下部に「文字」で表示する(2026-07-28 変更)。
+           設定で並べ替えた優先順(stampDefs の並び)の上位から入るだけ出す */
         var stArr = monthStamps[String(dayNum)];
         if (Array.isArray(stArr) && stArr.length) {
-          /* 表示は3個までなので、設定で並べ替えた「優先順(stampDefs の並び)」の上位から選ぶ。
-             定義に無いスタンプ(削除済み)は最後に回す。押してある記録そのものは変えない */
           var order = {};
           state.stampDefs.forEach(function (def, i) { order[def.label] = i; });
-          var icons = stArr.filter(function (s) { return typeof s === 'string'; })
+          var names = stArr.filter(function (s) { return typeof s === 'string'; })
             .slice()
             .sort(function (a, b) {
               var ia = order.hasOwnProperty(a) ? order[a] : 9999;
               var ib = order.hasOwnProperty(b) ? order[b] : 9999;
               return ia - ib;
-            })
-            .map(function (s) {
-              var def = findStampDef(s);
-              if (def && def.icon) return def.icon;
-              var chars = Array.from ? Array.from(s) : s.split('');
-              return chars[0] || '';
             });
-          if (icons.length) {
-            var stEl = document.createElement('div');
-            stEl.className = 'cell-stamps';
-            stEl.textContent = icons.slice(0, 3).join('') + (icons.length > 3 ? '…' : '');
-            cell.appendChild(stEl);
-          }
+          stampNames = names;
         }
 
-        /* 運動予定をマス下部に小さく1行で表示(🚴回数・💪)。
-           記録済みなら状態も添える(済=✓ / 休む=🌙)。シフト名の表示には影響させない */
-        var exLine = buildCellExerciseLine(ym, dayNum, sh, cellInnerW);
+        /* 運動予定とスタンプをマス下部の1行にまとめて表示する。
+           行を増やすとマスからはみ出すため、幅に入る書き方を自動で選ぶ
+           (優先度: シフト名 > フィールサイクル朝晩 > スタンプ文字) */
+        var exLine = buildCellExerciseLine(ym, dayNum, sh, cellInnerW, stampNames);
         if (exLine) cell.appendChild(exLine);
       } catch (e) { /* このマスは日付だけ表示して続行 */ }
 
@@ -1538,23 +1687,58 @@ function renderDayInfo() {
   if (!selected || selected.y !== cur.y || selected.m !== cur.m) {
     $('di-date').textContent = cur.y + '年' + cur.m + '月';
     $('di-info').textContent = '日付をタップするとスタンプを押せます';
+    $('di-note-btn').style.display = 'none';
   } else {
     var w = WEEK_JA[new Date(selected.y, selected.m - 1, selected.d).getDay()];
-    $('di-date').textContent = selected.m + '/' + selected.d + '(' + w + ')のシフト入力';
+    $('di-date').textContent = selected.m + '/' + selected.d + '(' + w + ')';
     var ym = ymKey(selected.y, selected.m);
     var sh = normShift((state.shifts[ym] || {})[String(selected.d)]);
     var parts = [];
     if (sh) {
       if (sh.label === UNKNOWN_LABEL) parts.push('不明(読み取れなかった日。紙のシフト表で確認)');
       else parts.push(sh.label + (sh.time ? ' ' + sh.time : ''));
-      if (sh.memo) parts.push('📝 ' + sh.memo);
     } else {
       parts.push('予定なし');
     }
+    /* シフト表の補足(📋)と自分のメモ(📝)は、行を増やさずこの1行にまとめる
+       (行を足すとカレンダーの高さが削られ、6行1画面が崩れるため)。
+       全文はこの欄をタップすると表示される */
+    var myNote = getNote(ym, selected.d);
+    if (sh && sh.memo) parts.push('📋 ' + sh.memo);
+    if (myNote) parts.push('📝 ' + myNote);
     $('di-info').textContent = parts.join(' / ');
+    $('di-note-btn').style.display = '';
+    $('di-note-btn').textContent = myNote ? '📝 メモを編集' : '📝 メモ';
   }
   renderStampChipRow();
 }
+
+/* 詳細欄をタップすると、その日の全文(シフト表の補足と自分のメモ)を表示する。
+   表示は alert なので、どんな文字を入れても文字としてしか出ない(XSS の心配がない) */
+$('di-info').addEventListener('click', function () {
+  if (!selected || selected.y !== cur.y || selected.m !== cur.m) return;
+  var ym = ymKey(selected.y, selected.m);
+  var sh = normShift((state.shifts[ym] || {})[String(selected.d)]);
+  var myNote = getNote(ym, selected.d);
+  var lines = [selected.m + '/' + selected.d + ' の詳細', ''];
+  if (sh && sh.memo) lines.push('📋 シフト表の補足:', sh.memo, '');
+  if (myNote) lines.push('📝 メモ:', myNote);
+  alert(lines.join('\n'));
+});
+
+/* メモの入力(既存のスタンプ編集と同じ prompt 方式で統一) */
+$('di-note-btn').addEventListener('click', function () {
+  if (!selected || selected.y !== cur.y || selected.m !== cur.m) return;
+  var ym = ymKey(selected.y, selected.m);
+  var before = getNote(ym, selected.d);
+  var input = prompt(selected.m + '/' + selected.d + ' のメモ(空にすると消せます)', before);
+  if (input === null) return;   /* キャンセルは何もしない */
+  setNote(ym, selected.d, input);
+  var after = getNote(ym, selected.d);
+  render();
+  if (!after && before) toast('メモを消しました');
+  else if (after && after !== before) toast('メモを保存しました');
+});
 
 /* 日付タップ = 詳細表示だけ。スタンプは「スタンプ」ボタンから(問題14) */
 function selectDay(d) {
@@ -1733,24 +1917,39 @@ function getFeelcycleCount(dateStr, shiftEntry, isManualClosure) {
 
   if (label === UNKNOWN_LABEL) return { count: 0, reason: '不明', excludedFromTotal: true };
   if (label === '希休') return { count: 0, reason: '希休' };
-  if (label === '日勤' || label === '休み') return { count: 2, reason: label };
+  /* slots = 各回が朝か晩か(2026-07-28 追加)。同じ2回でも「朝+晩」と「朝2回」がある */
+  if (label === '日勤' || label === '休み') {
+    return { count: 2, reason: label, slots: ['朝', '晩'] };
+  }
 
   if (label === '遅番') {
-    if (dow >= 1 && dow <= 4) return { count: 2, reason: '遅番(平日)' };
-    return { count: 1, reason: '遅番(週末)' };
+    if (dow >= 1 && dow <= 4) return { count: 2, reason: '遅番(平日)', slots: ['朝', '朝'] };
+    return { count: 1, reason: '遅番(週末)', slots: ['朝'] };
   }
   if (label === 'MT' || label === '早番' || label === '有休' || label === '半9') {
-    return { count: 1, reason: label };
+    return { count: 1, reason: label, slots: ['朝'] };
   }
 
   /* 応援・健診・未知ラベル(店舗名など) → memo で判定、無ければデフォルト2回 */
   if (memo.indexOf('遅番') >= 0) {
-    if (dow >= 1 && dow <= 4) return { count: 2, reason: label + '(memo:遅番/平日)' };
-    return { count: 1, reason: label + '(memo:遅番/週末)' };
+    if (dow >= 1 && dow <= 4) return { count: 2, reason: label + '(memo:遅番/平日)', slots: ['朝', '朝'] };
+    return { count: 1, reason: label + '(memo:遅番/週末)', slots: ['朝'] };
   }
-  if (memo.indexOf('早番') >= 0) return { count: 1, reason: label + '(memo:早番)' };
-  if (memo.indexOf('日勤') >= 0) return { count: 2, reason: label + '(memo:日勤)' };
-  return { count: 2, reason: label + '(デフォルト2回)' };
+  if (memo.indexOf('早番') >= 0) return { count: 1, reason: label + '(memo:早番)', slots: ['朝'] };
+  if (memo.indexOf('日勤') >= 0) return { count: 2, reason: label + '(memo:日勤)', slots: ['朝', '晩'] };
+  return { count: 2, reason: label + '(デフォルト2回)', slots: ['朝', '晩'] };
+}
+
+/* 朝晩の内訳を短い文字にする(「朝晩」「朝2」「朝」など)。予定0回なら空文字 */
+function feelSlotsLabel(res) {
+  if (!res || !res.count) return '';
+  var slots = res.slots || [];
+  if (!slots.length) return String(res.count);
+  var morning = 0, evening = 0;
+  slots.forEach(function (s) { if (s === '晩') evening++; else morning++; });
+  if (morning && evening) return '朝晩';
+  if (morning) return morning > 1 ? '朝' + morning : '朝';
+  return evening > 1 ? '晩' + evening : '晩';
 }
 
 /* 10-4-2: 筋トレ予定日の計算(月またぎ継続・繰り越し)。一度確定した月は再計算しない */
@@ -1888,7 +2087,11 @@ function buildExerciseRow(row, ym) {
   var countSpan = document.createElement('span');
   var isOff = row.res.count === 0;
   countSpan.className = 'ex-feel-tag' + (isOff ? ' ex-tag-gray' : '');
-  countSpan.textContent = row.res.count > 0 ? row.res.count + '回' : row.res.reason;
+  /* 「2回」だけでなく朝晩の別も見せる(例: 2回(朝晩) / 2回(朝2)) */
+  var slotTxt = feelSlotsLabel(row.res);
+  countSpan.textContent = row.res.count > 0
+    ? row.res.count + '回' + (slotTxt ? '(' + slotTxt + ')' : '')
+    : row.res.reason;
   head.appendChild(countSpan);
 
   if (!row.isFriday) {
@@ -1911,6 +2114,7 @@ function buildExerciseRow(row, ym) {
   el.appendChild(buildRecordGroup({
     ym: ym, d: row.d,
     count: row.res.count > 0 ? row.res.count : 0,
+    slots: row.res.slots || [],
     withMuscle: row.isMuscleDay
   }));
   return el;
@@ -1970,7 +2174,16 @@ function buildRecordGroup(opt) {
 
   for (var i = 0; i < opt.count; i++) {
     (function (idx) {
-      var label = opt.count > 1 ? String(idx + 1) : '🚴';   /* 2回予定の日は「1」「2」だけにして幅を節約 */
+      /* 朝・晩が分かるラベルにする(同じ2回でも「朝+晩」と「朝2回」がある) */
+      var slots = opt.slots || [];
+      var label;
+      if (slots.length === opt.count && slots[idx]) {
+        var sameCount = 0, seq = 0;
+        slots.forEach(function (s, i) { if (s === slots[idx]) { sameCount++; if (i <= idx) seq++; } });
+        label = slots[idx] + (sameCount > 1 ? seq : '');   /* 朝 / 晩 / 朝1・朝2 */
+      } else {
+        label = opt.count > 1 ? String(idx + 1) : '🚴';
+      }
       addPair(label,
         function () { return getFeelState(opt.ym, opt.d, idx); },
         function (next) { setFeelState(opt.ym, opt.d, idx, next); });
@@ -2942,6 +3155,7 @@ $('backup-restore').addEventListener('click', function () {
   s.stamps = sanitizeStamps(d.stamps);
   s.stampDefs = sanitizeStampDefs(d.stampDefs);
   s.exercise = sanitizeExercise(d.exercise);
+  s.notes = sanitizeNotes(d.notes);
   if (d.settings && typeof d.settings === 'object' && typeof d.settings.userName === 'string') {
     s.settings.userName = d.settings.userName;
   }
@@ -2957,7 +3171,7 @@ $('backup-restore').addEventListener('click', function () {
 
 /* ================= 全データ消去(問題13) ================= */
 $('reset-all').addEventListener('click', function () {
-  if (!confirm('本当に全データ(シフト・スタンプ・名前・運動予定)を消しますか?\n運動予定(休館日・筋トレの記録)も消えます。')) return;
+  if (!confirm('本当に全データ(シフト・スタンプ・名前・運動予定・メモ)を消しますか?\n運動予定(休館日・筋トレの記録)と、自分で書いたメモも消えます。')) return;
   if (!confirm('バックアップは取りましたか?\n「OK」を押すと元に戻せません。')) return;
   try { localStorage.removeItem(STORE_KEY); } catch (e) {}
   state = defaultState();
