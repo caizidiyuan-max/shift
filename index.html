@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- shift-calendar build 2026-07-28-03 -->
+<!-- shift-calendar build 2026-07-28-04 -->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -497,7 +497,7 @@
   .ex-count-box.flash { animation: ex-flash .6s ease; }
   .ex-muscle-line { margin-bottom: 10px; }
   #ex-list { max-height: 62vh; overflow-y: auto; }
-  .ex-row { border-bottom: 1px solid var(--line); padding: 5px 2px; }
+  .ex-row { border-bottom: 1px solid var(--line); padding: 4px 2px; }
   .ex-row.ex-row-off { background: #f2f2f2; }
   .ex-row-head { display: flex; align-items: center; font-size: 13px; gap: 6px; flex-wrap: nowrap; }
   .ex-row-head .ex-feel-tag { margin-left: auto; }
@@ -520,8 +520,8 @@
   }
   .ex-closure-btn.on { background: #ebe6da; color: #6b6355; border-color: #bdb4a2; }
   .ex-muscle-badge {
-    margin-top: 3px;
-    font-size: 10px;
+    margin-top: 2px;
+    font-size: 9px;
     background: #ffe9d6;
     color: #a34700;
     border-radius: 6px;
@@ -533,8 +533,8 @@
   }
 
   /* ===== 実施の記録(済 / 休む) ===== */
-  .rec-group { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; margin-top: 4px; }
-  .rec-label { font-size: 11px; color: #6b6355; flex: 0 0 auto; margin-left: 1px; }
+  .rec-group { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin-top: 2px; }
+  .rec-label { font-size: 11px; color: #6b6355; flex: 0 0 auto; margin-left: 0; }
   .rec-btn {
     position: relative;
     flex: 0 0 auto;
@@ -544,7 +544,7 @@
     color: var(--navy);
     border: 1.5px solid #c9c1b0;
     border-radius: 8px;
-    padding: 0 8px;
+    padding: 0 6px;
     min-height: 40px;   /* 指で押しやすい大きさを確保 */
     cursor: pointer;
     transition: background .15s ease, border-color .15s ease, color .15s ease;
@@ -555,7 +555,7 @@
   .rec-btn-moon {
     font-size: 13px;
     font-weight: normal;
-    padding: 0 6px;
+    padding: 0 4px;
     min-width: 40px;
     border-style: dashed;
     border-color: #d3cbb9;
@@ -573,6 +573,23 @@
     min-width: 40px;
   }
   .rec-btn-extra { font-size: 11px; padding: 0 8px; }
+  /* 30分歩いた記録。追加と同じ「前向きな操作」なので同系だが、色で見分けられるようにする */
+  .rec-btn-walk {
+    font-size: 12px;
+    font-weight: normal;
+    color: #1565c0;
+    border-color: #a9c7e8;
+    border-style: dashed;
+    padding: 0 6px;
+    min-width: 40px;
+  }
+  .rec-btn-walkchip {
+    font-size: 11px;
+    padding: 0 8px;
+    background: #e7f0fb;
+    border-color: #1565c0;
+    color: #0d47a1;
+  }
 
   /* 済: 小さい状態から「ぐわっと」大きく育って現れ、最後に等倍へ落ち着く */
   @keyframes rec-stamp-pop {
@@ -721,7 +738,8 @@
   <div class="ex-orphan-note" id="ex-orphan-note"></div>
 
   <div id="ex-list"></div>
-  <div class="hint">「記録」を押すたびに 済 → 🌙休み → 未記録 と切り替わります。</div>
+  <div class="hint">数字(1・2)= その日の1回目・2回目のジム、💪= 筋トレ。「済」= 行った / 「🌙」= 休んだ(もう一度押すと取り消し)。<br>
+  「🚴+」= 予定外にジムへ行った / 「🚶+」= 30分歩いた(押すたびに1回ぶん増え、チップの ✕ で取り消せます)。</div>
 </div>
 
 <!-- ===== 設定シート ===== -->
@@ -1017,7 +1035,14 @@ function sanitizeExercise(src) {
           ex = Math.floor(ex);
           if (ex > 0) clean.extra = Math.min(ex, 20);
         }
-        if (clean.feel || clean.muscle || clean.extra) cleanMo[String(n)] = clean;
+        /* walk = 30分歩いた回数(2026-07-28 追加)。自動の予定は作らず、歩いた日に記録するだけ。
+           このキーが無い旧データも読める(単に0回として扱う) */
+        var wk = rec.walk;
+        if (typeof wk === 'number' && isFinite(wk)) {
+          wk = Math.floor(wk);
+          if (wk > 0) clean.walk = Math.min(wk, 20);
+        }
+        if (clean.feel || clean.muscle || clean.extra || clean.walk) cleanMo[String(n)] = clean;
       });
       if (Object.keys(cleanMo).length) out.records[ym] = cleanMo;
     });
@@ -1058,7 +1083,26 @@ function setExtraCount(ym, d, n) {
   if (!mo[key]) mo[key] = {};
   var rec = mo[key];
   if (n > 0) rec.extra = n; else delete rec.extra;
-  if (!rec.feel && !rec.muscle && !rec.extra) delete mo[key];
+  if (!rec.feel && !rec.muscle && !rec.extra && !rec.walk) delete mo[key];
+  if (!Object.keys(mo).length) delete state.exercise.records[ym];
+  saveState();
+}
+
+/* 30分歩いた回数(2026-07-28 追加)。予定は作らず、歩いた日に自分で記録する */
+function getWalkCount(ym, d) {
+  var rec = getDayRecord(ym, d);
+  return rec && typeof rec.walk === 'number' && rec.walk > 0 ? rec.walk : 0;
+}
+function setWalkCount(ym, d, n) {
+  if (n < 0) n = 0;
+  if (n > 20) n = 20;
+  if (!state.exercise.records[ym]) state.exercise.records[ym] = {};
+  var mo = state.exercise.records[ym];
+  var key = String(d);
+  if (!mo[key]) mo[key] = {};
+  var rec = mo[key];
+  if (n > 0) rec.walk = n; else delete rec.walk;
+  if (!rec.feel && !rec.muscle && !rec.extra && !rec.walk) delete mo[key];
   if (!Object.keys(mo).length) delete state.exercise.records[ym];
   saveState();
 }
@@ -1075,7 +1119,7 @@ function setFeelState(ym, d, index, next) {
   rec.feel[index] = (next === null || rec.feel[index] === next) ? null : next;
   while (rec.feel.length && rec.feel[rec.feel.length - 1] === null) rec.feel.pop();
   if (!rec.feel.length) delete rec.feel;
-  if (!rec.feel && !rec.muscle) delete mo[key];
+  if (!rec.feel && !rec.muscle && !rec.extra && !rec.walk) delete mo[key];
   if (!Object.keys(mo).length) delete state.exercise.records[ym];
   saveState();
 }
@@ -1087,7 +1131,7 @@ function setMuscleState(ym, d, next) {
   var rec = mo[key];
   if (next === null || rec.muscle === next) delete rec.muscle;  /* null = 未記録に戻す */
   else rec.muscle = next;
-  if (!rec.feel && !rec.muscle) delete mo[key];
+  if (!rec.feel && !rec.muscle && !rec.extra && !rec.walk) delete mo[key];
   if (!Object.keys(mo).length) delete state.exercise.records[ym];
   saveState();
 }
@@ -1272,7 +1316,8 @@ function buildCellExerciseLine(ym, d, shEntry, maxW) {
     var ms = getMuscleState(ym, d);
     mMark = ms === 'done' ? '✓' : (ms === 'rest' ? '🌙' : '');
   }
-  if (!hasFeel && !hasMuscle) return null;
+  var walkN = getWalkCount(ym, d);
+  if (!hasFeel && !hasMuscle && walkN === 0) return null;
 
   /* 「ジム」= フィールサイクル(呼び名が長いので略)、「筋トレ」= 筋トレ予定。
      予定外に行った回数は予定回数に足して表示する(予定0回の日でも「🚴ジム1」と出る) */
@@ -1296,7 +1341,7 @@ function buildCellExerciseLine(ym, d, shEntry, maxW) {
       '🚴' + n + feelMarkShort,
       '🚴' + n
     ];
-  } else {
+  } else if (hasMuscle) {
     cands = [
       '💪筋トレ' + mMark,
       '筋トレ' + mMark,
@@ -1304,7 +1349,23 @@ function buildCellExerciseLine(ym, d, shEntry, maxW) {
       '💪' + mMark,
       '💪'
     ];
+  } else {
+    cands = [];   /* 歩きだけの日。下で組み立てる */
   }
+
+  /* 30分歩いた記録はマスの幅がぎりぎりなので、収まるときだけ後ろに足す。
+     歩きしか無い日は「🚶30分」だけを出す */
+  var walkTxt = walkN > 1 ? '🚶' + walkN : '🚶';
+  if (walkN > 0) {
+    if (!cands.length) {
+      cands = ['🚶30分' + (walkN > 1 ? '×' + walkN : ''), '🚶' + (walkN > 1 ? walkN : '')];
+    } else {
+      /* 既存の候補それぞれに「 🚶」を足したものを前に置き、入らなければ歩き無しの表記に落とす */
+      var withWalk = cands.map(function (c) { return c + ' ' + walkTxt; });
+      cands = withWalk.concat(cands);
+    }
+  }
+
   var el = document.createElement('div');
   el.className = 'cell-ex';
   el.textContent = pickFitting(cands, maxW - 1);  /* 1px の余裕を見て切れを防ぐ */
@@ -1909,7 +1970,7 @@ function buildRecordGroup(opt) {
 
   for (var i = 0; i < opt.count; i++) {
     (function (idx) {
-      var label = opt.count > 1 ? '🚴' + (idx + 1) : '🚴';
+      var label = opt.count > 1 ? String(idx + 1) : '🚴';   /* 2回予定の日は「1」「2」だけにして幅を節約 */
       addPair(label,
         function () { return getFeelState(opt.ym, opt.d, idx); },
         function (next) { setFeelState(opt.ym, opt.d, idx, next); });
@@ -1941,7 +2002,7 @@ function buildRecordGroup(opt) {
   }
   var addBtn = document.createElement('button');
   addBtn.className = 'rec-btn rec-btn-add';
-  addBtn.textContent = '+ 追加';
+  addBtn.textContent = '🚴+';
   addBtn.setAttribute('aria-label', cur.m + '/' + opt.d + ' に予定外で行った1回を記録する');
   addBtn.addEventListener('click', function () {
     setExtraCount(opt.ym, opt.d, getExtraCount(opt.ym, opt.d) + 1);
@@ -1954,6 +2015,39 @@ function buildRecordGroup(opt) {
     }, 700);
   });
   wrap.appendChild(addBtn);
+
+  /* 30分歩いた記録(2026-07-28)。予定は作らず、歩いた日に1タップで記録する。
+     すべての日に出す(歩くのはジムの予定と関係がないため) */
+  var walk = getWalkCount(opt.ym, opt.d);
+  for (var w = 0; w < walk; w++) {
+    (function (num) {
+      var chip = document.createElement('button');
+      chip.className = 'rec-btn is-done rec-btn-walkchip';
+      chip.textContent = '🚶30分' + (walk > 1 ? num : '') + ' ✕';
+      chip.setAttribute('aria-label', cur.m + '/' + opt.d + ' の30分歩き' + num + '回目を取り消す');
+      chip.addEventListener('click', function () {
+        setWalkCount(opt.ym, opt.d, getWalkCount(opt.ym, opt.d) - 1);
+        renderExercise();
+        skipExerciseRerender = true; render(); skipExerciseRerender = false;
+        toast('30分歩きの記録を1回ぶん取り消しました');
+      });
+      wrap.appendChild(chip);
+    })(w + 1);
+  }
+  var walkBtn = document.createElement('button');
+  walkBtn.className = 'rec-btn rec-btn-walk';
+  walkBtn.textContent = '🚶+';
+  walkBtn.setAttribute('aria-label', cur.m + '/' + opt.d + ' に30分歩いたことを記録する');
+  walkBtn.addEventListener('click', function () {
+    setWalkCount(opt.ym, opt.d, getWalkCount(opt.ym, opt.d) + 1);
+    playPop(walkBtn);
+    updateExerciseCounts();
+    skipExerciseRerender = true; render(); skipExerciseRerender = false;
+    setTimeout(function () {
+      if ($('sheet-exercise').classList.contains('open')) renderExercise();
+    }, 700);
+  });
+  wrap.appendChild(walkBtn);
   return wrap;
 }
 
@@ -2047,7 +2141,7 @@ function updateExerciseCounts() {
   var monthShifts = state.shifts[ym] || {};
   var closure = state.exercise.closureDays[ym] || [];
 
-  var total = 0, feelDone = 0, feelRest = 0, feelExtra = 0;
+  var total = 0, feelDone = 0, feelRest = 0, feelExtra = 0, walkTotal = 0;
   var orphanDays = [];   /* 予定より多く記録が残っている日(問題40) */
   for (var d = 1; d <= dim; d++) {
     var ds = dateStrOf(cur.y, cur.m, d);
@@ -2060,6 +2154,7 @@ function updateExerciseCounts() {
       else if (st === 'rest') feelRest++;
     }
     feelExtra += getExtraCount(ym, d);   /* 予定外に行った回数 */
+    walkTotal += getWalkCount(ym, d);    /* 30分歩いた回数 */
     /* 予定の回数を超えて残っている記録がないか調べる(シフトが変わって予定が減った日) */
     var rec = getDayRecord(ym, d);
     if (rec && Array.isArray(rec.feel)) {
@@ -2072,17 +2167,21 @@ function updateExerciseCounts() {
     }
   }
 
-  /* 達成の判定は「実際に行った数(予定ぶんの済 + 予定外の追加)」で見る */
-  var doneAll = feelDone + feelExtra;
+  /* 達成の判定は「実際に行った数(予定ぶんの済 + 予定外の追加 + 30分歩き)」で見る */
+  var doneAll = feelDone + feelExtra + walkTotal;
   var achieved = doneAll >= 30;
   var prev = exercisePrevTotal.hasOwnProperty(ym) ? exercisePrevTotal[ym] : null;
   var justAchieved = achieved && prev !== null && prev < 30;
   exercisePrevTotal[ym] = doneAll;
 
+  /* 内訳は0のものを出さない(画面が煩雑にならないように) */
+  var parts = [];
+  if (feelExtra > 0) parts.push('追加 ' + feelExtra + '回');
+  if (walkTotal > 0) parts.push('歩き ' + walkTotal + '回');
   var box = $('ex-feel-box');
   box.classList.toggle('achieved', achieved);
   $('ex-feel-count').textContent = '予定 ' + total + '回 / 済 ' + doneAll + '回' +
-    (feelExtra > 0 ? '(うち追加 ' + feelExtra + '回)' : '') + (achieved ? ' 🎉' : '');
+    (parts.length ? '(うち' + parts.join('・') + ')' : '') + (achieved ? ' 🎉' : '');
   $('ex-feel-msg').textContent = achieved ? '🎉 今月の目標達成!' : '';
   if (justAchieved) {
     box.classList.remove('flash');
