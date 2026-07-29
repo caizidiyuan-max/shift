@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- shift-calendar build 2026-07-28-08 -->
+<!-- shift-calendar build 2026-07-28-09 -->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -199,6 +199,9 @@
     line-height: .9;
     font-size: 8px;        /* 2行になる日は少し小さくして必ずマス内に収める */
   }
+  /* 3行以上になる日(繰り返し予定+手動スタンプが多数重なる日)はさらに小さく */
+  .cell .cell-stamps.many-line { font-size: 6px; line-height: .85; }
+  .cell .cell-stamps.tiny-line { font-size: 5px; line-height: .8; }
   .cell .memo-dot {
     font-size: 8px;
     line-height: 1;
@@ -233,7 +236,9 @@
     .cell .time { font-size: 8px; line-height: 1; }
     .cell .memo-dot { font-size: 7px; }
     .cell .cell-stamps { font-size: 7px; line-height: .95; margin-top: 0; }
-    .cell .cell-stamps.two-line { font-size: 7px; line-height: .9; }
+    .cell .cell-stamps.two-line { font-size: 6px; line-height: .85; }
+    .cell .cell-stamps.many-line { font-size: 5px; line-height: .8; }
+    .cell .cell-stamps.tiny-line { font-size: 4px; line-height: .75; }
     .cell .cell-ex { font-size: 7px; line-height: .95; margin-top: 0; }
     .cell .shift { line-height: 1.05; }
   }
@@ -469,6 +474,32 @@
     cursor: pointer;
   }
   .stampdef-row button.sd-del { color: #b71c1c; border-color: #b71c1c; }
+  /* 繰り返し予定の一覧(設定シート内) */
+  .recur-row { display: flex; align-items: center; gap: 6px; margin: 6px 0; }
+  .recur-row .rc-name {
+    flex: 1 1 auto;
+    font-size: 13px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .recur-row .rc-when { font-size: 11px; color: #6b6355; flex: 0 0 auto; }
+  .recur-row button {
+    flex: 0 0 auto;
+    background: #fff;
+    border: 1px solid #c9c1b0;
+    color: var(--navy);
+    border-radius: 6px;
+    padding: 0 8px;
+    min-height: 40px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .recur-row button.rc-toggle.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .recur-row button.rc-del { color: #b71c1c; border-color: #d8a5a5; }
+  .recur-row.off .rc-name, .recur-row.off .rc-when { opacity: .45; }
+
   /* 並べ替えの取っ手(ここだけドラッグに反応する) */
   .sd-handle {
     flex: 0 0 auto;
@@ -823,6 +854,11 @@
   <button class="btn sub small" id="restore-default-stamps">最初から入っているスタンプを補充する</button>
   <div class="hint">アプリに新しい初期スタンプが増えたときや、消したものを戻したいときに押してください。足りないものだけを追加し、今あるスタンプは変えません。</div>
 
+  <div class="step">繰り返し予定</div>
+  <div class="hint">毎月・毎週くり返す予定です。ONにした予定は、その日のカレンダーに自動で出ます(手で押すスタンプとは別です)。</div>
+  <div id="recurring-list"></div>
+  <button class="btn sub small" id="add-recurring">+ 繰り返し予定を追加</button>
+
   <div class="step">バックアップ</div>
   <div class="notice">データはこのスマホのこのブラウザだけに保存されます。機種変更・履歴の削除で消えることがあるので、<b>月1回(シフト取り込みのついで)のバックアップをおすすめします。</b></div>
   <button class="btn sub" id="backup-out">書き出し(テキストをコピー)</button>
@@ -878,6 +914,18 @@ var DEFAULT_STAMPS = [
   { label: '予定あり', icon: '⭐' }
 ];
 
+/* 繰り返し予定の初期値(2026-07-28 ユーザー確定の6件)。
+   type: 'monthly' = 毎月の日にち('last' はその月の最終日)/ 'weekly' = 毎週の曜日(0=日〜6=土)
+   自動で出る予定なので state.stamps(手で押したスタンプ)には書き込まない */
+var DEFAULT_RECURRING = [
+  { label: '在庫〆日',        icon: '🗓', type: 'monthly', days: [15, 'last'], enabled: true },
+  { label: 'BML締め',         icon: '🅱', type: 'monthly', days: [20],        enabled: true },
+  { label: 'フィフティ締め',  icon: '🅵', type: 'monthly', days: [25],        enabled: true },
+  { label: 'フィフティ発注',  icon: '📋', type: 'weekly',  weekdays: [3],     enabled: true },
+  { label: 'フィフティ在庫確認', icon: '🔍', type: 'weekly', weekdays: [1],   enabled: true },
+  { label: 'BML発注',         icon: '🧾', type: 'weekly',  weekdays: [1, 4],  enabled: true }
+];
+
 var UNKNOWN_LABEL = '不明';
 var UNKNOWN_COLOR = '#9e9e9e';
 
@@ -892,6 +940,15 @@ function defaultState() {
     /* notes = 自分で書くメモ(2026-07-28 追加)。月→日→文字列。
        AI取り込みで入る shifts[日].memo(シフト表の補足)とは別物 */
     notes: {},
+    /* recurring = 毎月・毎週の繰り返し予定(2026-07-28 追加)。自動で該当日に出る */
+    recurring: DEFAULT_RECURRING.map(function (r) {
+      return {
+        label: r.label, icon: r.icon, type: r.type,
+        days: r.days ? r.days.slice() : undefined,
+        weekdays: r.weekdays ? r.weekdays.slice() : undefined,
+        enabled: r.enabled
+      };
+    }),
     /* 運動予定(2026-07-27 追加)。既存の shiftTypes/shifts/stamps/settings とは独立した箱。
        confirmedMonths = 「その月は最後まで計算し終えた」ことを示す確定済み月のリスト。
        muscle[月] にキーがあるだけでは「確定済み」と判定しない(繰り越しで1件だけこぼれた
@@ -923,6 +980,7 @@ function loadState() {
     s.stampDefs = sanitizeStampDefs(d.stampDefs);
     s.exercise = sanitizeExercise(d.exercise);
     s.notes = sanitizeNotes(d.notes);
+    s.recurring = sanitizeRecurring(d.recurring);
     if (d.settings && typeof d.settings === 'object' && typeof d.settings.userName === 'string') {
       s.settings.userName = d.settings.userName;
     }
@@ -1047,6 +1105,89 @@ function sanitizeNotes(src) {
     if (Object.keys(cleanMo).length) out[ym] = cleanMo;
   });
   return out;
+}
+
+/* 繰り返し予定を洗浄。recurring が無い旧データは初期6件で補う */
+function sanitizeRecurring(src) {
+  function defaults() {
+    return DEFAULT_RECURRING.map(function (r) {
+      return {
+        label: r.label, icon: r.icon, type: r.type,
+        days: r.days ? r.days.slice() : undefined,
+        weekdays: r.weekdays ? r.weekdays.slice() : undefined,
+        enabled: r.enabled
+      };
+    });
+  }
+  if (!Array.isArray(src)) return defaults();
+  var out = [], seen = {};
+  src.forEach(function (v) {
+    if (!v || typeof v !== 'object' || typeof v.label !== 'string') return;
+    var label = v.label.trim();
+    if (!label || seen[label]) return;
+    var item = {
+      label: label,
+      icon: typeof v.icon === 'string' ? v.icon : '',
+      enabled: v.enabled !== false,   /* 既定は ON */
+      type: (v.type === 'weekly') ? 'weekly' : 'monthly'
+    };
+    if (item.type === 'monthly') {
+      var days = [];
+      if (Array.isArray(v.days)) {
+        v.days.forEach(function (d) {
+          if (d === 'last') { if (days.indexOf('last') < 0) days.push('last'); return; }
+          var n = parseInt(d, 10);
+          if (n >= 1 && n <= 31 && days.indexOf(n) < 0) days.push(n);
+        });
+      }
+      if (!days.length) return;
+      item.days = days;
+    } else {
+      var wds = [];
+      /* 旧形式(weekday が1つだけ)も読めるようにする */
+      var srcWd = Array.isArray(v.weekdays) ? v.weekdays
+        : (typeof v.weekday === 'number' ? [v.weekday] : []);
+      srcWd.forEach(function (w) {
+        var n = parseInt(w, 10);
+        if (n >= 0 && n <= 6 && wds.indexOf(n) < 0) wds.push(n);
+      });
+      if (!wds.length) return;
+      item.weekdays = wds;
+    }
+    seen[label] = true;
+    out.push(item);
+  });
+  return out;
+}
+
+/* その日に出る繰り返し予定の名前を並び順で返す(ONのものだけ) */
+function recurringLabelsFor(y, m, d) {
+  var out = [];
+  if (!Array.isArray(state.recurring)) return out;
+  var dim = daysInMonth(y, m);
+  var dow = new Date(y, m - 1, d).getDay();
+  state.recurring.forEach(function (r) {
+    if (!r || r.enabled === false) return;
+    var hit = false;
+    if (r.type === 'monthly' && Array.isArray(r.days)) {
+      hit = r.days.some(function (x) {
+        return (x === 'last') ? (d === dim) : (parseInt(x, 10) === d);
+      });
+    } else if (r.type === 'weekly' && Array.isArray(r.weekdays)) {
+      hit = r.weekdays.indexOf(dow) >= 0;
+    }
+    if (hit && out.indexOf(r.label) < 0) out.push(r.label);
+  });
+  return out;
+}
+
+/* 繰り返し予定の定義を名前から探す(マス表示で絵文字を使うため) */
+function findRecurringDef(label) {
+  if (!Array.isArray(state.recurring)) return null;
+  for (var i = 0; i < state.recurring.length; i++) {
+    if (state.recurring[i].label === label) return state.recurring[i];
+  }
+  return null;
 }
 
 /* メモの読み書き。空文字を渡すと削除 */
@@ -1411,7 +1552,9 @@ function buildStampCellText(names, maxW) {
 
   function icon(name) {
     var def = findStampDef(name);
-    return def && def.icon ? def.icon : '';
+    if (def && def.icon) return def.icon;
+    var rec = findRecurringDef(name);   /* 繰り返し予定の絵文字も使う */
+    return rec && rec.icon ? rec.icon : '';
   }
   function head(name, n) {
     var chars = Array.from ? Array.from(name) : name.split('');
@@ -1430,9 +1573,12 @@ function buildStampCellText(names, maxW) {
     var text = names.map(styles[s]).join(' ');
     if (textFitsWidth(text, budget)) return { text: text, lines: 1 };
   }
-  /* 1行に入らないときは、絵文字だけにして2行に折り返す(区切りの空白も詰める) */
+  /* 1行に入らないときは絵文字だけにして折り返す。
+     必要な行数を先に数えて、行数が増えるほど文字を小さくし、必ずマス内に収める */
   var iconsOnly = names.map(styles[3]).join('');
-  return { text: iconsOnly, lines: textFitsWidth(iconsOnly, budget) ? 1 : 2 };
+  var w = measureCellText(iconsOnly);
+  var lines = Math.max(1, Math.ceil(w / Math.max(8, budget)));
+  return { text: iconsOnly, lines: lines };
 }
 
 function buildCellExerciseLine(ym, d, shEntry, maxW, stampNames) {
@@ -1522,6 +1668,22 @@ function buildCellExerciseLine(ym, d, shEntry, maxW, stampNames) {
   return el;
 }
 
+/* 描き終わったマスを実測して、スタンプがはみ出す日だけ段階的に小さくする。
+   ここで確実に収めるので、押したスタンプ・繰り返し予定を隠す必要がない */
+function fitStampLines() {
+  var steps = ['', 'two-line', 'two-line many-line', 'two-line many-line tiny-line'];
+  document.querySelectorAll('#grid .cell .cell-stamps').forEach(function (st) {
+    var cell = st.parentNode;
+    if (!cell || cell.scrollHeight <= cell.clientHeight) return;
+    for (var i = 1; i < steps.length; i++) {
+      st.className = 'cell-stamps ' + steps[i];
+      if (cell.scrollHeight <= cell.clientHeight) return;
+    }
+    /* 最小まで下げても足りない極端な日は、行の高さをさらに詰める(表示は消さない) */
+    st.style.lineHeight = '0.72';
+  });
+}
+
 /* 実施記録のボタンを押した直後だけ true。運動予定の一覧の作り直しを1回だけ見送る */
 var skipExerciseRerender = false;
 
@@ -1609,18 +1771,25 @@ function render() {
            (時刻は日付をタップすれば読める) */
         var stampNames = null, stampInfo = null;
         (function () {
+          /* 繰り返し予定(自動)を先に、手で押したスタンプを後に並べる。
+             同じ名前が両方にあっても1つだけ出す */
+          var list = recurringLabelsFor(cur.y, cur.m, dayNum);
           var arr = monthStamps[String(dayNum)];
-          if (!Array.isArray(arr) || !arr.length) return;
-          var order = {};
-          state.stampDefs.forEach(function (def, i) { order[def.label] = i; });
-          stampNames = arr.filter(function (s) { return typeof s === 'string'; })
-            .slice()
-            .sort(function (a, b) {
-              var ia = order.hasOwnProperty(a) ? order[a] : 9999;
-              var ib = order.hasOwnProperty(b) ? order[b] : 9999;
-              return ia - ib;
-            });
-          if (stampNames.length) stampInfo = buildStampCellText(stampNames, cellInnerW);
+          if (Array.isArray(arr) && arr.length) {
+            var order = {};
+            state.stampDefs.forEach(function (def, i) { order[def.label] = i; });
+            arr.filter(function (s) { return typeof s === 'string'; })
+              .slice()
+              .sort(function (a, b) {
+                var ia = order.hasOwnProperty(a) ? order[a] : 9999;
+                var ib = order.hasOwnProperty(b) ? order[b] : 9999;
+                return ia - ib;
+              })
+              .forEach(function (s) { if (list.indexOf(s) < 0) list.push(s); });
+          }
+          if (!list.length) return;
+          stampNames = list;
+          stampInfo = buildStampCellText(stampNames, cellInnerW);
         })();
         /* スタンプがある日は、押したスタンプを必ず全部出す場所を作るために時刻を省く
            (時刻は日付をタップすれば読める。ユーザーの最優先は「スタンプが全部見えること」) */
@@ -1665,7 +1834,10 @@ function render() {
         /* スタンプ専用の行。押したものは必ず全部出す(件数だけの省略はしない) */
         if (stampInfo && stampInfo.text) {
           var stEl = document.createElement('div');
-          stEl.className = 'cell-stamps' + (stampInfo.lines > 1 ? ' two-line' : '');
+          /* 行数が増えるほど小さくして、必ずマスの中に全部収める */
+          stEl.className = 'cell-stamps' +
+            (stampInfo.lines > 1 ? ' two-line' : '') +
+            (stampInfo.lines >= 3 ? ' many-line' : '');
           stEl.textContent = stampInfo.text;
           cell.appendChild(stEl);
         }
@@ -1680,6 +1852,17 @@ function render() {
     }
     grid.appendChild(cell);
   }
+
+  /* 行の高さが小数になると、マスの高さと中身の高さの丸めで1pxのズレが出る。
+     カレンダー全体の高さを行数で割り切れる値にそろえて、ズレを無くす */
+  var rowCount = totalCells / 7;
+  grid.style.maxHeight = '';
+  var gh = grid.clientHeight;
+  if (gh > rowCount) grid.style.maxHeight = (Math.floor(gh / rowCount) * rowCount) + 'px';
+
+  /* スタンプ(繰り返し予定+手で押したもの)が多い日は、実際に描いた高さを測って
+     収まるまで文字を小さくする。押したものを必ず全部見せるための最終調整 */
+  fitStampLines();
 
   renderDayInfo();
   /* 運動予定シートが開いていれば、月移動に連動して中身も更新する(表示中の月を共有)。
@@ -1710,6 +1893,9 @@ function renderDayInfo() {
        (行を足すとカレンダーの高さが削られ、6行1画面が崩れるため)。
        全文はこの欄をタップすると表示される */
     var myNote = getNote(ym, selected.d);
+    /* その日の繰り返し予定(在庫〆日・発注など)も見せる */
+    var recur = recurringLabelsFor(selected.y, selected.m, selected.d);
+    if (recur.length) parts.push('🔁 ' + recur.join('・'));
     if (sh && sh.memo) parts.push('📋 ' + sh.memo);
     if (myNote) parts.push('📝 ' + myNote);
     $('di-info').textContent = parts.join(' / ');
@@ -1727,6 +1913,8 @@ $('di-info').addEventListener('click', function () {
   var sh = normShift((state.shifts[ym] || {})[String(selected.d)]);
   var myNote = getNote(ym, selected.d);
   var lines = [selected.m + '/' + selected.d + ' の詳細', ''];
+  var rec = recurringLabelsFor(selected.y, selected.m, selected.d);
+  if (rec.length) lines.push('🔁 繰り返し予定:', rec.join('\n'), '');
   if (sh && sh.memo) lines.push('📋 シフト表の補足:', sh.memo, '');
   if (myNote) lines.push('📝 メモ:', myNote);
   alert(lines.join('\n'));
@@ -1841,6 +2029,7 @@ $('nav-settings').addEventListener('click', function () {
   $('user-name').value = state.settings.userName;
   renderTypeList();
   renderStampDefList();
+  renderRecurringList();
   $('backup-result').className = 'result-box';
   openSheet('settings');
 });
@@ -2489,6 +2678,7 @@ $('edit-stamps-btn').addEventListener('click', function () {
   $('user-name').value = state.settings.userName;
   renderTypeList();
   renderStampDefList();
+  renderRecurringList();
   $('backup-result').className = 'result-box';
   openSheet('settings');
   $('stamp-def-list').scrollIntoView();
@@ -2996,6 +3186,113 @@ function renderStampDefList() {
   }
 }
 
+/* ================= 繰り返し予定の管理(設定シート) ================= */
+var WEEK_JA_SHORT = ['日', '月', '火', '水', '木', '金', '土'];
+
+/* 「毎月15日・月末」「毎週 月・木」のような説明文を作る */
+function recurringWhenText(r) {
+  if (r.type === 'weekly') {
+    return '毎週 ' + (r.weekdays || []).map(function (w) { return WEEK_JA_SHORT[w]; }).join('・');
+  }
+  return '毎月 ' + (r.days || []).map(function (d) { return d === 'last' ? '月末' : d + '日'; }).join('・');
+}
+
+function renderRecurringList() {
+  var list = $('recurring-list');
+  list.textContent = '';
+  if (!Array.isArray(state.recurring) || !state.recurring.length) {
+    var hint = document.createElement('div');
+    hint.className = 'hint';
+    hint.textContent = '繰り返し予定がありません。「+ 繰り返し予定を追加」で作れます。';
+    list.appendChild(hint);
+    return;
+  }
+  state.recurring.forEach(function (r, idx) {
+    var row = document.createElement('div');
+    row.className = 'recur-row' + (r.enabled === false ? ' off' : '');
+
+    var name = document.createElement('span');
+    name.className = 'rc-name';
+    name.textContent = (r.icon ? r.icon + ' ' : '') + r.label;
+    row.appendChild(name);
+
+    var when = document.createElement('span');
+    when.className = 'rc-when';
+    when.textContent = recurringWhenText(r);
+    row.appendChild(when);
+
+    var toggle = document.createElement('button');
+    toggle.className = 'rc-toggle' + (r.enabled !== false ? ' on' : '');
+    toggle.textContent = r.enabled !== false ? 'ON' : 'OFF';
+    toggle.setAttribute('aria-label', r.label + ' の表示を切り替える');
+    toggle.addEventListener('click', function () {
+      state.recurring[idx].enabled = (state.recurring[idx].enabled === false);
+      saveState();
+      renderRecurringList();
+      render();
+      toast(r.label + ' を' + (state.recurring[idx].enabled ? 'カレンダーに出します' : '出さないようにしました'));
+    });
+    row.appendChild(toggle);
+
+    var del = document.createElement('button');
+    del.className = 'rc-del';
+    del.textContent = '削除';
+    del.setAttribute('aria-label', r.label + ' を削除する');
+    del.addEventListener('click', function () {
+      if (!confirm('繰り返し予定「' + r.label + '」を削除しますか?\n(カレンダーに出なくなります。手で押したスタンプは消えません)')) return;
+      state.recurring.splice(idx, 1);
+      saveState();
+      renderRecurringList();
+      render();
+      toast('繰り返し予定「' + r.label + '」を削除しました');
+    });
+    row.appendChild(del);
+    list.appendChild(row);
+  });
+}
+
+$('add-recurring').addEventListener('click', function () {
+  var name = prompt('繰り返し予定の名前(絵文字を先頭に付けてもOK)');
+  if (name === null) return;
+  name = String(name).trim();
+  if (!name) { toast('名前が空です。追加しませんでした'); return; }
+  for (var i = 0; i < state.recurring.length; i++) {
+    if (state.recurring[i].label === name) { toast('同じ名前の繰り返し予定がすでにあります'); return; }
+  }
+  var weekly = confirm('くり返し方を選んでください。\n\n「OK」= 毎週(曜日で決める)\n「キャンセル」= 毎月(日にちで決める)');
+  var item = { label: name, icon: '', enabled: true };
+  if (weekly) {
+    var wIn = prompt('何曜日ですか?(日=0 月=1 火=2 水=3 木=4 金=5 土=6)\n複数なら「1,4」のようにカンマ区切り', '1');
+    if (wIn === null) return;
+    var wds = [];
+    String(wIn).split(',').forEach(function (t) {
+      var n = parseInt(t.trim(), 10);
+      if (n >= 0 && n <= 6 && wds.indexOf(n) < 0) wds.push(n);
+    });
+    if (!wds.length) { toast('曜日が読み取れませんでした。追加しませんでした'); return; }
+    item.type = 'weekly';
+    item.weekdays = wds;
+  } else {
+    var dIn = prompt('毎月の何日ですか?(1〜31)\n月末は「末」と入力。複数なら「15,末」のようにカンマ区切り', '15');
+    if (dIn === null) return;
+    var days = [];
+    String(dIn).split(',').forEach(function (t) {
+      var s = t.trim();
+      if (s === '末' || s === 'last' || s === '月末') { if (days.indexOf('last') < 0) days.push('last'); return; }
+      var n = parseInt(s, 10);
+      if (n >= 1 && n <= 31 && days.indexOf(n) < 0) days.push(n);
+    });
+    if (!days.length) { toast('日にちが読み取れませんでした。追加しませんでした'); return; }
+    item.type = 'monthly';
+    item.days = days;
+  }
+  state.recurring.push(item);
+  saveState();
+  renderRecurringList();
+  render();
+  toast('繰り返し予定「' + name + '」を追加しました');
+});
+
 /* 空・重複をチェック。OKなら trim 済みの名前、ダメなら null(理由はトーストで知らせる) */
 function validStampName(input, ignoreIndex) {
   if (input === null) return null; /* prompt のキャンセル */
@@ -3162,6 +3459,7 @@ $('backup-restore').addEventListener('click', function () {
   s.stampDefs = sanitizeStampDefs(d.stampDefs);
   s.exercise = sanitizeExercise(d.exercise);
   s.notes = sanitizeNotes(d.notes);
+  s.recurring = sanitizeRecurring(d.recurring);
   if (d.settings && typeof d.settings === 'object' && typeof d.settings.userName === 'string') {
     s.settings.userName = d.settings.userName;
   }
@@ -3171,6 +3469,7 @@ $('backup-restore').addEventListener('click', function () {
   $('user-name').value = state.settings.userName;
   renderTypeList();
   renderStampDefList();
+  renderRecurringList();
   showBackupResult('✅ 復元しました。', false);
   render();
 });
@@ -3187,6 +3486,7 @@ $('reset-all').addEventListener('click', function () {
   $('backup-in').value = '';
   renderTypeList();
   renderStampDefList();
+  renderRecurringList();
   showBackupResult('全データを消去しました。最初の状態に戻っています。', false);
   render();
 });
@@ -3202,6 +3502,7 @@ $('reset-all').addEventListener('click', function () {
     $('user-name').value = '';
     renderTypeList();
     renderStampDefList();
+    renderRecurringList();
     $('backup-result').className = 'result-box';
     openSheet('settings');
     $('user-name').focus();
