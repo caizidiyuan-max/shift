@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- shift-calendar build 2026-07-28-09 -->
+<!-- shift-calendar build 2026-07-28-10 -->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -313,7 +313,7 @@
   /* ===== 下部メニュー ===== */
   nav {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
     border-top: 1px solid var(--line);
     background: #f3ede1;
     flex-shrink: 0;
@@ -743,6 +743,155 @@
     animation: rec-moon-rise .75s ease-out, rec-moon-glow 1.15s ease-out;
   }
 
+  /* ===== 食事(ダイエット)=====
+     色は「未達=落ち着いた青 #3a6ea5 / 達成=金 #c9a227」の2色だけ。
+     赤・オレンジ・警告アイコンは使わない(罰しない設計。計画11-6) */
+  .diet-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+  .diet-tab {
+    flex: 1 1 0;
+    background: var(--cell-bg);
+    border: 1px solid #cfc7b5;
+    color: var(--ink);
+    border-radius: 8px;
+    min-height: 40px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .diet-tab.on { background: var(--navy); color: #fff; border-color: var(--navy); font-weight: bold; }
+  .diet-date { font-size: 14px; font-weight: bold; margin-bottom: 8px; }
+  .diet-card {
+    background: var(--cell-bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+  }
+  .weight-row { display: flex; align-items: center; gap: 8px; }
+  .weight-row input[type=number] {
+    flex: 1 1 auto;
+    min-width: 0;
+    border: 1px solid #bbb;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 16px;
+  }
+  .weight-unit { font-size: 13px; flex: 0 0 auto; }
+  .body-bmi { font-size: 13px; color: #6b6355; }        /* 区分名は淡い小さな文字(強調しない) */
+  .body-remain { font-size: 17px; font-weight: bold; margin: 4px 0; }
+  /* メーター */
+  .meter-row { margin: 8px 0; }
+  .meter-head { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px; }
+  .meter-name { font-weight: bold; }
+  .meter-bar { height: 10px; background: #ece7db; border-radius: 5px; overflow: hidden; }
+  .meter-fill { height: 100%; background: #3a6ea5; border-radius: 5px; transition: width .25s ease; }
+  .meter-row.is-done .meter-fill { background: #c9a227; }
+  .meter-row.is-done .meter-name { color: #8a6d13; }
+  .meter-sub { font-size: 11px; color: #6b6355; margin-top: 2px; }
+  /* 祝福スタンプ */
+  .diet-stamps { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; min-height: 1px; }
+  .diet-stamp {
+    font-size: 12px;
+    background: #fff7dc;
+    border: 1px solid #c9a227;
+    color: #8a6d13;
+    border-radius: 14px;
+    padding: 5px 10px;
+  }
+  .diet-stamp.star { font-weight: bold; font-size: 13px; }
+  @keyframes diet-pop {
+    0%   { transform: scale(.3); opacity: .4; }
+    55%  { transform: scale(1.3); opacity: 1; }
+    75%  { transform: scale(.95); }
+    100% { transform: scale(1); }
+  }
+  .diet-stamp.pop { animation: diet-pop .6s cubic-bezier(.22,.8,.3,1.2); }
+  /* 食品ボタン */
+  .food-item { margin-bottom: 8px; }
+  .food-btn {
+    position: relative;
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: var(--cell-bg);
+    border: 2px solid #c9c1b0;
+    color: var(--ink);
+    border-radius: 10px;
+    padding: 10px 66px 10px 12px;
+    min-height: 48px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .food-btn.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .food-btn .food-sub { display: block; font-size: 11px; opacity: .8; margin-top: 2px; }
+  .food-count {
+    position: absolute;
+    right: 40px; top: 50%;
+    transform: translateY(-50%);
+    background: #fff; color: var(--navy);
+    border-radius: 12px;
+    min-width: 24px;
+    padding: 2px 6px;
+    font-size: 12px;
+    font-weight: bold;
+    text-align: center;
+  }
+  .food-x, .food-g {
+    position: absolute;
+    right: 6px;
+    background: transparent;
+    border: 1px solid currentColor;
+    color: inherit;
+    border-radius: 6px;
+    width: 28px;
+    min-height: 22px;
+    font-size: 11px;
+    cursor: pointer;
+    padding: 0;
+  }
+  .food-x { top: 6px; }
+  .food-g { bottom: 6px; }
+  .food-gram-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .gram-chip {
+    font-size: 11px;
+    background: #eef0fb;
+    border: 1px solid #6b74b8;
+    color: #3f4790;
+    border-radius: 10px;
+    padding: 4px 8px;
+    min-height: 28px;
+    cursor: pointer;
+  }
+  /* グラフ */
+  .graph-range { display: flex; gap: 6px; margin-bottom: 8px; }
+  .range-btn {
+    background: var(--cell-bg);
+    border: 1px solid #cfc7b5;
+    color: var(--ink);
+    border-radius: 8px;
+    padding: 0 12px;
+    min-height: 36px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .range-btn.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+  #diet-graph { width: 100%; display: block; background: var(--cell-bg); border: 1px solid var(--line); border-radius: 8px; }
+  /* 設定の行 */
+  .diet-row { display: flex; align-items: center; gap: 6px; margin: 6px 0; flex-wrap: wrap; }
+  .diet-row .dr-label { flex: 1 1 auto; font-size: 13px; min-width: 0; }
+  .diet-row .dr-value { font-size: 13px; font-weight: bold; }
+  .diet-row button {
+    background: #fff;
+    border: 1px solid #c9c1b0;
+    color: var(--navy);
+    border-radius: 6px;
+    padding: 0 10px;
+    min-height: 40px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .diet-row button.dr-del { color: #b71c1c; border-color: #d8a5a5; }
+  .dr-auto { font-size: 10px; color: #8a8577; }
+
   /* トースト */
   #toast {
     position: fixed;
@@ -790,6 +939,7 @@
 <nav>
   <button id="nav-import"><span class="ico">📥</span>AI取り込み</button>
   <button id="nav-exercise"><span class="ico">💪</span>運動予定</button>
+  <button id="nav-diet"><span class="ico">🍽</span>食事</button>
   <button id="nav-settings"><span class="ico">⚙️</span>設定・バックアップ</button>
 </nav>
 
@@ -832,6 +982,78 @@
   「🚴+」= 予定外にジムへ行った / 「🚶+」= 30分歩いた(押すたびに1回ぶん増え、チップの ✕ で取り消せます)。</div>
 </div>
 
+<!-- ===== 食事シート(ダイエット・食事管理。計画.md 11章) ===== -->
+<div class="sheet-back" data-close="diet"></div>
+<div class="sheet" id="sheet-diet">
+  <button class="close-x" data-close="diet">✕</button>
+  <h2>🍽 食事</h2>
+  <div class="diet-tabs">
+    <button class="diet-tab on" data-dtab="today">今日</button>
+    <button class="diet-tab" data-dtab="review">ふりかえり</button>
+    <button class="diet-tab" data-dtab="settings">食品・設定</button>
+  </div>
+
+  <!-- タブ1: 今日 -->
+  <div class="diet-pane" id="dpane-today">
+    <div class="diet-date" id="diet-date">--</div>
+
+    <div class="diet-card">
+      <div class="step" style="margin-top:0;">体重</div>
+      <div class="weight-row">
+        <input type="number" id="diet-weight" step="0.1" min="20" max="300" inputmode="decimal">
+        <span class="weight-unit">kg</span>
+        <button class="btn small" id="diet-weight-save" style="width:auto;margin:0;">記録</button>
+      </div>
+      <div class="hint" id="diet-weight-prev"></div>
+    </div>
+
+    <div class="diet-card" id="diet-body-card">
+      <div class="body-bmi" id="diet-bmi">--</div>
+      <div class="body-remain" id="diet-remain">--</div>
+      <div class="hint" id="diet-energy"></div>
+    </div>
+
+    <div class="step">今日のメーター</div>
+    <div id="diet-meters"></div>
+    <div class="diet-stamps" id="diet-stamps"></div>
+
+    <div class="step">今日食べたもの</div>
+    <div class="hint">ボタンを押すと1つずつ増えます。右上の ✕ で0に戻ります。「g」でグラム入力もできます。</div>
+    <div id="diet-foods"></div>
+    <button class="btn sub small" id="diet-goto-foods">+ 食品を追加・編集する</button>
+  </div>
+
+  <!-- タブ2: ふりかえり -->
+  <div class="diet-pane" id="dpane-review" style="display:none;">
+    <div class="step" style="margin-top:0;">体重グラフ</div>
+    <div class="graph-range">
+      <button class="range-btn on" data-range="30">30日</button>
+      <button class="range-btn" data-range="90">90日</button>
+      <button class="range-btn" data-range="all">ぜんぶ</button>
+    </div>
+    <canvas id="diet-graph" height="200"></canvas>
+    <div class="hint" id="diet-graph-note"></div>
+    <div class="step">今月のようす</div>
+    <div id="diet-month-summary"></div>
+  </div>
+
+  <!-- タブ3: 食品・設定 -->
+  <div class="diet-pane" id="dpane-settings" style="display:none;">
+    <div class="notice" id="diet-kcal-notice" style="display:none;"></div>
+
+    <div class="step" style="margin-top:0;">食品マスタ</div>
+    <div class="hint">実際のパッケージの数字に直せます。「1つぶんのグラム数」はグラム入力の換算に使います(HUELなら「何グラムで400kcalか」)。</div>
+    <div id="diet-food-list"></div>
+    <button class="btn sub small" id="diet-add-food">+ 食品を追加</button>
+
+    <div class="step">プロフィール</div>
+    <div id="diet-profile"></div>
+
+    <div class="step">目標</div>
+    <div id="diet-goals"></div>
+  </div>
+</div>
+
 <!-- ===== 設定シート ===== -->
 <div class="sheet-back" data-close="settings"></div>
 <div class="sheet" id="sheet-settings">
@@ -868,7 +1090,7 @@
   <div class="result-box" id="backup-result"></div>
 
   <div class="step" style="margin-top:14px;">全データを消す</div>
-  <div class="hint">シフト・スタンプ・名前・運動予定・メモをすべて消して最初の状態に戻します。消す前にバックアップの書き出しをおすすめします。</div>
+  <div class="hint">シフト・スタンプ・名前・運動予定・メモ・食事や体重の記録をすべて消して最初の状態に戻します。消す前にバックアップの書き出しをおすすめします。</div>
   <button class="btn small danger" id="reset-all">全データ消去(リセット)</button>
 </div>
 
@@ -929,6 +1151,49 @@ var DEFAULT_RECURRING = [
 var UNKNOWN_LABEL = '不明';
 var UNKNOWN_COLOR = '#9e9e9e';
 
+/* ===== ダイエット・食事管理(2026-07-28 追加。計画.md 11章) =====
+   数はすべて整数で持つ(小数の誤差を持ち越さないため):
+   体重=0.1kg単位 / P・F・C=0.1g単位 / kcal=1kcal単位 / 身長=0.1cm単位 /
+   活動係数=0.01単位 / 目標BMI=0.1単位 */
+var DEFAULT_FOODS = [
+  /* 毎日食べる3品(11-5-1) */
+  { id: 'f1', name: '鶏もも肉(皮なし)グリル焼き', unit: '枚(生200g)', unitGrams: 200, kcal: 226, p: 380, f: 100, c: 0,   fav: true },
+  { id: 'f2', name: 'HUEL ブラックエディション',   unit: '食(400kcal)', unitGrams: 90,  kcal: 400, p: 400, f: 175, c: 210, fav: true },
+  { id: 'f3', name: 'トマト',                       unit: '個(150g)',   unitGrams: 150, kcal: 30,  p: 11,  f: 2,   c: 54,  fav: true },
+  /* 不足しがちな分を補う候補(fav なし) */
+  { id: 'f4', name: 'ゆで卵 / 卵',                  unit: '個(50g)',    unitGrams: 50,  kcal: 76,  p: 61,  f: 52,  c: 2,   fav: false },
+  { id: 'f5', name: 'ブロッコリー',                 unit: '100g',        unitGrams: 100, kcal: 37,  p: 54,  f: 6,   c: 15,  fav: false },
+  { id: 'f6', name: '納豆',                         unit: 'パック(45g)', unitGrams: 45, kcal: 83,  p: 74,  f: 45,  c: 24,  fav: false },
+  { id: 'f7', name: 'ごはん',                       unit: '杯(120g)',   unitGrams: 120, kcal: 187, p: 30,  f: 4,   c: 444, fav: false },
+  { id: 'f8', name: 'ギリシャヨーグルト(無糖)',   unit: '個(100g)',   unitGrams: 100, kcal: 59,  p: 100, f: 4,   c: 39,  fav: false }
+];
+
+function defaultDiet() {
+  return {
+    profile: {
+      heightCm: 1550,      /* 155.0cm */
+      age: 25,
+      activityFactor: 155, /* 1.55 */
+      goalBmi: 250,        /* BMI 25.0 */
+      targetKcal: 1500,
+      ratioP: 4, ratioF: 4, ratioC: 3,
+      manualP: null, manualF: 260, manualC: null,   /* F だけ指導値26.0gを手動指定 */
+      useExerciseKcal: true,
+      tuanGoal: 50,
+      startWeight: 720,    /* 記録が1件も無いときに入力欄へ出す値(72.0kg) */
+      kcalNoticeSeen: false
+    },
+    exKcal: { feel: 400, muscle: 150, walk: 130, extra: 400 },
+    thresholds: { pRate: 90, fGram: 260, cLow: 80, cHigh: 120, kcalLow: 90, kcalHigh: 110 },
+    foods: DEFAULT_FOODS.map(function (f) {
+      return { id: f.id, name: f.name, unit: f.unit, unitGrams: f.unitGrams,
+               kcal: f.kcal, p: f.p, f: f.f, c: f.c, fav: f.fav };
+    }),
+    weights: {}, meals: {}, mealsGrams: {},
+    diary: {}, habits: {}, habitDefs: [], prep: {}, achieved: {}
+  };
+}
+
 function defaultState() {
   return {
     version: 1,
@@ -955,7 +1220,9 @@ function defaultState() {
        月を誤って確定扱いするバグを防ぐため。2026-07-27 修正) */
     /* records = 実施の記録。月→日→{ feel: ["done"|"rest"|null,...], muscle: "done"|"rest"|null }
        フィールサイクルは予定回数ぶんの配列で1回ずつ独立に記録できる(2026-07-27 追加) */
-    exercise: { closureDays: {}, muscle: {}, muscleAnchor: null, confirmedMonths: [], records: {} }
+    exercise: { closureDays: {}, muscle: {}, muscleAnchor: null, confirmedMonths: [], records: {} },
+    /* diet = ダイエット・食事管理(2026-07-28 追加)。既存キーには触らない */
+    diet: defaultDiet()
   };
 }
 
@@ -981,6 +1248,7 @@ function loadState() {
     s.exercise = sanitizeExercise(d.exercise);
     s.notes = sanitizeNotes(d.notes);
     s.recurring = sanitizeRecurring(d.recurring);
+    s.diet = sanitizeDiet(d.diet);
     if (d.settings && typeof d.settings === 'object' && typeof d.settings.userName === 'string') {
       s.settings.userName = d.settings.userName;
     }
@@ -1158,6 +1426,333 @@ function sanitizeRecurring(src) {
     out.push(item);
   });
   return out;
+}
+
+/* ================= ダイエット: 保存データの洗浄(11-5) ================= */
+function sanitizeDiet(src) {
+  var out = defaultDiet();
+  if (!src || typeof src !== 'object' || Array.isArray(src)) return out;
+
+  function intIn(v, lo, hi, def) {
+    var n = parseInt(v, 10);
+    if (!isFinite(n) || n < lo || n > hi) return def;
+    return n;
+  }
+  /* 月→日→値 の入れ物を洗う(値の検査は callback に任せる) */
+  function dayMap(v, pick) {
+    var o = {};
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return o;
+    Object.keys(v).forEach(function (ym) {
+      if (!/^\d{4}-\d{2}$/.test(ym)) return;
+      var mo = v[ym];
+      if (!mo || typeof mo !== 'object' || Array.isArray(mo)) return;
+      var y = parseInt(ym.slice(0, 4), 10), m = parseInt(ym.slice(5, 7), 10);
+      if (!(m >= 1 && m <= 12)) return;
+      var dim = daysInMonth(y, m);
+      var clean = {};
+      Object.keys(mo).forEach(function (dk) {
+        if (!/^\d{1,2}$/.test(dk)) return;
+        var dn = parseInt(dk, 10);
+        if (dn < 1 || dn > dim) return;
+        var val = pick(mo[dk]);
+        if (val !== null && val !== undefined) clean[String(dn)] = val;
+      });
+      if (Object.keys(clean).length) o[ym] = clean;
+    });
+    return o;
+  }
+
+  var p = src.profile;
+  if (p && typeof p === 'object') {
+    out.profile.heightCm       = intIn(p.heightCm, 1000, 2500, out.profile.heightCm);
+    out.profile.age            = intIn(p.age, 1, 120, out.profile.age);
+    out.profile.activityFactor = intIn(p.activityFactor, 100, 300, out.profile.activityFactor);
+    out.profile.goalBmi        = intIn(p.goalBmi, 150, 400, out.profile.goalBmi);
+    out.profile.targetKcal     = intIn(p.targetKcal, 500, 6000, out.profile.targetKcal);
+    out.profile.ratioP         = intIn(p.ratioP, 1, 20, out.profile.ratioP);
+    out.profile.ratioF         = intIn(p.ratioF, 1, 20, out.profile.ratioF);
+    out.profile.ratioC         = intIn(p.ratioC, 1, 20, out.profile.ratioC);
+    out.profile.startWeight    = intIn(p.startWeight, 200, 3000, out.profile.startWeight);
+    out.profile.tuanGoal       = intIn(p.tuanGoal, 10, 99, out.profile.tuanGoal);
+    ['manualP', 'manualF', 'manualC'].forEach(function (k) {
+      if (p[k] === null || p[k] === undefined) { out.profile[k] = null; return; }
+      var n = parseInt(p[k], 10);
+      out.profile[k] = (isFinite(n) && n >= 0 && n <= 10000) ? n : null;
+    });
+    out.profile.useExerciseKcal = (p.useExerciseKcal !== false);
+    out.profile.kcalNoticeSeen  = (p.kcalNoticeSeen === true);
+  }
+
+  if (src.exKcal && typeof src.exKcal === 'object') {
+    ['feel', 'muscle', 'walk', 'extra'].forEach(function (k) {
+      out.exKcal[k] = intIn(src.exKcal[k], 0, 3000, out.exKcal[k]);
+    });
+  }
+  if (src.thresholds && typeof src.thresholds === 'object') {
+    var t = src.thresholds, ot = out.thresholds;
+    ot.pRate    = intIn(t.pRate, 1, 300, ot.pRate);
+    ot.fGram    = intIn(t.fGram, 1, 10000, ot.fGram);
+    ot.cLow     = intIn(t.cLow, 1, 300, ot.cLow);
+    ot.cHigh    = intIn(t.cHigh, 1, 500, ot.cHigh);
+    ot.kcalLow  = intIn(t.kcalLow, 1, 300, ot.kcalLow);
+    ot.kcalHigh = intIn(t.kcalHigh, 1, 500, ot.kcalHigh);
+  }
+
+  /* 食品マスタ(200件まで) */
+  if (Array.isArray(src.foods)) {
+    var foods = [], seenId = {};
+    src.foods.forEach(function (f) {
+      if (foods.length >= 200) return;
+      if (!f || typeof f !== 'object') return;
+      if (typeof f.id !== 'string' || !f.id.trim() || seenId[f.id]) return;
+      if (typeof f.name !== 'string' || !f.name.trim()) return;
+      seenId[f.id] = true;
+      foods.push({
+        id: f.id.trim(),
+        name: f.name.trim().slice(0, 60),
+        unit: (typeof f.unit === 'string' ? f.unit.trim().slice(0, 30) : ''),
+        unitGrams: intIn(f.unitGrams, 1, 2000, 100),
+        kcal: intIn(f.kcal, 0, 20000, 0),
+        p: intIn(f.p, 0, 20000, 0),
+        f: intIn(f.f, 0, 20000, 0),
+        c: intIn(f.c, 0, 20000, 0),
+        fav: f.fav === true
+      });
+    });
+    out.foods = foods;   /* 空配列(全部消した状態)も尊重する */
+  }
+
+  out.weights    = dayMap(src.weights, function (v) {
+    var n = parseInt(v, 10);
+    return (isFinite(n) && n >= 200 && n <= 3000) ? n : null;   /* 20.0〜300.0kg */
+  });
+  out.meals      = dayMap(src.meals, function (v) {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+    var o = {};
+    Object.keys(v).forEach(function (fid) {
+      var n = parseInt(v[fid], 10);
+      if (isFinite(n) && n > 0 && n <= 99) o[fid] = n;
+    });
+    return Object.keys(o).length ? o : null;
+  });
+  out.mealsGrams = dayMap(src.mealsGrams, function (v) {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+    var o = {};
+    Object.keys(v).forEach(function (fid) {
+      var n = parseInt(v[fid], 10);
+      if (isFinite(n) && n > 0 && n <= 200000) o[fid] = n;   /* 0.1g単位 */
+    });
+    return Object.keys(o).length ? o : null;
+  });
+  out.diary = dayMap(src.diary, function (v) {
+    if (typeof v !== 'string') return null;
+    var t = v.trim();
+    return t ? t.slice(0, 500) : null;
+  });
+  out.habits = dayMap(src.habits, function (v) {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+    var o = {};
+    Object.keys(v).forEach(function (k) {
+      if (v[k] === 'done' || v[k] === 'rest') o[k] = v[k];
+    });
+    return Object.keys(o).length ? o : null;
+  });
+  out.prep = dayMap(src.prep, function (v) {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+    var o = {};
+    Object.keys(v).forEach(function (k) {
+      if (v[k] === 'done' || v[k] === 'skip') o[k] = v[k];
+    });
+    return Object.keys(o).length ? o : null;
+  });
+  if (Array.isArray(src.habitDefs)) {
+    var hd = [];
+    src.habitDefs.forEach(function (h) {
+      if (hd.length >= 20) return;
+      if (!h || typeof h !== 'object') return;
+      if (typeof h.id !== 'string' || typeof h.label !== 'string' || !h.label.trim()) return;
+      hd.push({ id: h.id, label: h.label.trim().slice(0, 40) });
+    });
+    out.habitDefs = hd;
+  }
+  /* achieved = 月 → 達成した日にちの配列(一度書いたら消さない) */
+  if (src.achieved && typeof src.achieved === 'object' && !Array.isArray(src.achieved)) {
+    var ach = {};
+    Object.keys(src.achieved).forEach(function (ym) {
+      if (!/^\d{4}-\d{2}$/.test(ym)) return;
+      var arr = src.achieved[ym];
+      if (!Array.isArray(arr)) return;
+      var y = parseInt(ym.slice(0, 4), 10), m = parseInt(ym.slice(5, 7), 10);
+      if (!(m >= 1 && m <= 12)) return;
+      var dim = daysInMonth(y, m), clean = [];
+      arr.forEach(function (d) {
+        var s2 = String(d);
+        if (!/^\d{1,2}$/.test(s2)) return;
+        var n = parseInt(s2, 10);
+        if (n >= 1 && n <= dim && clean.indexOf(String(n)) < 0) clean.push(String(n));
+      });
+      if (clean.length) ach[ym] = clean;
+    });
+    out.achieved = ach;
+  }
+  return out;
+}
+
+/* ================= ダイエット: 計算(11-1) ================= */
+/* いちばん新しい体重(0.1kg単位の整数)。無ければプロフィールの開始体重 */
+function latestWeightBefore(y, m, d) {
+  var w = state.diet.weights, best = null, bestKey = null;
+  Object.keys(w).forEach(function (ym) {
+    Object.keys(w[ym]).forEach(function (dk) {
+      var key = ym + '-' + (parseInt(dk, 10) < 10 ? '0' : '') + dk;
+      if (y != null) {
+        var target = dateStrOf(y, m, d);
+        if (key > target) return;   /* その日より後の記録は使わない */
+      }
+      if (bestKey === null || key > bestKey) { bestKey = key; best = w[ym][dk]; }
+    });
+  });
+  return { weight: best, dateKey: bestKey };
+}
+function currentWeight() {
+  var r = latestWeightBefore(null);
+  return r.weight !== null ? r.weight : state.diet.profile.startWeight;
+}
+/* BMI は小数第1位まで「切り捨て」(11-1-1) */
+function calcBmi(weight10, heightCm10) {
+  var hM = heightCm10 / 100 / 10;
+  var bmi = (weight10 / 10) / (hM * hM);
+  return Math.floor(bmi * 10) / 10;
+}
+function bmiCategory(bmi) {
+  if (bmi < 18.5) return '低体重';
+  /* 表示用に切り捨てた値で判定する。ちょうど25.0は目標到達なので「普通体重」とする */
+  if (bmi <= 25) return '普通体重';
+  if (bmi < 30) return '肥満(1度)';
+  if (bmi < 35) return '肥満(2度)';
+  if (bmi < 40) return '肥満(3度)';
+  return '肥満(4度)';
+}
+/* 目標体重(0.1kg単位の整数に四捨五入) */
+function targetWeight10() {
+  var p = state.diet.profile;
+  var hM = p.heightCm / 100 / 10;
+  return Math.round((p.goalBmi / 10) * hM * hM * 10);
+}
+/* 基礎代謝(ハリス・ベネディクト 女性・原式)。体重が変われば毎回変わる */
+function calcBmrRaw(weight10) {
+  var p = state.diet.profile;
+  var kg = weight10 / 10, cm = p.heightCm / 10;
+  return 655.1 + (9.563 * kg) + (1.850 * cm) - (4.676 * p.age);
+}
+function calcBmr(weight10) { return Math.round(calcBmrRaw(weight10)); }
+/* 消費目安は「丸める前の基礎代謝」から計算する(丸めを二度かけると数字がずれるため) */
+function calcTdee(weight10) {
+  return Math.round(calcBmrRaw(weight10) * (state.diet.profile.activityFactor / 100));
+}
+/* 目標PFC(0.1g単位の整数)。手動指定があればそれを使う(11-1-7) */
+function targetPfc() {
+  var p = state.diet.profile;
+  var kcal = p.targetKcal;
+  var sum = p.ratioP + p.ratioF + p.ratioC;
+  var autoP = Math.round((kcal * (p.ratioP / sum) / 4) * 10);
+  var autoF = Math.round((kcal * (p.ratioF / sum) / 9) * 10);
+  var autoC = Math.round((kcal * (p.ratioC / sum) / 4) * 10);
+  return {
+    p: (p.manualP === null ? autoP : p.manualP), pAuto: (p.manualP === null),
+    f: (p.manualF === null ? autoF : p.manualF), fAuto: (p.manualF === null),
+    c: (p.manualC === null ? autoC : p.manualC), cAuto: (p.manualC === null),
+    autoValues: { p: autoP, f: autoF, c: autoC }
+  };
+}
+
+/* その日の食事の合計(タップぶん + グラムぶん)。単位は kcal / 0.1g */
+function dayIntake(ym, d) {
+  var total = { kcal: 0, p: 0, f: 0, c: 0 };
+  var foodsById = {};
+  state.diet.foods.forEach(function (f) { foodsById[f.id] = f; });
+
+  var meals = (state.diet.meals[ym] || {})[String(d)] || {};
+  Object.keys(meals).forEach(function (fid) {
+    var f = foodsById[fid];
+    if (!f) return;                      /* 消された食品は飛ばす(エラーにしない) */
+    var n = meals[fid];
+    total.kcal += f.kcal * n;
+    total.p += f.p * n; total.f += f.f * n; total.c += f.c * n;
+  });
+  var grams = (state.diet.mealsGrams[ym] || {})[String(d)] || {};
+  Object.keys(grams).forEach(function (fid) {
+    var f = foodsById[fid];
+    if (!f || !f.unitGrams) return;
+    var g10 = grams[fid];                /* 0.1g単位 */
+    var ratio = (g10 / 10) / f.unitGrams;
+    total.kcal += Math.round(f.kcal * ratio);
+    total.p += Math.round(f.p * ratio);
+    total.f += Math.round(f.f * ratio);
+    total.c += Math.round(f.c * ratio);
+  });
+  return total;
+}
+
+/* その日の運動消費(既存 exercise.records を読むだけ・書き換えない) */
+function dayExerciseKcal(ym, d) {
+  var rec = (state.exercise.records[ym] || {})[String(d)];
+  if (!rec) return 0;
+  var k = state.diet.exKcal, sum = 0;
+  if (Array.isArray(rec.feel)) {
+    rec.feel.forEach(function (v) { if (v === 'done') sum += k.feel; });
+  }
+  if (rec.muscle === 'done') sum += k.muscle;
+  if (typeof rec.extra === 'number' && rec.extra > 0) sum += k.extra * rec.extra;
+  if (typeof rec.walk === 'number' && rec.walk > 0) sum += k.walk * rec.walk;
+  return sum;
+}
+/* その日の目標カロリー(運動ぶんを足す設定なら加算) */
+function dayTargetKcal(ym, d) {
+  var base = state.diet.profile.targetKcal;
+  if (!state.diet.profile.useExerciseKcal) return base;
+  return base + dayExerciseKcal(ym, d);
+}
+
+/* 祝福スタンプの判定(11-6)。条件を満たしたものだけ true */
+function dietStampStatus(ym, d) {
+  var t = state.diet.thresholds, tp = targetPfc();
+  var got = dayIntake(ym, d);
+  var kcalTarget = dayTargetKcal(ym, d);
+  /* しきい値は切り捨て(136.4g の90% → 122.7g)。計画11-6の数値に合わせる */
+  var pNeed = Math.floor(tp.p * t.pRate / 100);
+  var cLow = Math.floor(tp.c * t.cLow / 100), cHigh = Math.floor(tp.c * t.cHigh / 100);
+  var kLow = Math.floor(kcalTarget * t.kcalLow / 100), kHigh = Math.floor(kcalTarget * t.kcalHigh / 100);
+  var s = {
+    p: got.p >= pNeed,
+    f: got.f >= t.fGram,
+    c: (got.c >= cLow && got.c <= cHigh),
+    kcal: (got.kcal >= kLow && got.kcal <= kHigh)
+  };
+  s.star = (s.p && s.f && s.c);
+  s.need = { p: pNeed, cLow: cLow, cHigh: cHigh, kLow: kLow, kHigh: kHigh, f: t.fGram };
+  s.got = got; s.kcalTarget = kcalTarget;
+  return s;
+}
+
+/* 一度ついたスタンプはその日のうち消さない(11-6)。達成日は achieved に記録 */
+var dietStampMemo = {};   /* セッション中だけ覚える「もう出したスタンプ」 */
+function dietStampsForDay(ym, d) {
+  var key = ym + '-' + d;
+  var live = dietStampStatus(ym, d);
+  var memo = dietStampMemo[key] || { p: false, f: false, c: false, kcal: false, star: false };
+  /* 一度でも条件を満たしたら、その日のうちは残す */
+  ['p', 'f', 'c', 'kcal', 'star'].forEach(function (k) {
+    if (live[k]) memo[k] = true;
+  });
+  dietStampMemo[key] = memo;
+  if (memo.star) markDietAchieved(ym, d);
+  return { shown: memo, live: live };
+}
+function markDietAchieved(ym, d) {
+  if (!state.diet.achieved[ym]) state.diet.achieved[ym] = [];
+  var arr = state.diet.achieved[ym];
+  if (arr.indexOf(String(d)) < 0) { arr.push(String(d)); saveState(); }
 }
 
 /* その日に出る繰り返し予定の名前を並び順で返す(ONのものだけ) */
@@ -3186,6 +3781,681 @@ function renderStampDefList() {
   }
 }
 
+/* ================= 食事(ダイエット)画面 ================= */
+/* 表示中の日は「選択中の日」を共有する(独立した日付変数を持たない。計画11-4) */
+function dietDay() {
+  var t = new Date();
+  if (selected) return { y: selected.y, m: selected.m, d: selected.d };
+  return { y: cur.y, m: cur.m, d: (cur.y === t.getFullYear() && cur.m === (t.getMonth() + 1)) ? t.getDate() : 1 };
+}
+function fmt1(v10) { return (v10 / 10).toFixed(1); }
+/* 「1枚(生200g)」のように書く。単位が数字で始まる(例「100g」)ときは「1」を付けない */
+function foodUnitLabel(f) {
+  var u = f.unit || '個';
+  return /^[0-9]/.test(u) ? u : ('1' + u);
+}
+
+$('nav-diet').addEventListener('click', function () {
+  renderDiet();
+  openSheet('diet');
+});
+
+/* タブ切り替え */
+Array.prototype.forEach.call(document.querySelectorAll('.diet-tab'), function (btn) {
+  btn.addEventListener('click', function () {
+    var name = btn.getAttribute('data-dtab');
+    Array.prototype.forEach.call(document.querySelectorAll('.diet-tab'), function (b) {
+      b.classList.toggle('on', b === btn);
+    });
+    ['today', 'review', 'settings'].forEach(function (k) {
+      $('dpane-' + k).style.display = (k === name) ? '' : 'none';
+    });
+    if (name === 'review') { renderDietGraph(); renderDietMonthSummary(); }
+    if (name === 'settings') { renderDietSettings(); showKcalNoticeOnce(); }
+  });
+});
+
+function renderDiet() {
+  var day = dietDay();
+  var ym = ymKey(day.y, day.m);
+  var w = WEEK_JA[new Date(day.y, day.m - 1, day.d).getDay()];
+  $('diet-date').textContent = day.y + '年' + day.m + '月' + day.d + '日(' + w + ')';
+
+  /* --- 体重の入力欄: 表示と保存は分ける(記録ボタンでのみ保存。計画11-4/C) --- */
+  var todays = (state.diet.weights[ym] || {})[String(day.d)];
+  var prev = latestWeightBefore(day.y, day.m, day.d);
+  var box = $('diet-weight');
+  if (todays !== undefined) {
+    box.value = fmt1(todays);
+    $('diet-weight-prev').textContent = 'この日の記録: ' + fmt1(todays) + 'kg(直すこともできます)';
+  } else if (prev.weight !== null) {
+    box.value = fmt1(prev.weight);   /* 前回値を入れておくだけ。保存はしない */
+    var pk = prev.dateKey.split('-');
+    $('diet-weight-prev').textContent = '前回(' + parseInt(pk[1], 10) + '/' + parseInt(pk[2], 10) + ')の記録: ' + fmt1(prev.weight) + 'kg';
+  } else {
+    box.value = fmt1(state.diet.profile.startWeight);
+    $('diet-weight-prev').textContent = 'まだ記録がありません。数字を直して「記録」を押すと保存されます';
+  }
+
+  renderBodyCard(day);
+  renderDietMeters(ym, day.d);
+  renderDietFoods(ym, day.d);
+}
+
+/* からだのカード(BMI・目標まで・基礎代謝・消費目安)。毎回その場で計算する */
+function renderBodyCard(day) {
+  var w10 = currentWeight();
+  var p = state.diet.profile;
+  var bmi = calcBmi(w10, p.heightCm);
+  $('diet-bmi').textContent = 'BMI ' + bmi.toFixed(1) + ' / ' + bmiCategory(bmi);
+  var tw = targetWeight10();
+  var remain = w10 - tw;
+  if (remain <= 0) {
+    $('diet-remain').textContent = '🎉 目標に届きました';
+  } else {
+    $('diet-remain').textContent = '目標(BMI' + (p.goalBmi / 10) + ' = ' + fmt1(tw) + 'kg)まで あと ' + fmt1(remain) + 'kg';
+  }
+  $('diet-energy').textContent = '基礎代謝 約' + calcBmr(w10).toLocaleString() + ' kcal / 1日の消費目安 約' + calcTdee(w10).toLocaleString() + ' kcal';
+}
+
+/* メーター4本(カロリー・P・F・C)とスタンプ */
+function renderDietMeters(ym, d) {
+  var tp = targetPfc();
+  var st = dietStampsForDay(ym, d);
+  var got = st.live.got;
+  var kcalTarget = st.live.kcalTarget;
+  var exKcal = state.diet.profile.useExerciseKcal ? dayExerciseKcal(ym, d) : 0;
+
+  var wrap = $('diet-meters');
+  wrap.textContent = '';
+
+  function addMeter(name, gotVal, targetVal, done, unit, subText) {
+    var row = document.createElement('div');
+    row.className = 'meter-row' + (done ? ' is-done' : '');
+    var head = document.createElement('div');
+    head.className = 'meter-head';
+    var n = document.createElement('span');
+    n.className = 'meter-name';
+    n.textContent = name;
+    var v = document.createElement('span');
+    v.textContent = (unit === 'kcal')
+      ? (gotVal + ' / ' + targetVal + ' kcal')
+      : (fmt1(gotVal) + ' / ' + fmt1(targetVal) + 'g');
+    head.appendChild(n); head.appendChild(v);
+    row.appendChild(head);
+    var bar = document.createElement('div');
+    bar.className = 'meter-bar';
+    var fill = document.createElement('div');
+    fill.className = 'meter-fill';
+    var pct = targetVal > 0 ? Math.min(100, Math.round(gotVal / targetVal * 100)) : 0;
+    fill.style.width = pct + '%';
+    bar.appendChild(fill);
+    row.appendChild(bar);
+    if (subText) {
+      var sub = document.createElement('div');
+      sub.className = 'meter-sub';
+      sub.textContent = subText;
+      row.appendChild(sub);
+    }
+    wrap.appendChild(row);
+  }
+
+  addMeter('カロリー', got.kcal, kcalTarget, st.live.kcal, 'kcal',
+    exKcal > 0 ? '+ 運動 ' + exKcal + 'kcal' : '');
+  /* P は目標の90%で達成。届いていないときは「あと◯g」とだけ書く(責める表現にしない) */
+  addMeter('P たんぱく質', got.p, tp.p, st.live.p, 'g',
+    st.live.p ? '' : 'あと ' + fmt1(Math.max(0, st.live.need.p - got.p)) + 'g で 🥩');
+  addMeter('F 脂質', got.f, tp.f, st.live.f, 'g',
+    st.live.f ? '' : 'あと ' + fmt1(Math.max(0, st.live.need.f - got.f)) + 'g で 🥑');
+  addMeter('C 炭水化物', got.c, tp.c, st.live.c, 'g',
+    st.live.c ? '' : (got.c < st.live.need.cLow ? 'あと ' + fmt1(st.live.need.cLow - got.c) + 'g で 🍚' : ''));
+
+  renderDietStamps(ym, d, st);
+}
+
+/* スタンプ表示。出た瞬間だけ1回アニメーションする(再読み込み時は再生しない) */
+var dietStampAnimShown = {};
+function renderDietStamps(ym, d, st) {
+  var box = $('diet-stamps');
+  box.textContent = '';
+  var list = [
+    { key: 'p',    text: '🥩 たんぱく質そろった' },
+    { key: 'f',    text: '🥑 脂質そろった' },
+    { key: 'c',    text: '🍚 炭水化物そろった' },
+    { key: 'kcal', text: '🎯 カロリーそろった' },
+    { key: 'star', text: '🌟 今日はそろいました' }
+  ];
+  var memoKey = ym + '-' + d;
+  list.forEach(function (item) {
+    if (!st.shown[item.key]) return;
+    var el = document.createElement('span');
+    el.className = 'diet-stamp' + (item.key === 'star' ? ' star' : '');
+    el.textContent = item.text;
+    var animKey = memoKey + '|' + item.key;
+    if (!dietStampAnimShown[animKey]) {
+      dietStampAnimShown[animKey] = 'pending';   /* 初回描画では光らせない */
+    } else if (dietStampAnimShown[animKey] === 'play') {
+      el.classList.add('pop');
+      dietStampAnimShown[animKey] = 'done';
+      setTimeout(function () { el.classList.remove('pop'); }, 700);
+    }
+    box.appendChild(el);
+  });
+}
+
+/* 食品ボタン(よく食べるものを先に) */
+function renderDietFoods(ym, d) {
+  var wrap = $('diet-foods');
+  wrap.textContent = '';
+  var meals = (state.diet.meals[ym] || {})[String(d)] || {};
+  var grams = (state.diet.mealsGrams[ym] || {})[String(d)] || {};
+  var foods = state.diet.foods.slice().sort(function (a, b) {
+    return (b.fav ? 1 : 0) - (a.fav ? 1 : 0);
+  });
+  if (!foods.length) {
+    var hint = document.createElement('div');
+    hint.className = 'hint';
+    hint.textContent = '食品がありません。「+ 食品を追加・編集する」から登録できます。';
+    wrap.appendChild(hint);
+    return;
+  }
+  foods.forEach(function (f) {
+    var item = document.createElement('div');
+    item.className = 'food-item';
+    var n = meals[f.id] || 0;
+
+    var btn = document.createElement('button');
+    btn.className = 'food-btn' + (n > 0 ? ' on' : '');
+    var nameEl = document.createElement('span');
+    nameEl.textContent = f.name;                       /* textContent で表示(XSS対策) */
+    btn.appendChild(nameEl);
+    var sub = document.createElement('span');
+    sub.className = 'food-sub';
+    sub.textContent = foodUnitLabel(f) + ' = ' + f.kcal + 'kcal / P' + fmt1(f.p) + ' F' + fmt1(f.f) + ' C' + fmt1(f.c);
+    btn.appendChild(sub);
+    if (n > 0) {
+      var cnt = document.createElement('span');
+      cnt.className = 'food-count';
+      cnt.textContent = n + '個';
+      btn.appendChild(cnt);
+    }
+    btn.addEventListener('click', function () { addFoodCount(ym, d, f.id, 1); });
+    item.appendChild(btn);
+
+    if (n > 0) {
+      var x = document.createElement('button');
+      x.className = 'food-x';
+      x.textContent = '✕';
+      x.setAttribute('aria-label', f.name + ' を0に戻す');
+      x.addEventListener('click', function (ev) { ev.stopPropagation(); setFoodCount(ym, d, f.id, 0); });
+      btn.appendChild(x);
+    }
+    var g = document.createElement('button');
+    g.className = 'food-g';
+    g.textContent = 'g';
+    g.setAttribute('aria-label', f.name + ' をグラムで記録する');
+    g.addEventListener('click', function (ev) { ev.stopPropagation(); askGrams(ym, d, f); });
+    btn.appendChild(g);
+
+    if (grams[f.id]) {
+      var chips = document.createElement('div');
+      chips.className = 'food-gram-chips';
+      var chip = document.createElement('button');
+      chip.className = 'gram-chip';
+      chip.textContent = '+' + fmt1(grams[f.id]) + 'g ✕';
+      chip.setAttribute('aria-label', f.name + ' のグラム記録を取り消す');
+      chip.addEventListener('click', function () { setFoodGrams(ym, d, f.id, 0); });
+      chips.appendChild(chip);
+      item.appendChild(chips);
+    }
+    wrap.appendChild(item);
+  });
+}
+
+/* 食事の記録(個数・グラム)。0になったらキーごと消す */
+function setFoodCount(ym, d, fid, n) {
+  if (!state.diet.meals[ym]) state.diet.meals[ym] = {};
+  var mo = state.diet.meals[ym];
+  if (!mo[String(d)]) mo[String(d)] = {};
+  var day = mo[String(d)];
+  if (n > 0) day[fid] = Math.min(99, n); else delete day[fid];
+  if (!Object.keys(day).length) delete mo[String(d)];
+  if (!Object.keys(mo).length) delete state.diet.meals[ym];
+  saveState();
+  afterDietChange(ym, d);
+}
+function addFoodCount(ym, d, fid, delta) {
+  var cur0 = ((state.diet.meals[ym] || {})[String(d)] || {})[fid] || 0;
+  setFoodCount(ym, d, fid, cur0 + delta);
+}
+function setFoodGrams(ym, d, fid, g10) {
+  if (!state.diet.mealsGrams[ym]) state.diet.mealsGrams[ym] = {};
+  var mo = state.diet.mealsGrams[ym];
+  if (!mo[String(d)]) mo[String(d)] = {};
+  var day = mo[String(d)];
+  if (g10 > 0) day[fid] = Math.min(200000, g10); else delete day[fid];
+  if (!Object.keys(day).length) delete mo[String(d)];
+  if (!Object.keys(mo).length) delete state.diet.mealsGrams[ym];
+  saveState();
+  afterDietChange(ym, d);
+}
+/* グラム入力(1〜2000、小数第1位まで) */
+function askGrams(ym, d, f) {
+  var now = ((state.diet.mealsGrams[ym] || {})[String(d)] || {})[f.id] || 0;
+  var input = prompt(f.name + ' のグラム数を入力(例: 45)\n1つぶん = ' + f.unitGrams + 'g = ' + f.kcal + 'kcal',
+    now ? fmt1(now) : '');
+  if (input === null) return;
+  var t = String(input).trim();
+  if (!t) { toast('数字で入れてください(例: 45)'); return; }
+  var v = parseFloat(t);
+  if (!isFinite(v) || v <= 0 || v > 2000) { toast('数字で入れてください(例: 45)'); return; }
+  setFoodGrams(ym, d, f.id, Math.round(v * 10));
+  toast(f.name + ' を ' + v + 'g 記録しました');
+}
+
+/* 記録が変わったら、メーター・スタンプ・食品ボタンを描き直す。
+   新しく達成したスタンプは、この描画のときだけ光らせる */
+function afterDietChange(ym, d) {
+  var before = dietStampMemo[ym + '-' + d] || {};
+  var beforeCopy = { p: before.p, f: before.f, c: before.c, kcal: before.kcal, star: before.star };
+  var st = dietStampsForDay(ym, d);
+  ['p', 'f', 'c', 'kcal', 'star'].forEach(function (k) {
+    if (st.shown[k] && !beforeCopy[k]) dietStampAnimShown[ym + '-' + d + '|' + k] = 'play';
+  });
+  renderDietMeters(ym, d);
+  renderDietFoods(ym, d);
+}
+
+/* 体重の記録(「記録」ボタンでのみ保存) */
+$('diet-weight-save').addEventListener('click', function () {
+  var day = dietDay();
+  var ym = ymKey(day.y, day.m);
+  var t = String($('diet-weight').value).trim();
+  var v = parseFloat(t);
+  if (!t || !isFinite(v) || v < 20 || v > 300) {
+    toast('体重は 20〜300 の数字で入れてください(例: 72.0)');
+    return;
+  }
+  var v10 = Math.round(v * 10);
+  if (!state.diet.weights[ym]) state.diet.weights[ym] = {};
+  state.diet.weights[ym][String(day.d)] = v10;   /* 同じ日は上書き */
+  saveState();
+  renderDiet();
+  toast(fmt1(v10) + 'kg を記録しました');
+});
+
+$('diet-goto-foods').addEventListener('click', function () {
+  var tab = document.querySelector('.diet-tab[data-dtab="settings"]');
+  if (tab) tab.click();
+});
+
+/* ================= 体重グラフ(素のCanvas。ライブラリなし) ================= */
+var dietGraphRange = '30';
+var dietGraphPoints = [];
+Array.prototype.forEach.call(document.querySelectorAll('.range-btn'), function (b) {
+  b.addEventListener('click', function () {
+    dietGraphRange = b.getAttribute('data-range');
+    Array.prototype.forEach.call(document.querySelectorAll('.range-btn'), function (x) {
+      x.classList.toggle('on', x === b);
+    });
+    renderDietGraph();
+  });
+});
+
+/* 記録を日付順の配列にする */
+function weightSeries() {
+  var out = [];
+  Object.keys(state.diet.weights).forEach(function (ym) {
+    Object.keys(state.diet.weights[ym]).forEach(function (dk) {
+      var y = parseInt(ym.slice(0, 4), 10), m = parseInt(ym.slice(5, 7), 10), d = parseInt(dk, 10);
+      out.push({ key: dateStrOf(y, m, d), t: new Date(y, m - 1, d).getTime(), w: state.diet.weights[ym][dk], y: y, m: m, d: d });
+    });
+  });
+  out.sort(function (a, b) { return a.t - b.t; });
+  return out;
+}
+
+function renderDietGraph() {
+  var cv = $('diet-graph');
+  var note = $('diet-graph-note');
+  var all = weightSeries();
+  var data = all;
+  if (dietGraphRange !== 'all' && all.length) {
+    var days = parseInt(dietGraphRange, 10);
+    var last = all[all.length - 1].t;
+    var from = last - (days - 1) * 86400000;
+    data = all.filter(function (p) { return p.t >= from; });
+  }
+  /* 高解像度対応(devicePixelRatio) */
+  var ratio = window.devicePixelRatio || 1;
+  var cssW = cv.clientWidth || 300, cssH = 200;
+  cv.width = Math.round(cssW * ratio);
+  cv.height = Math.round(cssH * ratio);
+  cv.style.height = cssH + 'px';
+  var ctx = cv.getContext('2d');
+  ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  ctx.clearRect(0, 0, cssW, cssH);
+  dietGraphPoints = [];
+
+  if (!data.length) {
+    note.textContent = 'まだ記録がありません。「今日」タブで体重を記録すると、ここに現れます。';
+    ctx.fillStyle = '#8a8577';
+    ctx.font = '13px sans-serif';
+    ctx.fillText('まだ記録がありません', 12, cssH / 2);
+    return;
+  }
+
+  var padL = 42, padR = 10, padT = 12, padB = 22;
+  var w = cssW - padL - padR, h = cssH - padT - padB;
+  var tw = targetWeight10();
+  var vals = data.map(function (p) { return p.w; });
+  var minV = Math.min.apply(null, vals), maxV = Math.max.apply(null, vals);
+  /* 目標線も入るように範囲を広げる */
+  minV = Math.min(minV, tw); maxV = Math.max(maxV, tw);
+  /* 縦軸の幅は最低4kg(40)を確保する(小さな揺れを崖に見せない。罰しない設計) */
+  var span = maxV - minV;
+  if (span < 40) {
+    var mid = (maxV + minV) / 2;
+    minV = mid - 20; maxV = mid + 20;
+  } else {
+    minV -= 5; maxV += 5;
+  }
+  function xAt(i) { return data.length === 1 ? padL + w / 2 : padL + (w * i / (data.length - 1)); }
+  function yAt(v) { return padT + h - ((v - minV) / (maxV - minV)) * h; }
+
+  /* 目盛り(横線と数字) */
+  ctx.strokeStyle = '#e5ded0'; ctx.lineWidth = 1;
+  ctx.fillStyle = '#8a8577'; ctx.font = '10px sans-serif';
+  for (var i = 0; i <= 4; i++) {
+    var v = minV + (maxV - minV) * i / 4;
+    var yy = yAt(v);
+    ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(padL + w, yy); ctx.stroke();
+    ctx.fillText((v / 10).toFixed(1), 6, yy + 3);
+  }
+  /* 目標体重の線(淡い金の点線) */
+  if (tw >= minV && tw <= maxV) {
+    ctx.save();
+    ctx.strokeStyle = '#c9a227';
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(padL, yAt(tw)); ctx.lineTo(padL + w, yAt(tw)); ctx.stroke();
+    ctx.restore();
+  }
+  /* 折れ線(増えた区間も減った区間も同じ色。下向き矢印や赤は使わない) */
+  ctx.strokeStyle = '#3a4470'; ctx.lineWidth = 2;
+  ctx.beginPath();
+  data.forEach(function (p, i) {
+    var x = xAt(i), y = yAt(p.w);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  /* 点(記録のある日だけ) */
+  ctx.fillStyle = '#3a4470';
+  data.forEach(function (p, i) {
+    var x = xAt(i), y = yAt(p.w);
+    ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+    dietGraphPoints.push({ x: x, y: y, p: p });
+  });
+  /* 端の日付 */
+  ctx.fillStyle = '#8a8577'; ctx.font = '10px sans-serif';
+  ctx.fillText(data[0].m + '/' + data[0].d, padL, cssH - 6);
+  if (data.length > 1) {
+    var lastP = data[data.length - 1];
+    var label = lastP.m + '/' + lastP.d;
+    ctx.fillText(label, padL + w - ctx.measureText(label).width, cssH - 6);
+  }
+  note.textContent = '記録 ' + data.length + '件。点をタップすると日付と体重が出ます。';
+}
+
+/* 点のタップ */
+$('diet-graph').addEventListener('click', function (ev) {
+  var rect = this.getBoundingClientRect();
+  var x = ev.clientX - rect.left, y = ev.clientY - rect.top;
+  var hit = null, best = 999;
+  dietGraphPoints.forEach(function (pt) {
+    var dx = pt.x - x, dy = pt.y - y;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 18 && dist < best) { best = dist; hit = pt.p; }
+  });
+  if (hit) $('diet-graph-note').textContent = hit.m + '/' + hit.d + '  ' + fmt1(hit.w) + 'kg';
+});
+
+/* 今月のようす(できたことだけを出す。できなかった日の数は出さない) */
+function renderDietMonthSummary() {
+  var day = dietDay();
+  var ym = ymKey(day.y, day.m);
+  var box = $('diet-month-summary');
+  box.textContent = '';
+  function line(text) {
+    var el = document.createElement('div');
+    el.className = 'diet-row';
+    var s = document.createElement('span');
+    s.className = 'dr-label';
+    s.textContent = text;
+    el.appendChild(s);
+    box.appendChild(el);
+  }
+  var ach = (state.diet.achieved[ym] || []).length;
+  line('食事が達成できた日: ' + ach + '日');
+  var wm = state.diet.weights[ym] || {};
+  var days = Object.keys(wm);
+  line('体重を記録した日: ' + days.length + '日');
+  if (days.length) {
+    var minD = null, minV = null;
+    days.forEach(function (dk) {
+      if (minV === null || wm[dk] < minV) { minV = wm[dk]; minD = dk; }
+    });
+    line('今月のいちばん軽かった日: ' + fmt1(minV) + 'kg(' + day.m + '/' + minD + ')');
+  }
+}
+
+/* ================= 食品・設定タブ ================= */
+function dietRow(labelText, valueText, buttons, extraClass) {
+  var row = document.createElement('div');
+  row.className = 'diet-row' + (extraClass ? ' ' + extraClass : '');
+  var lab = document.createElement('span');
+  lab.className = 'dr-label';
+  lab.textContent = labelText;
+  row.appendChild(lab);
+  if (valueText !== null && valueText !== undefined) {
+    var val = document.createElement('span');
+    val.className = 'dr-value';
+    val.textContent = valueText;
+    row.appendChild(val);
+  }
+  (buttons || []).forEach(function (b) {
+    var btn = document.createElement('button');
+    btn.textContent = b.text;
+    if (b.cls) btn.className = b.cls;
+    btn.addEventListener('click', b.onClick);
+    row.appendChild(btn);
+  });
+  return row;
+}
+
+function renderDietSettings() {
+  /* --- 食品マスタ --- */
+  var list = $('diet-food-list');
+  list.textContent = '';
+  if (!state.diet.foods.length) {
+    var h = document.createElement('div');
+    h.className = 'hint';
+    h.textContent = '食品がありません。「+ 食品を追加」から登録できます。';
+    list.appendChild(h);
+  }
+  state.diet.foods.forEach(function (f, idx) {
+    var row = document.createElement('div');
+    row.className = 'diet-row';
+    var lab = document.createElement('span');
+    lab.className = 'dr-label';
+    lab.textContent = (f.fav ? '★ ' : '') + f.name;
+    var sub = document.createElement('span');
+    sub.className = 'dr-auto';
+    sub.textContent = ' ' + foodUnitLabel(f) + '=' + f.unitGrams + 'g / ' + f.kcal + 'kcal P' + fmt1(f.p) + ' F' + fmt1(f.f) + ' C' + fmt1(f.c);
+    lab.appendChild(sub);
+    row.appendChild(lab);
+
+    var favBtn = document.createElement('button');
+    favBtn.textContent = f.fav ? '★' : '☆';
+    favBtn.setAttribute('aria-label', f.name + ' のよく食べる印を切り替える');
+    favBtn.addEventListener('click', function () {
+      state.diet.foods[idx].fav = !state.diet.foods[idx].fav;
+      saveState(); renderDietSettings(); renderDiet();
+    });
+    row.appendChild(favBtn);
+
+    var editBtn = document.createElement('button');
+    editBtn.textContent = '編集';
+    editBtn.addEventListener('click', function () { editFood(idx); });
+    row.appendChild(editBtn);
+
+    var delBtn = document.createElement('button');
+    delBtn.className = 'dr-del';
+    delBtn.textContent = '削除';
+    delBtn.addEventListener('click', function () {
+      if (!confirm('食品「' + f.name + '」を消しますか?\n(これまでの記録はそのまま残ります)')) return;
+      state.diet.foods.splice(idx, 1);
+      saveState(); renderDietSettings(); renderDiet();
+      toast('食品を消しました');
+    });
+    row.appendChild(delBtn);
+    list.appendChild(row);
+  });
+
+  /* --- プロフィール --- */
+  var p = state.diet.profile;
+  var pf = $('diet-profile');
+  pf.textContent = '';
+  pf.appendChild(dietRow('身長', (p.heightCm / 10).toFixed(1) + ' cm', [{ text: '変更', onClick: function () {
+    var v = prompt('身長を入力(cm)', (p.heightCm / 10).toFixed(1));
+    if (v === null) return;
+    var n = parseFloat(v);
+    if (!isFinite(n) || n < 100 || n > 250) { toast('身長は 100〜250 の数字で入れてください'); return; }
+    p.heightCm = Math.round(n * 10); saveState(); renderDietSettings(); renderDiet();
+  } }]));
+  pf.appendChild(dietRow('年齢', p.age + ' 歳', [{ text: '変更', onClick: function () {
+    var v = prompt('年齢を入力', String(p.age));
+    if (v === null) return;
+    var n = parseInt(v, 10);
+    if (!isFinite(n) || n < 1 || n > 120) { toast('年齢は 1〜120 の数字で入れてください'); return; }
+    p.age = n; saveState(); renderDietSettings(); renderDiet();
+  } }]));
+  var actNames = { 120: 'ほとんど座っている', 137: '少し動く', 155: 'ふつう(立ち仕事+運動あり)', 172: 'よく動く' };
+  pf.appendChild(dietRow('活動レベル', (actNames[p.activityFactor] || (p.activityFactor / 100)) + ' (' + (p.activityFactor / 100).toFixed(2) + ')',
+    [{ text: '変更', onClick: function () {
+      var v = prompt('活動レベルを選んでください\n1 = ほとんど座っている(1.2)\n2 = 少し動く(1.375)\n3 = ふつう(1.55)\n4 = よく動く(1.725)', '3');
+      if (v === null) return;
+      var map = { '1': 120, '2': 137, '3': 155, '4': 172 };
+      if (!map[String(v).trim()]) { toast('1〜4 の数字で選んでください'); return; }
+      p.activityFactor = map[String(v).trim()]; saveState(); renderDietSettings(); renderDiet();
+    } }]));
+  pf.appendChild(dietRow('目標BMI', (p.goalBmi / 10).toFixed(1), [{ text: '変更', onClick: function () {
+    var v = prompt('目標BMIを入力', (p.goalBmi / 10).toFixed(1));
+    if (v === null) return;
+    var n = parseFloat(v);
+    if (!isFinite(n) || n < 15 || n > 40) { toast('目標BMIは 15〜40 の数字で入れてください'); return; }
+    p.goalBmi = Math.round(n * 10); saveState(); renderDietSettings(); renderDiet();
+  } }]));
+
+  /* --- 目標(カロリー・PFC) --- */
+  var g = $('diet-goals');
+  g.textContent = '';
+  g.appendChild(dietRow('目標カロリー', p.targetKcal + ' kcal', [{ text: '変更', onClick: function () {
+    var v = prompt('1日の目標カロリーを入力(kcal)', String(p.targetKcal));
+    if (v === null) return;
+    var n = parseInt(v, 10);
+    if (!isFinite(n) || n < 500 || n > 6000) { toast('目標カロリーは 500〜6000 の数字で入れてください'); return; }
+    p.targetKcal = n;
+    p.kcalNoticeSeen = false;      /* 変えたときだけもう一度だけ確認の一言を出す */
+    saveState(); renderDietSettings(); renderDiet(); showKcalNoticeOnce();
+  } }]));
+  var tp = targetPfc();
+  [['P たんぱく質', 'manualP', tp.p, tp.pAuto, tp.autoValues.p],
+   ['F 脂質',       'manualF', tp.f, tp.fAuto, tp.autoValues.f],
+   ['C 炭水化物',   'manualC', tp.c, tp.cAuto, tp.autoValues.c]].forEach(function (row) {
+    var name = row[0], key = row[1], val = row[2], isAuto = row[3], autoVal = row[4];
+    var buttons = [{ text: '変更', onClick: function () {
+      var v = prompt(name + ' の目標グラム数を入力(空にすると自動計算 ' + fmt1(autoVal) + 'g に戻ります)',
+        isAuto ? '' : fmt1(val));
+      if (v === null) return;
+      var t = String(v).trim();
+      if (!t) { p[key] = null; saveState(); renderDietSettings(); renderDiet(); toast(name + ' を自動計算に戻しました'); return; }
+      var n = parseFloat(t);
+      if (!isFinite(n) || n < 0 || n > 1000) { toast('0〜1000 の数字で入れてください'); return; }
+      p[key] = Math.round(n * 10); saveState(); renderDietSettings(); renderDiet();
+    } }];
+    var el = dietRow(name, fmt1(val) + ' g', buttons);
+    var mark = document.createElement('span');
+    mark.className = 'dr-auto';
+    mark.textContent = isAuto ? '自動' : '手で設定';
+    el.insertBefore(mark, el.querySelector('button'));
+    g.appendChild(el);
+  });
+  g.appendChild(dietRow('PFCの比率(カロリー比)', p.ratioP + ':' + p.ratioF + ':' + p.ratioC, [{ text: '変更', onClick: function () {
+    var v = prompt('PFCの比率を「4:4:3」の形で入力', p.ratioP + ':' + p.ratioF + ':' + p.ratioC);
+    if (v === null) return;
+    var parts = String(v).split(':').map(function (x) { return parseInt(x.trim(), 10); });
+    if (parts.length !== 3 || parts.some(function (n) { return !isFinite(n) || n < 1 || n > 20; })) {
+      toast('「4:4:3」のように、1〜20 の数字3つで入れてください'); return;
+    }
+    p.ratioP = parts[0]; p.ratioF = parts[1]; p.ratioC = parts[2];
+    saveState(); renderDietSettings(); renderDiet();
+  } }]));
+  g.appendChild(dietRow('運動したぶんを目標に足す', p.useExerciseKcal ? 'する' : 'しない', [{ text: '切り替え', onClick: function () {
+    p.useExerciseKcal = !p.useExerciseKcal; saveState(); renderDietSettings(); renderDiet();
+  } }]));
+}
+
+/* 食品の編集・追加 */
+function editFood(idx) {
+  var f = state.diet.foods[idx];
+  var name = prompt('食品の名前', f.name);
+  if (name === null) return;
+  name = String(name).trim();
+  if (!name) { toast('名前を入れてください'); return; }
+  var unit = prompt('1つぶんの言い方(例: 枚(生200g))', f.unit);
+  if (unit === null) return;
+  var ug = prompt('1つぶんは何グラムですか?(グラム入力の換算に使います)', String(f.unitGrams));
+  if (ug === null) return;
+  var ugN = parseInt(ug, 10);
+  if (!isFinite(ugN) || ugN < 1 || ugN > 2000) { toast('1〜2000 の数字で入れてください'); return; }
+  var kcal = prompt('1つぶんのカロリー(kcal)', String(f.kcal));
+  if (kcal === null) return;
+  var kN = parseInt(kcal, 10);
+  if (!isFinite(kN) || kN < 0 || kN > 20000) { toast('0〜20000 の数字で入れてください'); return; }
+  var pfc = prompt('1つぶんの P / F / C(g)を「38/10/0」の形で入力', fmt1(f.p) + '/' + fmt1(f.f) + '/' + fmt1(f.c));
+  if (pfc === null) return;
+  var parts = String(pfc).split('/').map(function (x) { return parseFloat(x.trim()); });
+  if (parts.length !== 3 || parts.some(function (n) { return !isFinite(n) || n < 0 || n > 2000; })) {
+    toast('「38/10/0」のように、数字3つで入れてください'); return;
+  }
+  f.name = name.slice(0, 60);
+  f.unit = String(unit).trim().slice(0, 30);
+  f.unitGrams = ugN; f.kcal = kN;
+  f.p = Math.round(parts[0] * 10); f.f = Math.round(parts[1] * 10); f.c = Math.round(parts[2] * 10);
+  saveState(); renderDietSettings(); renderDiet();
+  toast('食品を保存しました');
+}
+
+$('diet-add-food').addEventListener('click', function () {
+  if (state.diet.foods.length >= 200) { toast('食品は200件までです'); return; }
+  var id = 'f' + Date.now();
+  state.diet.foods.push({ id: id, name: '新しい食品', unit: '個', unitGrams: 100, kcal: 0, p: 0, f: 0, c: 0, fav: false });
+  saveState();
+  editFood(state.diet.foods.length - 1);
+});
+
+/* 目標カロリーが基礎代謝を下回るときの静かな一言(初回・変更時に1回だけ) */
+function showKcalNoticeOnce() {
+  var box = $('diet-kcal-notice');
+  var p = state.diet.profile;
+  var bmr = calcBmr(currentWeight());
+  if (p.kcalNoticeSeen || p.targetKcal >= bmr) { box.style.display = 'none'; return; }
+  box.textContent = 'この数字は、いまの基礎代謝(約' + bmr.toLocaleString() + 'kcal)より少し低い設定です。医師・管理栄養士に確認した数字かどうか、念のためご確認ください。';
+  box.style.display = '';
+  p.kcalNoticeSeen = true;
+  saveState();
+}
+
 /* ================= 繰り返し予定の管理(設定シート) ================= */
 var WEEK_JA_SHORT = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -3460,6 +4730,7 @@ $('backup-restore').addEventListener('click', function () {
   s.exercise = sanitizeExercise(d.exercise);
   s.notes = sanitizeNotes(d.notes);
   s.recurring = sanitizeRecurring(d.recurring);
+  s.diet = sanitizeDiet(d.diet);
   if (d.settings && typeof d.settings === 'object' && typeof d.settings.userName === 'string') {
     s.settings.userName = d.settings.userName;
   }
@@ -3476,7 +4747,7 @@ $('backup-restore').addEventListener('click', function () {
 
 /* ================= 全データ消去(問題13) ================= */
 $('reset-all').addEventListener('click', function () {
-  if (!confirm('本当に全データ(シフト・スタンプ・名前・運動予定・メモ)を消しますか?\n運動予定(休館日・筋トレの記録)と、自分で書いたメモも消えます。')) return;
+  if (!confirm('本当に全データ(シフト・スタンプ・名前・運動予定・メモ・食事)を消しますか?\n運動予定(休館日・筋トレの記録)・自分で書いたメモ・食事や体重の記録も消えます。')) return;
   if (!confirm('バックアップは取りましたか?\n「OK」を押すと元に戻せません。')) return;
   try { localStorage.removeItem(STORE_KEY); } catch (e) {}
   state = defaultState();
