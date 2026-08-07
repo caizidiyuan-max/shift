@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- shift-calendar build 2026-07-28-10 -->
+<!-- shift-calendar build 2026-07-28-12 -->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -1159,12 +1159,16 @@ var DEFAULT_FOODS = [
   /* 毎日食べる3品(11-5-1) */
   { id: 'f1', name: '鶏もも肉(皮なし)グリル焼き', unit: '枚(生200g)', unitGrams: 200, kcal: 226, p: 380, f: 100, c: 0,   fav: true },
   { id: 'f2', name: 'HUEL ブラックエディション',   unit: '食(400kcal)', unitGrams: 90,  kcal: 400, p: 400, f: 175, c: 210, fav: true },
-  { id: 'f3', name: 'トマト',                       unit: '個(150g)',   unitGrams: 150, kcal: 30,  p: 11,  f: 2,   c: 54,  fav: true },
+  /* ミニトマト: 八訂「赤色ミニトマト 果実 生」100g = 30kcal / P1.1 / F0.1 / C7.2 を 1個15g で換算 */
+  { id: 'f9', name: 'ミニトマト',                   unit: '個(15g)',    unitGrams: 15,  kcal: 5,   p: 2,   f: 0,   c: 11,  fav: true },
   /* 不足しがちな分を補う候補(fav なし) */
   { id: 'f4', name: 'ゆで卵 / 卵',                  unit: '個(50g)',    unitGrams: 50,  kcal: 76,  p: 61,  f: 52,  c: 2,   fav: false },
   { id: 'f5', name: 'ブロッコリー',                 unit: '100g',        unitGrams: 100, kcal: 37,  p: 54,  f: 6,   c: 15,  fav: false },
   { id: 'f6', name: '納豆',                         unit: 'パック(45g)', unitGrams: 45, kcal: 83,  p: 74,  f: 45,  c: 24,  fav: false },
-  { id: 'f7', name: 'ごはん',                       unit: '杯(120g)',   unitGrams: 120, kcal: 187, p: 30,  f: 4,   c: 444, fav: false },
+  /* ごはん: 米1合(生米150g)の1/3を炊いたぶん ≒ 炊きあがり110g。
+     八訂「水稲めし 精白米 うるち米」100g = 156kcal / P2.5 / F0.3 / C37.1 で換算。
+     炊きあがりの重さは炊き加減で変わるので、食品編集で直せる */
+  { id: 'f7', name: 'ごはん(米1/3合ぶん)',        unit: '個(炊110g)', unitGrams: 110, kcal: 172, p: 28,  f: 3,   c: 408, fav: false },
   { id: 'f8', name: 'ギリシャヨーグルト(無糖)',   unit: '個(100g)',   unitGrams: 100, kcal: 59,  p: 100, f: 4,   c: 39,  fav: false }
 ];
 
@@ -1595,7 +1599,37 @@ function sanitizeDiet(src) {
     });
     out.achieved = ach;
   }
+  migrateDietFoods(out);
   return out;
+}
+
+/* 食品マスタの入れ替え(2026-07-28)。
+   ・旧「トマト」(f3・1個150g)は消さずに残す(その日の記録の意味を変えないため)。
+     代わりに「ミニトマト」(f9・1個15g)を足して、よく食べる印をミニトマトへ移す
+   ・「ごはん」(f7)は同じ食品の数え方を変えるだけなので、その場で新しい値に更新する
+     (米1合の1/3を炊いたぶん = 炊きあがり約110g) */
+function migrateDietFoods(diet) {
+  if (!Array.isArray(diet.foods)) return;
+  var byId = {};
+  diet.foods.forEach(function (f) { byId[f.id] = f; });
+
+  var oldTomato = byId['f3'];
+  if (oldTomato && !byId['f9']) {
+    var mini = DEFAULT_FOODS.filter(function (f) { return f.id === 'f9'; })[0];
+    if (mini && diet.foods.length < 200) {
+      diet.foods.push({ id: mini.id, name: mini.name, unit: mini.unit, unitGrams: mini.unitGrams,
+                        kcal: mini.kcal, p: mini.p, f: mini.f, c: mini.c, fav: true });
+      oldTomato.fav = false;   /* 旧トマトは残すが、よく食べる印は外す */
+    }
+  }
+  var rice = byId['f7'];
+  if (rice && rice.unitGrams === 120 && rice.kcal === 187) {
+    var newRice = DEFAULT_FOODS.filter(function (f) { return f.id === 'f7'; })[0];
+    if (newRice) {
+      rice.name = newRice.name; rice.unit = newRice.unit; rice.unitGrams = newRice.unitGrams;
+      rice.kcal = newRice.kcal; rice.p = newRice.p; rice.f = newRice.f; rice.c = newRice.c;
+    }
+  }
 }
 
 /* ================= ダイエット: 計算(11-1) ================= */
@@ -3183,7 +3217,10 @@ function updateExerciseCounts() {
   if (walkTotal > 0) parts.push('歩き ' + walkTotal + '回');
   var box = $('ex-feel-box');
   box.classList.toggle('achieved', achieved);
-  $('ex-feel-count').textContent = '予定 ' + total + '回 / 済 ' + doneAll + '回' +
+  /* 🌙(休む)を選んだ回は「予定」の合計から差し引く(2026-07-28 ユーザー承認)。
+     達成判定(doneAll >= 30)には影響しない。都合よく調整された、という前向きな体験にする */
+  var totalShown = Math.max(0, total - feelRest);
+  $('ex-feel-count').textContent = '予定 ' + totalShown + '回 / 済 ' + doneAll + '回' +
     (parts.length ? '(うち' + parts.join('・') + ')' : '') + (achieved ? ' 🎉' : '');
   $('ex-feel-msg').textContent = achieved ? '🎉 今月の目標達成!' : '';
   if (justAchieved) {
@@ -3226,7 +3263,9 @@ function updateExerciseCounts() {
     if (st === 'done') mDone++;
     else if (st === 'rest') mRest++;
   });
-  $('ex-muscle-count').textContent = '予定 ' + muscleDays.length + '回 / 済 ' + mDone + '回';
+  /* 筋トレの🌙も同じ考え方で「予定」から差し引く(2026-07-28 ユーザー承認・フィールサイクルと揃える) */
+  var muscleTotalShown = Math.max(0, muscleDays.length - mRest);
+  $('ex-muscle-count').textContent = '予定 ' + muscleTotalShown + '回 / 済 ' + mDone + '回';
   $('ex-muscle-rest').textContent = mRest > 0 ? '🌙 ' + mRest + '回' : '';
 }
 
