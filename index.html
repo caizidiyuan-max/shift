@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- shift-calendar build 2026-07-28-15 -->
+<!-- shift-calendar build 2026-08-08-01 -->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -350,6 +350,31 @@
     display: none;
   }
   .sheet.open { display: block; }
+  /* 常に触れる「つまみ」(2026-08-08 追加。運動予定・食事シートのみ)。
+     リストのスクロール位置に関係なく、いつでも下スワイプで閉じられる専用エリア。
+     position: sticky でシートの表示領域の一番上に固定し、リスト本体とはタッチ対象を分離する */
+  .sheet-handle {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    margin: -14px -16px 20px;
+    background: var(--cell-bg);
+    border-radius: 14px 14px 0 0;
+  }
+  .sheet-handle-touch {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 40px;      /* 指が多少ずれても反応するよう当たり判定を確保 */
+    touch-action: none;    /* この上ではブラウザのスクロールを渡さない(.sd-handle と同じ考え方) */
+    cursor: grab;
+  }
+  .sheet-handle-bar {
+    width: 42px;
+    height: 5px;
+    border-radius: 3px;
+    background: #d8d0c0;   /* クリーム基調に馴染む控えめな色 */
+  }
   .sheet h2 {
     font-size: 16px;
     margin-bottom: 10px;
@@ -365,6 +390,8 @@
     font-size: 15px;
     cursor: pointer;
   }
+  /* つまみがある2シートだけ、✕ボタンをつまみの下にずらして重なりを防ぐ */
+  .sheet-handle + .close-x { top: 58px; }
   .sheet .step {
     font-size: 13px;
     margin: 10px 0 6px;
@@ -967,6 +994,7 @@
 <!-- ===== 運動予定シート ===== -->
 <div class="sheet-back" data-close="exercise"></div>
 <div class="sheet" id="sheet-exercise">
+  <div class="sheet-handle"><div class="sheet-handle-touch"><span class="sheet-handle-bar"></span></div></div>
   <button class="close-x" data-close="exercise">✕</button>
   <h2>💪 運動予定</h2>
   <div class="ex-month-bar">
@@ -996,6 +1024,7 @@
 <!-- ===== 食事シート(ダイエット・食事管理。計画.md 11章) ===== -->
 <div class="sheet-back" data-close="diet"></div>
 <div class="sheet" id="sheet-diet">
+  <div class="sheet-handle"><div class="sheet-handle-touch"><span class="sheet-handle-bar"></span></div></div>
   <button class="close-x" data-close="diet">✕</button>
   <h2>🍽 食事</h2>
   <div class="diet-tabs">
@@ -1027,9 +1056,6 @@
     <div class="step">今日のメーター</div>
     <div id="diet-meters"></div>
     <div class="diet-stamps" id="diet-stamps"></div>
-
-    <div class="step">あと何が食べられるか</div>
-    <div id="diet-remaining"></div>
 
     <div class="step">今日食べたもの</div>
     <div class="hint">ボタンを押すと1つずつ増えます。右上の ✕ で0に戻ります。「g」でグラム入力もできます。</div>
@@ -1829,19 +1855,18 @@ function dietStampStatus(ym, d) {
   return s;
 }
 
-/* 一度ついたスタンプはその日のうち消さない(11-6)。達成日は achieved に記録 */
-var dietStampMemo = {};   /* セッション中だけ覚える「もう出したスタンプ」 */
+/* スタンプの見た目は「今の状態」をそのまま映す(2026-08-08 仕様変更)。
+   以前は一度ついたスタンプをその日のうち消さない設計だったが、食品を減らしても
+   スタンプが残る不具合として報告されたため、live判定をそのまま表示する方式に変更した。
+   ただし月間の達成日数カウント(achieved)は、一度でも達成条件を満たした日として維持する
+   (dietStampMemo は達成後アニメーションの「直前の状態」を覚えるためだけに使う) */
+var dietStampMemo = {};   /* 直前に描画した時点の状態(アニメーション判定用) */
 function dietStampsForDay(ym, d) {
   var key = ym + '-' + d;
   var live = dietStampStatus(ym, d);
-  var memo = dietStampMemo[key] || { p: false, f: false, c: false, kcal: false, star: false };
-  /* 一度でも条件を満たしたら、その日のうちは残す */
-  ['p', 'f', 'c', 'kcal', 'star'].forEach(function (k) {
-    if (live[k]) memo[k] = true;
-  });
-  dietStampMemo[key] = memo;
-  if (memo.star) markDietAchieved(ym, d);
-  return { shown: memo, live: live };
+  if (live.star) markDietAchieved(ym, d);
+  dietStampMemo[key] = { p: live.p, f: live.f, c: live.c, kcal: live.kcal, star: live.star };
+  return { shown: live, live: live };
 }
 function markDietAchieved(ym, d) {
   if (!state.diet.achieved[ym]) state.diet.achieved[ym] = [];
@@ -2708,6 +2733,45 @@ Array.prototype.forEach.call(document.querySelectorAll('[data-close]'), function
     if (ev.target === el) closeSheet(el.getAttribute('data-close'));
   });
 });
+
+/* 常に触れる「つまみ」を下スワイプでシートを閉じる(2026-08-08 追加。運動予定・食事の2シートのみ)。
+   最初は「リストが一番上までスクロールされているときだけ閉じる」方式にしたが、
+   「一番上までスクロールするのが面倒」というユーザー指摘を受けて、
+   スクロール位置に関係なくいつでも反応する専用の「つまみ」エリア方式に変更した(2026-08-08)。
+   つまみはリスト本体(#ex-list・#diet-foods など)とは別のタッチ対象なので、
+   リストを普通にスクロールしていて誤って閉じることはない。
+   touchmove では preventDefault を呼ばず、つまみ以外の操作には一切影響しない */
+function enableSheetHandleClose(handleSelector, closeName) {
+  var handle = document.querySelector(handleSelector);
+  if (!handle) return;
+  var SWIPE_MIN_Y = 40;
+  var startX = null, startY = null, multiTouch = false;
+
+  handle.addEventListener('touchstart', function (ev) {
+    if (ev.touches.length !== 1) { multiTouch = true; return; }
+    multiTouch = false;
+    startX = ev.touches[0].clientX;
+    startY = ev.touches[0].clientY;
+  }, { passive: true });
+
+  handle.addEventListener('touchend', function (ev) {
+    if (multiTouch || startY === null) { startX = startY = null; return; }
+    var t = ev.changedTouches && ev.changedTouches[0];
+    if (!t) { startX = startY = null; return; }
+    var dx = t.clientX - startX;
+    var dy = t.clientY - startY;
+    startX = startY = null;
+    /* 下向きに十分大きく動き、横移動より縦移動が大きいときだけ閉じる */
+    if (dy < SWIPE_MIN_Y || Math.abs(dy) <= Math.abs(dx)) return;
+    closeSheet(closeName);
+  }, { passive: true });
+
+  handle.addEventListener('touchcancel', function () {
+    startX = startY = null;
+  }, { passive: true });
+}
+enableSheetHandleClose('#sheet-exercise .sheet-handle-touch', 'exercise');
+enableSheetHandleClose('#sheet-diet .sheet-handle-touch', 'diet');
 
 $('nav-import').addEventListener('click', function () {
   $('import-result').className = 'result-box';
@@ -3960,7 +4024,6 @@ function renderDiet() {
 
   renderBodyCard(day);
   renderDietMeters(ym, day.d);
-  renderDietRemaining(ym, day.d);
   renderDietFoods(ym, day.d);
   renderDietHabits(ym, day.d);
 }
@@ -4118,83 +4181,6 @@ function dietGramEstimate(food, got, tp, kcalTarget) {
   return { grams: rounded, label: NUTRIENT_LABEL[dom] };
 }
 
-/* 「あと何が食べられるか」の3グループ振り分け(11-7-1)。全部達成の日は allDone だけ返す */
-function dietRemainingGroups(ym, d) {
-  var tp = targetPfc();
-  var st = dietStampsForDay(ym, d);
-  if (st.live.star) return { allDone: true };   /* P・F・Cが3つそろった日はリストを差し替える */
-
-  var got = st.live.got;
-  var kcalTarget = st.live.kcalTarget;
-  var kcalUpper = kcalTarget * 1.10;
-  var fUpper = tp.f * 1.20;
-  var cUpper = tp.c * 1.20;
-  var groups = { full: [], half: [], tomorrow: [] };
-
-  state.diet.foods.forEach(function (f) {
-    function wouldExceed(mult) {
-      return (got.kcal + f.kcal * mult) > kcalUpper
-        || (got.f + f.f * mult) > fUpper
-        || (got.c + f.c * mult) > cUpper;
-    }
-    var bucket = !wouldExceed(1) ? 'full' : (!wouldExceed(0.5) ? 'half' : 'tomorrow');
-    groups[bucket].push({ id: f.id, name: f.name, p: f.p, est: dietGramEstimate(f, got, tp, kcalTarget) });
-  });
-  /* 並び順: 残りのPをいちばん埋める食品(=1個あたりのPが多い食品)を上に */
-  ['full', 'half', 'tomorrow'].forEach(function (k) {
-    groups[k].sort(function (a, b) { return b.p - a.p; });
-  });
-  return { allDone: false, groups: groups };
-}
-
-function renderDietRemaining(ym, d) {
-  var box = $('diet-remaining');
-  box.textContent = '';
-  var data = dietRemainingGroups(ym, d);
-  if (data.allDone) {
-    var msg = document.createElement('div');
-    msg.className = 'hint';
-    msg.textContent = '今日はそろいました 🌟 ここからは好きに選んでください';
-    box.appendChild(msg);
-    return;
-  }
-  if (!state.diet.foods.length) {
-    var empty = document.createElement('div');
-    empty.className = 'hint';
-    empty.textContent = '食品がありません。「+ 食品を追加・編集する」から登録できます。';
-    box.appendChild(empty);
-    return;
-  }
-  var groupDefs = [
-    { key: 'full', title: 'そのまま食べられます' },
-    { key: 'half', title: '半分なら' },
-    { key: 'tomorrow', title: '明日の分に' }
-  ];
-  groupDefs.forEach(function (g) {
-    var items = data.groups[g.key];
-    if (!items.length) return;
-    var h = document.createElement('div');
-    h.className = 'diet-remain-heading';
-    h.textContent = g.title;
-    box.appendChild(h);
-    items.forEach(function (it) {
-      var row = document.createElement('div');
-      row.className = 'diet-row';
-      var lab = document.createElement('span');
-      lab.className = 'dr-label';
-      lab.textContent = it.name;                  /* textContent で表示(XSS対策) */
-      row.appendChild(lab);
-      box.appendChild(row);
-      var sub = document.createElement('div');
-      sub.className = 'hint diet-remain-est';
-      sub.textContent = it.est.grams > 0
-        ? 'あと約' + it.est.grams + 'g(' + it.est.label + 'がそろいます)'
-        : it.est.label + 'はそろっています';       /* 5g未満/すでに十分は罰しない表現で */
-      box.appendChild(sub);
-    });
-  });
-}
-
 /* ================= 今日の習慣(11章8番。第3弾を前倒し・2026-07-28) ================= */
 function getHabitState(ym, d, hid) {
   var mo = state.diet.habits[ym];
@@ -4313,7 +4299,8 @@ function renderDietHabitSettings() {
   });
 }
 
-/* 食品ボタン(よく食べるものを先に) */
+/* 食品ボタン(よく食べるものを先に)。
+   各ボタンのサブテキストに「あと約◯g食べられるか」を統合表示する(2026-08-08。旧・独立セクション「あと何が食べられるか」を統合して行数を詰めた) */
 function renderDietFoods(ym, d) {
   var wrap = $('diet-foods');
   wrap.textContent = '';
@@ -4329,6 +4316,18 @@ function renderDietFoods(ym, d) {
     wrap.appendChild(hint);
     return;
   }
+  /* あと何が食べられるかの推定に使う、その日ぶんの値をまとめて1回だけ取る */
+  var tp = targetPfc();
+  var st = dietStampsForDay(ym, d);
+  var got = st.live.got;
+  var kcalTarget = st.live.kcalTarget;
+  var allDone = st.live.star;
+  if (allDone) {
+    var doneMsg = document.createElement('div');
+    doneMsg.className = 'diet-remain-heading';
+    doneMsg.textContent = '今日はそろいました 🌟 ここからは好きに選んでください';
+    wrap.appendChild(doneMsg);
+  }
   foods.forEach(function (f) {
     var item = document.createElement('div');
     item.className = 'food-item';
@@ -4341,7 +4340,14 @@ function renderDietFoods(ym, d) {
     btn.appendChild(nameEl);
     var sub = document.createElement('span');
     sub.className = 'food-sub';
-    sub.textContent = foodUnitLabel(f) + ' = ' + f.kcal + 'kcal / P' + fmt1(f.p) + ' F' + fmt1(f.f) + ' C' + fmt1(f.c);
+    var subText = foodUnitLabel(f) + ' = ' + f.kcal + 'kcal / P' + fmt1(f.p) + ' F' + fmt1(f.f) + ' C' + fmt1(f.c);
+    if (!allDone) {
+      var est = dietGramEstimate(f, got, tp, kcalTarget);
+      subText += est.grams > 0
+        ? ' ・あと約' + est.grams + 'g(' + est.label + 'がそろいます)'
+        : ' ・' + est.label + 'はそろっています';   /* 5g未満/すでに十分は罰しない表現で */
+    }
+    sub.textContent = subText;
     btn.appendChild(sub);
     if (n > 0) {
       var cnt = document.createElement('span');
