@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- shift-calendar build 2026-07-28-14 -->
+<!-- shift-calendar build 2026-07-28-15 -->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -1187,12 +1187,16 @@ var DEFAULT_FOODS = [
   /* 不足しがちな分を補う候補(fav なし) */
   { id: 'f4', name: 'ゆで卵 / 卵',                  unit: '個(50g)',    unitGrams: 50,  kcal: 76,  p: 61,  f: 52,  c: 2,   fav: false },
   { id: 'f5', name: 'ブロッコリー',                 unit: '100g',        unitGrams: 100, kcal: 37,  p: 54,  f: 6,   c: 15,  fav: false },
-  { id: 'f6', name: '納豆',                         unit: 'パック(45g)', unitGrams: 45, kcal: 83,  p: 74,  f: 45,  c: 24,  fav: false },
-  /* ごはん: 米1合(生米150g)の1/3を炊いたぶん ≒ 炊きあがり110g。
-     八訂「水稲めし 精白米 うるち米」100g = 156kcal / P2.5 / F0.3 / C37.1 で換算。
-     炊きあがりの重さは炊き加減で変わるので、食品編集で直せる */
-  { id: 'f7', name: 'ごはん(米1/3合ぶん)',        unit: '個(炊110g)', unitGrams: 110, kcal: 172, p: 28,  f: 3,   c: 408, fav: false },
-  { id: 'f8', name: 'ギリシャヨーグルト(無糖)',   unit: '個(100g)',   unitGrams: 100, kcal: 59,  p: 100, f: 4,   c: 39,  fav: false }
+  /* おかゆ: 炊いた後のおかゆを基準に50gずつカウント(2026-08-08、旧「ごはん」f7から置き換え)。
+     八訂「こめ 水稲全かゆ 精白米」100g = 71kcal / P1.1 / F0.1 / C15.7 で換算(50gぶん)。
+     出典: https://fooddb.mext.go.jp/details/details.pl?ITEM_NO=1_01093_7 */
+  { id: 'f7', name: 'おかゆ',                       unit: '杯(炊50g)',  unitGrams: 50,  kcal: 36,  p: 6,   f: 1,   c: 79,  fav: false },
+  /* おくら: 八訂「おくら 果実 生」100g = 26kcal / P2.1 / F0.2 / C6.6 を 20gぶんで換算(2026-08-08追加)。
+     出典: https://fooddb.mext.go.jp/details/details.pl?ITEM_NO=6_06032_7 */
+  { id: 'f10', name: 'おくら',                      unit: '20g',        unitGrams: 20,  kcal: 5,   p: 4,   f: 0,   c: 13,  fav: false },
+  /* にんじん: 八訂「にんじん 根 皮つき 生」100g = 35kcal / P0.7 / F0.2 / C9.3 を 20gぶんで換算(2026-08-08追加)。
+     出典: https://fooddb.mext.go.jp/details/details.pl?ITEM_NO=6_06212_7 */
+  { id: 'f11', name: 'にんじん',                    unit: '20g',        unitGrams: 20,  kcal: 7,   p: 1,   f: 0,   c: 19,  fav: false }
 ];
 
 /* 今日の習慣(11章8番・第3弾を前倒し)。既定5項目(11-2の⑥で確定)+「22時就寝」を追加した6項目(2026-07-28 ユーザー指示)。
@@ -1650,11 +1654,11 @@ function sanitizeDiet(src) {
   return out;
 }
 
-/* 食品マスタの入れ替え(2026-07-28)。
+/* 食品マスタの入れ替え(2026-07-28、2026-08-08追加)。
    ・旧「トマト」(f3・1個150g)は消さずに残す(その日の記録の意味を変えないため)。
      代わりに「ミニトマト」(f9・1個15g)を足して、よく食べる印をミニトマトへ移す
-   ・「ごはん」(f7)は同じ食品の数え方を変えるだけなので、その場で新しい値に更新する
-     (米1合の1/3を炊いたぶん = 炊きあがり約110g) */
+   ・「ごはん→おかゆ」(f7)は同じ食品IDの数え方を変えるだけなので、その場で新しい値に更新する
+     (2026-07-28: 米1合の1/3を炊いたぶん≒110g → 2026-08-08: 炊いた後のおかゆ50gに変更) */
 function migrateDietFoods(diet) {
   if (!Array.isArray(diet.foods)) return;
   var byId = {};
@@ -1671,10 +1675,19 @@ function migrateDietFoods(diet) {
   }
   var rice = byId['f7'];
   if (rice && rice.unitGrams === 120 && rice.kcal === 187) {
-    var newRice = DEFAULT_FOODS.filter(function (f) { return f.id === 'f7'; })[0];
-    if (newRice) {
-      rice.name = newRice.name; rice.unit = newRice.unit; rice.unitGrams = newRice.unitGrams;
-      rice.kcal = newRice.kcal; rice.p = newRice.p; rice.f = newRice.f; rice.c = newRice.c;
+    var newRice119 = DEFAULT_FOODS.filter(function (f) { return f.id === 'f7'; })[0];
+    if (newRice119) {
+      rice.name = newRice119.name; rice.unit = newRice119.unit; rice.unitGrams = newRice119.unitGrams;
+      rice.kcal = newRice119.kcal; rice.p = newRice119.p; rice.f = newRice119.f; rice.c = newRice119.c;
+    }
+  }
+  /* ごはん(炊110g・172kcal)→おかゆ(炊50g・36kcal)への切り替え(2026-08-08) */
+  var rice2 = byId['f7'];
+  if (rice2 && rice2.unitGrams === 110 && rice2.kcal === 172) {
+    var newPorridge = DEFAULT_FOODS.filter(function (f) { return f.id === 'f7'; })[0];
+    if (newPorridge) {
+      rice2.name = newPorridge.name; rice2.unit = newPorridge.unit; rice2.unitGrams = newPorridge.unitGrams;
+      rice2.kcal = newPorridge.kcal; rice2.p = newPorridge.p; rice2.f = newPorridge.f; rice2.c = newPorridge.c;
     }
   }
 }
