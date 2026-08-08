@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- shift-calendar build 2026-07-28-12 -->
+<!-- shift-calendar build 2026-07-28-14 -->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -563,6 +563,7 @@
   .ex-count-line { font-size: 14px; margin: 3px 0; }
   .ex-count-box.achieved #ex-feel-count { color: #b8860b; font-weight: bold; }
   .ex-feel-msg { font-size: 13px; color: #b8860b; font-weight: bold; margin-top: 2px; min-height: 1.2em; }
+  .ex-count-box.achieved #ex-tuan-count { color: #b8860b; font-weight: bold; }
   /* 休んだ記録は控えめに(責める見た目にしない)。ただし読める濃さは確保する */
   .ex-rest-note { font-size: 11px; color: #6f6a5c; font-weight: normal; }
   /* 予定の回数に収まらない記録のお知らせ(事実だけを穏やかに伝える) */
@@ -876,6 +877,11 @@
   .range-btn.on { background: var(--navy); color: #fff; border-color: var(--navy); }
   #diet-graph { width: 100%; display: block; background: var(--cell-bg); border: 1px solid var(--line); border-radius: 8px; }
   /* 設定の行 */
+  .habit-row { padding: 4px 0; border-bottom: 1px solid var(--line); }
+  .habit-label { flex: 1 1 auto; min-width: 0; font-size: 13px; }
+  .habit-auto-note { font-size: 10px; color: #6f6a5c; margin-left: 4px; }
+  .diet-remain-heading { font-size: 12px; font-weight: bold; color: #7a6a4a; margin: 8px 0 2px; }
+  .diet-remain-est { margin: -4px 0 6px; }
   .diet-row { display: flex; align-items: center; gap: 6px; margin: 6px 0; flex-wrap: wrap; }
   .diet-row .dr-label { flex: 1 1 auto; font-size: 13px; min-width: 0; }
   .diet-row .dr-value { font-size: 13px; font-weight: bold; }
@@ -977,6 +983,11 @@
   <div class="ex-count-line ex-muscle-line">筋トレ: <span id="ex-muscle-count">予定 0回 / 済 0回</span> <span class="ex-rest-note" id="ex-muscle-rest"></span></div>
   <div class="ex-orphan-note" id="ex-orphan-note"></div>
 
+  <div class="ex-count-box" id="ex-tuan-box">
+    <div class="ex-count-line">🏆 <span id="ex-tuan-count">チュアンドタンまで あと 50回</span></div>
+    <div class="ex-feel-msg" id="ex-tuan-msg"></div>
+  </div>
+
   <div id="ex-list"></div>
   <div class="hint">数字(1・2)= その日の1回目・2回目のジム、💪= 筋トレ。「済」= 行った / 「🌙」= 休んだ(もう一度押すと取り消し)。<br>
   「🚴+」= 予定外にジムへ行った / 「🚶+」= 30分歩いた(押すたびに1回ぶん増え、チップの ✕ で取り消せます)。</div>
@@ -1017,10 +1028,17 @@
     <div id="diet-meters"></div>
     <div class="diet-stamps" id="diet-stamps"></div>
 
+    <div class="step">あと何が食べられるか</div>
+    <div id="diet-remaining"></div>
+
     <div class="step">今日食べたもの</div>
     <div class="hint">ボタンを押すと1つずつ増えます。右上の ✕ で0に戻ります。「g」でグラム入力もできます。</div>
     <div id="diet-foods"></div>
     <button class="btn sub small" id="diet-goto-foods">+ 食品を追加・編集する</button>
+
+    <div class="step">今日の習慣</div>
+    <div id="diet-habits"></div>
+    <button class="btn sub small" id="diet-goto-habits">+ 習慣を追加・編集する</button>
   </div>
 
   <!-- タブ2: ふりかえり -->
@@ -1051,6 +1069,11 @@
 
     <div class="step">目標</div>
     <div id="diet-goals"></div>
+
+    <div class="step">今日の習慣(項目)</div>
+    <div class="hint">名前を変えても、これまでの記録はそのまま残ります。</div>
+    <div id="diet-habit-list"></div>
+    <button class="btn sub small" id="diet-add-habit">+ 習慣を追加</button>
   </div>
 </div>
 
@@ -1172,6 +1195,17 @@ var DEFAULT_FOODS = [
   { id: 'f8', name: 'ギリシャヨーグルト(無糖)',   unit: '個(100g)',   unitGrams: 100, kcal: 59,  p: 100, f: 4,   c: 39,  fav: false }
 ];
 
+/* 今日の習慣(11章8番・第3弾を前倒し)。既定5項目(11-2の⑥で確定)+「22時就寝」を追加した6項目(2026-07-28 ユーザー指示)。
+   h5(体重を記録した)は特別扱いで、その日に体重の記録があれば自動でON表示にする(getHabitDisplayState参照) */
+var DEFAULT_HABITS = [
+  { id: 'h1', label: '水を1.5Lのむ' },
+  { id: 'h2', label: '湯船につかる' },
+  { id: 'h3', label: '夕食を早めにとれた' },
+  { id: 'h4', label: 'ストレッチ5分' },
+  { id: 'h5', label: '体重を記録した' },
+  { id: 'h6', label: '22時就寝' }
+];
+
 function defaultDiet() {
   return {
     profile: {
@@ -1185,7 +1219,9 @@ function defaultDiet() {
       useExerciseKcal: true,
       tuanGoal: 50,
       startWeight: 720,    /* 記録が1件も無いときに入力欄へ出す値(72.0kg) */
-      kcalNoticeSeen: false
+      kcalNoticeSeen: false,
+      habitDefsSeeded: true    /* 習慣の初期6項目を一度だけ入れたかどうか(2026-07-28)。
+                                   新規にdefaultDiet()を使うときはこの場で既定6項目を入れているのでtrueにしておく */
     },
     exKcal: { feel: 400, muscle: 150, walk: 130, extra: 400 },
     thresholds: { pRate: 90, fGram: 260, cLow: 80, cHigh: 120, kcalLow: 90, kcalHigh: 110 },
@@ -1194,7 +1230,10 @@ function defaultDiet() {
                kcal: f.kcal, p: f.p, f: f.f, c: f.c, fav: f.fav };
     }),
     weights: {}, meals: {}, mealsGrams: {},
-    diary: {}, habits: {}, habitDefs: [], prep: {}, achieved: {}
+    diary: {},
+    habits: {},
+    habitDefs: DEFAULT_HABITS.map(function (h) { return { id: h.id, label: h.label }; }),
+    prep: {}, achieved: {}
   };
 }
 
@@ -1485,6 +1524,7 @@ function sanitizeDiet(src) {
     });
     out.profile.useExerciseKcal = (p.useExerciseKcal !== false);
     out.profile.kcalNoticeSeen  = (p.kcalNoticeSeen === true);
+    out.profile.habitDefsSeeded = (p.habitDefsSeeded === true);
   }
 
   if (src.exKcal && typeof src.exKcal === 'object') {
@@ -1578,6 +1618,13 @@ function sanitizeDiet(src) {
       hd.push({ id: h.id, label: h.label.trim().slice(0, 40) });
     });
     out.habitDefs = hd;
+  }
+  /* 習慣の初期6項目を一度だけ入れる(2026-07-28)。第1弾では habitDefs は空のまま保存されていたので、
+     「一度も習慣機能を使っていない(=空のまま・まだ種をまいていない)」ときだけ既定6項目を入れる。
+     一度入れた後にユーザーが全部消しても、二度と勝手には復活させない(食品マスタの「空も尊重する」と同じ考え方) */
+  if (!out.habitDefs.length && !out.profile.habitDefsSeeded) {
+    out.habitDefs = DEFAULT_HABITS.map(function (h) { return { id: h.id, label: h.label }; });
+    out.profile.habitDefsSeeded = true;
   }
   /* achieved = 月 → 達成した日にちの配列(一度書いたら消さない) */
   if (src.achieved && typeof src.achieved === 'object' && !Array.isArray(src.achieved)) {
@@ -2878,6 +2925,7 @@ function toggleClosureDay(ym, d) {
 /* 月ごとの「前回描画時の合計」を覚えておく一時変数(保存はしない)。
    達成の瞬間だけフラッシュを再生し、ページ再読み込み直後は再生しないための仕組み */
 var exercisePrevTotal = {};
+var exercisePrevTuan = {};   /* チュアンドタン(11-7-2)の前回カウント。月ごとに達成の瞬間だけ演出を出すため */
 
 function buildExerciseRow(row, ym) {
   var el = document.createElement('div');
@@ -3267,6 +3315,27 @@ function updateExerciseCounts() {
   var muscleTotalShown = Math.max(0, muscleDays.length - mRest);
   $('ex-muscle-count').textContent = '予定 ' + muscleTotalShown + '回 / 済 ' + mDone + '回';
   $('ex-muscle-rest').textContent = mRest > 0 ? '🌙 ' + mRest + '回' : '';
+
+  /* チュアンドタン目標(11-7-2)。フィールサイクル済+予定外ジム+筋トレ済+ウォーキングの合計で判定する。
+     「🌙 休む」はどちらの内訳にも入っていないので自然にカウント対象外になる */
+  var tuanGoal = state.diet.profile.tuanGoal;
+  var tuanTotal = feelDone + feelExtra + mDone + walkTotal;
+  var tuanAchieved = tuanTotal >= tuanGoal;
+  var tuanPrev = exercisePrevTuan.hasOwnProperty(ym) ? exercisePrevTuan[ym] : null;
+  var tuanJustAchieved = tuanAchieved && tuanPrev !== null && tuanPrev < tuanGoal;
+  exercisePrevTuan[ym] = tuanTotal;
+
+  var tuanBox = $('ex-tuan-box');
+  tuanBox.classList.toggle('achieved', tuanAchieved);
+  $('ex-tuan-count').textContent = tuanAchieved
+    ? 'チュアンドタン級!(' + tuanTotal + '回)'
+    : 'チュアンドタンまで あと ' + (tuanGoal - tuanTotal) + '回';
+  $('ex-tuan-msg').textContent = tuanAchieved ? '🏆 チュアンドタン級!' : '';
+  if (tuanJustAchieved) {
+    tuanBox.classList.remove('flash');
+    void tuanBox.offsetWidth; /* reflow でアニメーションを最初から再生させる(フィールサイクル30回と同じ仕組み) */
+    tuanBox.classList.add('flash');
+  }
 }
 
 /* ================= スタンプ(下部のチップ横並び) ================= */
@@ -3878,7 +3947,9 @@ function renderDiet() {
 
   renderBodyCard(day);
   renderDietMeters(ym, day.d);
+  renderDietRemaining(ym, day.d);
   renderDietFoods(ym, day.d);
+  renderDietHabits(ym, day.d);
 }
 
 /* からだのカード(BMI・目標まで・基礎代謝・消費目安)。毎回その場で計算する */
@@ -3979,6 +4050,253 @@ function renderDietStamps(ym, d, st) {
       setTimeout(function () { el.classList.remove('pop'); }, 700);
     }
     box.appendChild(el);
+  });
+}
+
+/* ================= あと何が食べられるか + 4:4:3グラム推定(11-7-1) ================= */
+var NUTRIENT_LABEL = { p: 'P', f: 'F', c: 'C' };
+
+/* 1タップぶんのP・F・Cのうち、カロリー寄与(P×4 / F×9 / C×4)がいちばん大きい栄養素を返す。
+   食品データは0.1g単位のまま(全部10倍されているだけ)なので、大小関係の比較には影響しない */
+function dominantNutrient(food) {
+  var pk = food.p * 4, fk = food.f * 9, ck = food.c * 4;
+  if (pk >= fk && pk >= ck) return 'p';
+  if (fk >= pk && fk >= ck) return 'f';
+  return 'c';
+}
+/* その食品「1gあたり」の指定栄養素の量(0.1g単位/g) */
+function perGramOf(food, key) {
+  if (!food.unitGrams) return 0;
+  return food[key] / food.unitGrams;
+}
+/* 4:4:3に近づけるグラム推定(11-7-1の手順どおり)。5g刻み。5g未満は「そろっています」扱い */
+function dietGramEstimate(food, got, tp, kcalTarget) {
+  var remain = {
+    p: Math.max(0, tp.p - got.p),
+    f: Math.max(0, tp.f - got.f),
+    c: Math.max(0, tp.c - got.c)
+  };
+  var dom = dominantNutrient(food);
+  var domPerGram = perGramOf(food, dom);
+  if (domPerGram <= 0) return { grams: 0, label: NUTRIENT_LABEL[dom] };
+
+  var proposed = remain[dom] / domPerGram;   /* g */
+
+  /* 上限チェック: F(目標の120%)・C(120%)・カロリー(110%)。Pには上限を設けない(11-6と同じ) */
+  var caps = [];
+  ['f', 'c'].forEach(function (k) {
+    var perG = perGramOf(food, k);
+    if (perG > 0) {
+      var limit = tp[k] * 1.2;
+      caps.push(Math.max(0, (limit - got[k]) / perG));
+    }
+  });
+  var kcalPerGram = food.unitGrams ? food.kcal / food.unitGrams : 0;
+  if (kcalPerGram > 0) {
+    var kcalLimit = kcalTarget * 1.10;
+    caps.push(Math.max(0, (kcalLimit - got.kcal) / kcalPerGram));
+  }
+  var finalGrams = proposed;
+  caps.forEach(function (c) { finalGrams = Math.min(finalGrams, c); });
+  finalGrams = Math.max(0, finalGrams);
+
+  var rounded = Math.floor(finalGrams / 5) * 5;
+  if (rounded < 5) return { grams: 0, label: NUTRIENT_LABEL[dom] };
+  return { grams: rounded, label: NUTRIENT_LABEL[dom] };
+}
+
+/* 「あと何が食べられるか」の3グループ振り分け(11-7-1)。全部達成の日は allDone だけ返す */
+function dietRemainingGroups(ym, d) {
+  var tp = targetPfc();
+  var st = dietStampsForDay(ym, d);
+  if (st.live.star) return { allDone: true };   /* P・F・Cが3つそろった日はリストを差し替える */
+
+  var got = st.live.got;
+  var kcalTarget = st.live.kcalTarget;
+  var kcalUpper = kcalTarget * 1.10;
+  var fUpper = tp.f * 1.20;
+  var cUpper = tp.c * 1.20;
+  var groups = { full: [], half: [], tomorrow: [] };
+
+  state.diet.foods.forEach(function (f) {
+    function wouldExceed(mult) {
+      return (got.kcal + f.kcal * mult) > kcalUpper
+        || (got.f + f.f * mult) > fUpper
+        || (got.c + f.c * mult) > cUpper;
+    }
+    var bucket = !wouldExceed(1) ? 'full' : (!wouldExceed(0.5) ? 'half' : 'tomorrow');
+    groups[bucket].push({ id: f.id, name: f.name, p: f.p, est: dietGramEstimate(f, got, tp, kcalTarget) });
+  });
+  /* 並び順: 残りのPをいちばん埋める食品(=1個あたりのPが多い食品)を上に */
+  ['full', 'half', 'tomorrow'].forEach(function (k) {
+    groups[k].sort(function (a, b) { return b.p - a.p; });
+  });
+  return { allDone: false, groups: groups };
+}
+
+function renderDietRemaining(ym, d) {
+  var box = $('diet-remaining');
+  box.textContent = '';
+  var data = dietRemainingGroups(ym, d);
+  if (data.allDone) {
+    var msg = document.createElement('div');
+    msg.className = 'hint';
+    msg.textContent = '今日はそろいました 🌟 ここからは好きに選んでください';
+    box.appendChild(msg);
+    return;
+  }
+  if (!state.diet.foods.length) {
+    var empty = document.createElement('div');
+    empty.className = 'hint';
+    empty.textContent = '食品がありません。「+ 食品を追加・編集する」から登録できます。';
+    box.appendChild(empty);
+    return;
+  }
+  var groupDefs = [
+    { key: 'full', title: 'そのまま食べられます' },
+    { key: 'half', title: '半分なら' },
+    { key: 'tomorrow', title: '明日の分に' }
+  ];
+  groupDefs.forEach(function (g) {
+    var items = data.groups[g.key];
+    if (!items.length) return;
+    var h = document.createElement('div');
+    h.className = 'diet-remain-heading';
+    h.textContent = g.title;
+    box.appendChild(h);
+    items.forEach(function (it) {
+      var row = document.createElement('div');
+      row.className = 'diet-row';
+      var lab = document.createElement('span');
+      lab.className = 'dr-label';
+      lab.textContent = it.name;                  /* textContent で表示(XSS対策) */
+      row.appendChild(lab);
+      box.appendChild(row);
+      var sub = document.createElement('div');
+      sub.className = 'hint diet-remain-est';
+      sub.textContent = it.est.grams > 0
+        ? 'あと約' + it.est.grams + 'g(' + it.est.label + 'がそろいます)'
+        : it.est.label + 'はそろっています';       /* 5g未満/すでに十分は罰しない表現で */
+      box.appendChild(sub);
+    });
+  });
+}
+
+/* ================= 今日の習慣(11章8番。第3弾を前倒し・2026-07-28) ================= */
+function getHabitState(ym, d, hid) {
+  var mo = state.diet.habits[ym];
+  if (!mo) return null;
+  var rec = mo[String(d)];
+  if (!rec) return null;
+  var v = rec[hid];
+  return (v === 'done' || v === 'rest') ? v : null;
+}
+/* 表示用の状態。h5(体重を記録した)だけ特別扱いで、その日に体重の記録があれば
+   明示的な記録が無くても自動で「済」に見せる(🌙を押せば、その手動記録が優先される) */
+function getHabitDisplayState(ym, d, hid) {
+  var explicit = getHabitState(ym, d, hid);
+  if (explicit !== null) return explicit;
+  if (hid === 'h5') {
+    var wm = state.diet.weights[ym] || {};
+    if (wm[String(d)] !== undefined) return 'done';
+  }
+  return null;
+}
+function setHabitState(ym, d, hid, next) {
+  if (!state.diet.habits[ym]) state.diet.habits[ym] = {};
+  var mo = state.diet.habits[ym];
+  var key = String(d);
+  if (!mo[key]) mo[key] = {};
+  var rec = mo[key];
+  if (next === null || rec[hid] === next) delete rec[hid];  /* null = 未記録に戻す(取り消し) */
+  else rec[hid] = next;
+  if (!Object.keys(rec).length) delete mo[key];
+  if (!Object.keys(mo).length) delete state.diet.habits[ym];
+  saveState();
+}
+
+/* [済][🌙]の2ボタン。既存の運動記録(rec-btn系クラス)と同じ見た目・同じ思想を流用する */
+function renderDietHabits(ym, d) {
+  var box = $('diet-habits');
+  box.textContent = '';
+  var defs = state.diet.habitDefs;
+  if (!defs.length) {
+    var hint = document.createElement('div');
+    hint.className = 'hint';
+    hint.textContent = '習慣がありません。「+ 習慣を追加・編集する」から登録できます。';
+    box.appendChild(hint);
+    return;
+  }
+  defs.forEach(function (h) {
+    var row = document.createElement('div');
+    row.className = 'rec-group habit-row';
+
+    var lab = document.createElement('span');
+    lab.className = 'rec-label habit-label';
+    lab.textContent = h.label;   /* textContent で表示(XSS対策) */
+    row.appendChild(lab);
+
+    var autoNote = document.createElement('span');
+    autoNote.className = 'habit-auto-note';
+    row.appendChild(autoNote);
+
+    var doneBtn = document.createElement('button');
+    var restBtn = document.createElement('button');
+
+    function paint() {
+      var explicit = getHabitState(ym, d, h.id);
+      var st = getHabitDisplayState(ym, d, h.id);
+      doneBtn.className = 'rec-btn' + (st === 'done' ? ' is-done' : '');
+      doneBtn.textContent = st === 'done' ? '✓ 済' : '済';
+      restBtn.className = 'rec-btn rec-btn-moon' + (st === 'rest' ? ' is-rest' : '');
+      restBtn.textContent = '🌙';
+      doneBtn.setAttribute('aria-label', h.label + ' を済にする');
+      restBtn.setAttribute('aria-label', h.label + ' を休みにする');
+      autoNote.textContent = (h.id === 'h5' && explicit === null && st === 'done') ? '(体重の記録から自動)' : '';
+    }
+    doneBtn.addEventListener('click', function () {
+      var st = getHabitState(ym, d, h.id);
+      var next = (st === 'done') ? null : 'done';
+      setHabitState(ym, d, h.id, next);
+      paint();
+      if (next === 'done') playPop(doneBtn);
+    });
+    restBtn.addEventListener('click', function () {
+      var st = getHabitState(ym, d, h.id);
+      var next = (st === 'rest') ? null : 'rest';
+      setHabitState(ym, d, h.id, next);
+      paint();
+      if (next === 'rest') playMoon(restBtn);
+    });
+    paint();
+    row.appendChild(doneBtn);
+    row.appendChild(restBtn);
+    box.appendChild(row);
+  });
+}
+
+/* 習慣の項目一覧(食品・設定タブ)。名前変更・削除・追加ができる(11章の想定どおり) */
+function renderDietHabitSettings() {
+  var list = $('diet-habit-list');
+  list.textContent = '';
+  state.diet.habitDefs.forEach(function (h, idx) {
+    var row = dietRow(h.label, null, [
+      { text: '名前変更', onClick: function () {
+        var v = prompt('習慣の名前を入力', h.label);
+        if (v === null) return;
+        var t = String(v).trim();
+        if (!t) { toast('名前を入れてください'); return; }
+        state.diet.habitDefs[idx].label = t.slice(0, 40);
+        saveState(); renderDietHabitSettings(); renderDiet();
+      } },
+      { text: '削除', cls: 'dr-del', onClick: function () {
+        if (!confirm('習慣「' + h.label + '」を消しますか?\n(これまでの記録はそのまま残ります)')) return;
+        state.diet.habitDefs.splice(idx, 1);
+        saveState(); renderDietHabitSettings(); renderDiet();
+        toast('習慣を消しました');
+      } }
+    ]);
+    list.appendChild(row);
   });
 }
 
@@ -4124,6 +4442,10 @@ $('diet-weight-save').addEventListener('click', function () {
 });
 
 $('diet-goto-foods').addEventListener('click', function () {
+  var tab = document.querySelector('.diet-tab[data-dtab="settings"]');
+  if (tab) tab.click();
+});
+$('diet-goto-habits').addEventListener('click', function () {
   var tab = document.querySelector('.diet-tab[data-dtab="settings"]');
   if (tab) tab.click();
 });
@@ -4442,6 +4764,18 @@ function renderDietSettings() {
   g.appendChild(dietRow('運動したぶんを目標に足す', p.useExerciseKcal ? 'する' : 'しない', [{ text: '切り替え', onClick: function () {
     p.useExerciseKcal = !p.useExerciseKcal; saveState(); renderDietSettings(); renderDiet();
   } }]));
+  g.appendChild(dietRow('チュアンドタン目標(月の運動回数)', p.tuanGoal + ' 回', [{ text: '変更', onClick: function () {
+    var v = prompt('チュアンドタン目標(月の運動回数)を入力', String(p.tuanGoal));
+    if (v === null) return;
+    var n = parseInt(v, 10);
+    if (!isFinite(n) || n < 10 || n > 99) { toast('10〜99 の数字で入れてください'); return; }
+    p.tuanGoal = n; saveState(); renderDietSettings();
+    /* 運動予定シートが開いていれば、その場でカウント表示にも反映する */
+    if ($('sheet-exercise').classList.contains('open')) updateExerciseCounts();
+  } }]));
+
+  /* --- 今日の習慣(項目) --- */
+  renderDietHabitSettings();
 }
 
 /* 食品の編集・追加 */
@@ -4481,6 +4815,16 @@ $('diet-add-food').addEventListener('click', function () {
   state.diet.foods.push({ id: id, name: '新しい食品', unit: '個', unitGrams: 100, kcal: 0, p: 0, f: 0, c: 0, fav: false });
   saveState();
   editFood(state.diet.foods.length - 1);
+});
+$('diet-add-habit').addEventListener('click', function () {
+  if (state.diet.habitDefs.length >= 20) { toast('習慣は20件までです'); return; }
+  var v = prompt('新しい習慣の名前を入力');
+  if (v === null) return;
+  var t = String(v).trim();
+  if (!t) { toast('名前を入れてください'); return; }
+  var id = 'h' + Date.now();
+  state.diet.habitDefs.push({ id: id, label: t.slice(0, 40) });
+  saveState(); renderDietHabitSettings(); renderDiet();
 });
 
 /* 目標カロリーが基礎代謝を下回るときの静かな一言(初回・変更時に1回だけ) */
