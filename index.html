@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- shift-calendar build 2026-08-09-01 -->
+<!-- shift-calendar build 2026-08-09-02 -->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -652,7 +652,8 @@
   /* ===== 明日の持ち物(2026-08-08 追加) =====
      クリーム基調・角丸のチップ/ボタンで既存デザインに馴染ませる。
      「済」の見た目は実施の記録(rec-btn.is-done)と同じ緑系にして意味を揃える */
-  .pk-date { font-size: 12px; color: #6b6355; margin: -4px 0 6px; }
+  /* 2026-08-09: 日付にシフト・運動予定の要約を続けて出すため、折り返しても読みやすいよう行間を確保 */
+  .pk-date { font-size: 12px; color: #6b6355; margin: -4px 0 6px; line-height: 1.5; }
   .pk-row {
     display: flex;
     align-items: center;
@@ -660,7 +661,24 @@
     padding: 6px 2px;
     border-bottom: 1px solid var(--line);
   }
+  /* 2026-08-09: 明日の予定から見て「不要」と自動判定された項目。否定的な表現は使わず、
+     淡く見せるだけにとどめる(罰しない設計) */
+  .pk-row.pk-row-unneeded { opacity: .55; }
   .pk-name { flex: 1 1 auto; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pk-need-btn {
+    flex: 0 0 auto;
+    border: 1.5px solid #b9c6ee;
+    background: #eef3ff;
+    color: #1a4a9e;
+    border-radius: 8px;
+    padding: 0 8px;
+    min-height: 32px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .pk-need-btn.off { border-color: #c9c1b0; background: var(--cell-bg); color: #948c7d; font-weight: normal; }
   .pk-qty {
     flex: 0 0 auto;
     display: flex;
@@ -738,22 +756,23 @@
     min-width: 40px;
   }
   .rec-btn-extra { font-size: 11px; padding: 0 8px; }
-  /* 30分歩いた記録。追加と同じ「前向きな操作」なので同系だが、色で見分けられるようにする */
-  .rec-btn-walk {
+  /* 臨時で筋トレをした記録(2026-08-09 追加。ウォーキング機能の置き換え)。
+     追加(🚴+)と同じ「前向きな操作」なので同系だが、筋トレ色(オレンジ系)で見分けられるようにする */
+  .rec-btn-muscle-extra {
     font-size: 12px;
     font-weight: normal;
-    color: #1565c0;
-    border-color: #a9c7e8;
+    color: #a34700;
+    border-color: #e8c7a9;
     border-style: dashed;
     padding: 0 6px;
     min-width: 40px;
   }
-  .rec-btn-walkchip {
+  .rec-btn-muscle-extra-chip {
     font-size: 11px;
     padding: 0 8px;
-    background: #e7f0fb;
-    border-color: #1565c0;
-    color: #0d47a1;
+    background: #ffe9d6;
+    border-color: #a34700;
+    color: #7a3400;
   }
 
   /* 済: 小さい状態から「ぐわっと」大きく育って現れ、最後に等倍へ落ち着く */
@@ -1080,8 +1099,6 @@
   </div>
 
   <div id="ex-list"></div>
-  <div class="hint">数字(1・2)= その日の1回目・2回目のジム、💪= 筋トレ。「済」= 行った / 「🌙」= 休んだ(もう一度押すと取り消し)。<br>
-  「🚴+」= 予定外にジムへ行った / 「🚶+」= 30分歩いた(押すたびに1回ぶん増え、チップの ✕ で取り消せます)。</div>
 </div>
 
 <!-- ===== 食事シート(ダイエット・食事管理。計画.md 11章) ===== -->
@@ -1333,7 +1350,10 @@ function defaultDiet() {
 }
 
 /* 明日の持ち物(2026-08-08 追加。計画は検証\2026-08-08-持ち物チェックリスト.md 参照)。
-   固定(scales:false)= 回数に関係なく常に1つ。回数連動(scales:true)= 1回分なら1・2回分なら2が既定 */
+   固定(scales:false)= 回数に関係なく常に1つ。回数連動(scales:true)= 1回分なら1・2回分なら2が既定。
+   2026-08-09: k1(シャンプー等)・k9(日焼け止め)・k10(整髪剤)は、id を見て
+   packingItemNeeded() が明日の予定から要否を自動判定する(詳細はそちらのコメント参照)。
+   k9・k10 は個数を回数連動から「常に1個」に変更(要否判定のほうで意味を持たせるため) */
 var DEFAULT_PACKING = [
   { id: 'k1', name: 'シャンプー・ボディソープ', unit: '本', scales: false },
   { id: 'k2', name: 'クリーム', unit: '個', scales: false },
@@ -1343,8 +1363,8 @@ var DEFAULT_PACKING = [
   { id: 'k6', name: '洗顔料', unit: '', scales: true },
   { id: 'k7', name: 'クレンジング', unit: '', scales: true },
   { id: 'k8', name: '化粧水美容液など', unit: '', scales: true },
-  { id: 'k9', name: '日焼け止め', unit: '', scales: true },
-  { id: 'k10', name: '整髪剤', unit: '', scales: true }
+  { id: 'k9', name: '日焼け止め', unit: '', scales: false },
+  { id: 'k10', name: '整髪剤', unit: '', scales: false }
 ];
 function clonePackingDef(d) { return { id: d.id, name: d.name, unit: d.unit, scales: d.scales === true }; }
 
@@ -1908,7 +1928,8 @@ function dayExerciseKcal(ym, d) {
   }
   if (rec.muscle === 'done') sum += k.muscle;
   if (typeof rec.extra === 'number' && rec.extra > 0) sum += k.extra * rec.extra;
-  if (typeof rec.walk === 'number' && rec.walk > 0) sum += k.walk * rec.walk;
+  if (typeof rec.walk === 'number' && rec.walk > 0) sum += k.walk * rec.walk;   /* 旧データの互換用(新規入力はしない) */
+  if (typeof rec.muscleExtra === 'number' && rec.muscleExtra > 0) sum += k.muscle * rec.muscleExtra;
   return sum;
 }
 /* その日の目標カロリー(運動ぶんを足す設定なら加算) */
@@ -2083,14 +2104,22 @@ function sanitizeExercise(src) {
           ex = Math.floor(ex);
           if (ex > 0) clean.extra = Math.min(ex, 20);
         }
-        /* walk = 30分歩いた回数(2026-07-28 追加)。自動の予定は作らず、歩いた日に記録するだけ。
-           このキーが無い旧データも読める(単に0回として扱う) */
+        /* walk = 30分歩いた回数(2026-07-28 追加・2026-08-09 入力機能は廃止)。
+           ウォーキング機能は廃止したが、過去に記録した既存データは読み飛ばせるようそのまま残す
+           (壊さない・新規入力はできない) */
         var wk = rec.walk;
         if (typeof wk === 'number' && isFinite(wk)) {
           wk = Math.floor(wk);
           if (wk > 0) clean.walk = Math.min(wk, 20);
         }
-        if (clean.feel || clean.muscle || clean.extra || clean.walk) cleanMo[String(n)] = clean;
+        /* muscleExtra = 臨時で筋トレをした回数(2026-08-09 追加。ウォーキング機能の置き換え)。
+           🚴+(extra)と同じ考え方で、筋トレの予定が無い日でも記録できる。0〜20の整数だけ認める */
+        var mex = rec.muscleExtra;
+        if (typeof mex === 'number' && isFinite(mex)) {
+          mex = Math.floor(mex);
+          if (mex > 0) clean.muscleExtra = Math.min(mex, 20);
+        }
+        if (clean.feel || clean.muscle || clean.extra || clean.walk || clean.muscleExtra) cleanMo[String(n)] = clean;
       });
       if (Object.keys(cleanMo).length) out.records[ym] = cleanMo;
     });
@@ -2110,11 +2139,15 @@ function sanitizePackingDefs(src) {
     if (typeof d.id !== 'string' || !d.id || seen[d.id]) return;
     if (typeof d.name !== 'string' || !d.name.trim()) return;
     seen[d.id] = true;
+    var scales = d.scales === true;
+    /* 2026-08-09: 日焼け止め(k9)・整髪剤(k10)は「回数連動」をやめて常に1個にする仕様変更。
+       前バージョンで scales:true として保存されていた既存データも、ここで強制的に揃える */
+    if (d.id === 'k9' || d.id === 'k10') scales = false;
     out.push({
       id: d.id,
       name: d.name.trim().slice(0, 40),
       unit: (typeof d.unit === 'string') ? d.unit.slice(0, 10) : '',
-      scales: d.scales === true
+      scales: scales
     });
   });
   if (out.length > 30) out = out.slice(0, 30);
@@ -2160,7 +2193,15 @@ function sanitizePackingData(src) {
         });
         if (Object.keys(ov).length) clean.overrides = ov;
       }
-      if (clean.tab || clean.checked || clean.overrides) cleanMo[String(n)] = clean;
+      /* needOverride = 「必要/不要」の自動判定を、その日だけ手動で上書きしたもの(2026-08-09 追加) */
+      if (rec.needOverride && typeof rec.needOverride === 'object' && !Array.isArray(rec.needOverride)) {
+        var nd = {};
+        Object.keys(rec.needOverride).forEach(function (id) {
+          if (rec.needOverride[id] === true || rec.needOverride[id] === false) nd[id] = rec.needOverride[id];
+        });
+        if (Object.keys(nd).length) clean.needOverride = nd;
+      }
+      if (clean.tab || clean.checked || clean.overrides || clean.needOverride) cleanMo[String(n)] = clean;
     });
     if (Object.keys(cleanMo).length) out[ym] = cleanMo;
   });
@@ -2200,17 +2241,19 @@ function setExtraCount(ym, d, n) {
   if (!mo[key]) mo[key] = {};
   var rec = mo[key];
   if (n > 0) rec.extra = n; else delete rec.extra;
-  if (!rec.feel && !rec.muscle && !rec.extra && !rec.walk) delete mo[key];
+  if (!rec.feel && !rec.muscle && !rec.extra && !rec.walk && !rec.muscleExtra) delete mo[key];
   if (!Object.keys(mo).length) delete state.exercise.records[ym];
   saveState();
 }
 
-/* 30分歩いた回数(2026-07-28 追加)。予定は作らず、歩いた日に自分で記録する */
-function getWalkCount(ym, d) {
+/* 臨時で筋トレをした回数(2026-08-09 追加。ウォーキング機能の置き換え)。
+   🚴+(getExtraCount/setExtraCount)と同じ考え方で、通常の筋トレスケジュールの有無に関わらず
+   いつでも記録できる */
+function getMuscleExtraCount(ym, d) {
   var rec = getDayRecord(ym, d);
-  return rec && typeof rec.walk === 'number' && rec.walk > 0 ? rec.walk : 0;
+  return rec && typeof rec.muscleExtra === 'number' && rec.muscleExtra > 0 ? rec.muscleExtra : 0;
 }
-function setWalkCount(ym, d, n) {
+function setMuscleExtraCount(ym, d, n) {
   if (n < 0) n = 0;
   if (n > 20) n = 20;
   if (!state.exercise.records[ym]) state.exercise.records[ym] = {};
@@ -2218,10 +2261,18 @@ function setWalkCount(ym, d, n) {
   var key = String(d);
   if (!mo[key]) mo[key] = {};
   var rec = mo[key];
-  if (n > 0) rec.walk = n; else delete rec.walk;
-  if (!rec.feel && !rec.muscle && !rec.extra && !rec.walk) delete mo[key];
+  if (n > 0) rec.muscleExtra = n; else delete rec.muscleExtra;
+  if (!rec.feel && !rec.muscle && !rec.extra && !rec.walk && !rec.muscleExtra) delete mo[key];
   if (!Object.keys(mo).length) delete state.exercise.records[ym];
   saveState();
+}
+
+/* 30分歩いた回数(2026-07-28 追加・2026-08-09 入力機能は廃止)。
+   ウォーキングのボタン・表示は削除したが、既存データを読む関数はそのまま残す
+   (dayExerciseKcal などが過去データを参照できるようにするため) */
+function getWalkCount(ym, d) {
+  var rec = getDayRecord(ym, d);
+  return rec && typeof rec.walk === 'number' && rec.walk > 0 ? rec.walk : 0;
 }
 /* 同じ状態をもう一度選んだら取り消し(未記録に戻す) */
 function setFeelState(ym, d, index, next) {
@@ -2236,7 +2287,7 @@ function setFeelState(ym, d, index, next) {
   rec.feel[index] = (next === null || rec.feel[index] === next) ? null : next;
   while (rec.feel.length && rec.feel[rec.feel.length - 1] === null) rec.feel.pop();
   if (!rec.feel.length) delete rec.feel;
-  if (!rec.feel && !rec.muscle && !rec.extra && !rec.walk) delete mo[key];
+  if (!rec.feel && !rec.muscle && !rec.extra && !rec.walk && !rec.muscleExtra) delete mo[key];
   if (!Object.keys(mo).length) delete state.exercise.records[ym];
   saveState();
 }
@@ -2248,7 +2299,7 @@ function setMuscleState(ym, d, next) {
   var rec = mo[key];
   if (next === null || rec.muscle === next) delete rec.muscle;  /* null = 未記録に戻す */
   else rec.muscle = next;
-  if (!rec.feel && !rec.muscle && !rec.extra && !rec.walk) delete mo[key];
+  if (!rec.feel && !rec.muscle && !rec.extra && !rec.walk && !rec.muscleExtra) delete mo[key];
   if (!Object.keys(mo).length) delete state.exercise.records[ym];
   saveState();
 }
@@ -2470,15 +2521,22 @@ function buildCellExerciseLine(ym, d, shEntry, maxW, stampNames) {
     if (restN > 0) { feelMark += '🌙'; feelMarkShort += '🌙'; }
   }
   var muscleDays = state.exercise.muscle[ym] || [];
-  var hasMuscle = muscleDays.indexOf(String(d)) >= 0;
+  var isMuscleScheduled = muscleDays.indexOf(String(d)) >= 0;
+  var muscleExtraN = getMuscleExtraCount(ym, d);
+  var hasMuscle = isMuscleScheduled || muscleExtraN > 0;
   var mMark = '';
   if (hasMuscle) {
-    var ms = getMuscleState(ym, d);
-    mMark = ms === 'done' ? '✓' : (ms === 'rest' ? '🌙' : '');
+    var mDoneN = muscleExtraN, mRestN = 0;   /* 臨時の筋トレ(💪+)も「済」として数える */
+    if (isMuscleScheduled) {
+      var ms = getMuscleState(ym, d);
+      if (ms === 'done') mDoneN++;
+      else if (ms === 'rest') mRestN++;
+    }
+    if (mDoneN > 0) mMark += '✓' + (mDoneN > 1 ? mDoneN : '');
+    if (mRestN > 0) mMark += '🌙';
   }
-  var walkN = getWalkCount(ym, d);
   var hasStamps = !!(stampNames && stampNames.length);
-  if (!hasFeel && !hasMuscle && walkN === 0 && !hasStamps) return null;
+  if (!hasFeel && !hasMuscle && !hasStamps) return null;
 
   /* フィールサイクルは「朝晩」「朝2」「朝」のように、いつ行くかが分かる書き方にする。
      予定外に行った回数(extra)は「+n」で後ろに足す(予定0回の日でも出る) */
@@ -2514,20 +2572,7 @@ function buildCellExerciseLine(ym, d, shEntry, maxW, stampNames) {
       '💪'
     ];
   } else {
-    cands = [];   /* 歩きだけの日。下で組み立てる */
-  }
-
-  /* 30分歩いた記録はマスの幅がぎりぎりなので、収まるときだけ後ろに足す。
-     歩きしか無い日は「🚶30分」だけを出す */
-  var walkTxt = walkN > 1 ? '🚶' + walkN : '🚶';
-  if (walkN > 0) {
-    if (!cands.length) {
-      cands = ['🚶30分' + (walkN > 1 ? '×' + walkN : ''), '🚶' + (walkN > 1 ? walkN : '')];
-    } else {
-      /* 既存の候補それぞれに「 🚶」を足したものを前に置き、入らなければ歩き無しの表記に落とす */
-      var withWalk = cands.map(function (c) { return c + ' ' + walkTxt; });
-      cands = withWalk.concat(cands);
-    }
+    cands = [];
   }
 
   var exText = cands.length ? pickFitting(cands, maxW - 1) : '';  /* 1px の余裕を見て切れを防ぐ */
@@ -2697,7 +2742,7 @@ function render() {
           }
         }
 
-        /* 運動予定(🚴朝晩・💪・🚶)の行 */
+        /* 運動予定(🚴朝晩・💪)の行 */
         var exLine = buildCellExerciseLine(ym, dayNum, sh, cellInnerW, stampNames);
         if (exLine) cell.appendChild(exLine);
 
@@ -3334,38 +3379,38 @@ function buildRecordGroup(opt) {
   });
   wrap.appendChild(addBtn);
 
-  /* 30分歩いた記録(2026-07-28)。予定は作らず、歩いた日に1タップで記録する。
-     すべての日に出す(歩くのはジムの予定と関係がないため) */
-  var walk = getWalkCount(opt.ym, opt.d);
-  for (var w = 0; w < walk; w++) {
+  /* 臨時で筋トレをした記録(2026-08-09 追加。ウォーキング機能の置き換え)。
+     🚴+ と同じ操作感で、通常の筋トレスケジュールの有無に関わらずすべての日に出す */
+  var muscleExtra = getMuscleExtraCount(opt.ym, opt.d);
+  for (var me = 0; me < muscleExtra; me++) {
     (function (num) {
       var chip = document.createElement('button');
-      chip.className = 'rec-btn is-done rec-btn-walkchip';
-      chip.textContent = '🚶30分' + (walk > 1 ? num : '') + ' ✕';
-      chip.setAttribute('aria-label', cur.m + '/' + opt.d + ' の30分歩き' + num + '回目を取り消す');
+      chip.className = 'rec-btn is-done rec-btn-muscle-extra-chip';
+      chip.textContent = '💪臨時' + (muscleExtra > 1 ? num : '') + ' ✕';
+      chip.setAttribute('aria-label', cur.m + '/' + opt.d + ' の臨時筋トレ' + num + '回目を取り消す');
       chip.addEventListener('click', function () {
-        setWalkCount(opt.ym, opt.d, getWalkCount(opt.ym, opt.d) - 1);
+        setMuscleExtraCount(opt.ym, opt.d, getMuscleExtraCount(opt.ym, opt.d) - 1);
         renderExercise();
         skipExerciseRerender = true; render(); skipExerciseRerender = false;
-        toast('30分歩きの記録を1回ぶん取り消しました');
+        toast('臨時の筋トレの記録を1回ぶん取り消しました');
       });
       wrap.appendChild(chip);
-    })(w + 1);
+    })(me + 1);
   }
-  var walkBtn = document.createElement('button');
-  walkBtn.className = 'rec-btn rec-btn-walk';
-  walkBtn.textContent = '🚶+';
-  walkBtn.setAttribute('aria-label', cur.m + '/' + opt.d + ' に30分歩いたことを記録する');
-  walkBtn.addEventListener('click', function () {
-    setWalkCount(opt.ym, opt.d, getWalkCount(opt.ym, opt.d) + 1);
-    playPop(walkBtn);
+  var muscleExtraBtn = document.createElement('button');
+  muscleExtraBtn.className = 'rec-btn rec-btn-muscle-extra';
+  muscleExtraBtn.textContent = '💪+';
+  muscleExtraBtn.setAttribute('aria-label', cur.m + '/' + opt.d + ' に臨時で筋トレをしたことを記録する');
+  muscleExtraBtn.addEventListener('click', function () {
+    setMuscleExtraCount(opt.ym, opt.d, getMuscleExtraCount(opt.ym, opt.d) + 1);
+    playPop(muscleExtraBtn);
     updateExerciseCounts();
     skipExerciseRerender = true; render(); skipExerciseRerender = false;
     setTimeout(function () {
       if ($('sheet-exercise').classList.contains('open')) renderExercise();
     }, 700);
   });
-  wrap.appendChild(walkBtn);
+  wrap.appendChild(muscleExtraBtn);
   return wrap;
 }
 
@@ -3473,7 +3518,7 @@ function updateExerciseCounts() {
       else if (st === 'rest') feelRest++;
     }
     feelExtra += getExtraCount(ym, d);   /* 予定外に行った回数 */
-    walkTotal += getWalkCount(ym, d);    /* 30分歩いた回数 */
+    walkTotal += getWalkCount(ym, d);    /* 30分歩いた回数(旧データのみ。新規入力は廃止) */
     /* 予定の回数を超えて残っている記録がないか調べる(シフトが変わって予定が減った日) */
     var rec = getDayRecord(ym, d);
     if (rec && Array.isArray(rec.feel)) {
@@ -3493,10 +3538,10 @@ function updateExerciseCounts() {
   var justAchieved = achieved && prev !== null && prev < 30;
   exercisePrevTotal[ym] = doneAll;
 
-  /* 内訳は0のものを出さない(画面が煩雑にならないように) */
+  /* 内訳は0のものを出さない(画面が煩雑にならないように)。
+     ウォーキング機能は廃止したため「歩き◯回」の内訳表示はしない(合計への加算は互換のため残す) */
   var parts = [];
   if (feelExtra > 0) parts.push('追加 ' + feelExtra + '回');
-  if (walkTotal > 0) parts.push('歩き ' + walkTotal + '回');
   var box = $('ex-feel-box');
   box.classList.toggle('achieved', achieved);
   /* 🌙(休む)を選んだ回は「予定」の合計から差し引く(2026-07-28 ユーザー承認)。
@@ -3537,23 +3582,27 @@ function updateExerciseCounts() {
     noteEl.appendChild(btn);
   }
 
-  /* 筋トレ: 予定と済 */
+  /* 筋トレ: 予定と済(2026-08-09: 臨時の筋トレ「💪+」も済に加える) */
   var muscleDays = state.exercise.muscle[ym] || [];
-  var mDone = 0, mRest = 0;
+  var mDone = 0, mRest = 0, muscleExtraTotal = 0;
   muscleDays.forEach(function (dk) {
     var st = getMuscleState(ym, parseInt(dk, 10));
     if (st === 'done') mDone++;
     else if (st === 'rest') mRest++;
   });
+  for (var md = 1; md <= dim; md++) {
+    muscleExtraTotal += getMuscleExtraCount(ym, md);
+  }
   /* 筋トレの🌙も同じ考え方で「予定」から差し引く(2026-07-28 ユーザー承認・フィールサイクルと揃える) */
   var muscleTotalShown = Math.max(0, muscleDays.length - mRest);
-  $('ex-muscle-count').textContent = '予定 ' + muscleTotalShown + '回 / 済 ' + mDone + '回';
+  $('ex-muscle-count').textContent = '予定 ' + muscleTotalShown + '回 / 済 ' + (mDone + muscleExtraTotal) + '回' +
+    (muscleExtraTotal > 0 ? '(うち臨時 ' + muscleExtraTotal + '回)' : '');
   $('ex-muscle-rest').textContent = mRest > 0 ? '🌙 ' + mRest + '回' : '';
 
-  /* チュアンドタン目標(11-7-2)。フィールサイクル済+予定外ジム+筋トレ済+ウォーキングの合計で判定する。
+  /* チュアンドタン目標(11-7-2)。フィールサイクル済+予定外ジム+筋トレ済(臨時ぶんを含む)+旧ウォーキングデータの合計で判定する。
      「🌙 休む」はどちらの内訳にも入っていないので自然にカウント対象外になる */
   var tuanGoal = state.diet.profile.tuanGoal;
-  var tuanTotal = feelDone + feelExtra + mDone + walkTotal;
+  var tuanTotal = feelDone + feelExtra + mDone + muscleExtraTotal + walkTotal;
   var tuanAchieved = tuanTotal >= tuanGoal;
   var tuanPrev = exercisePrevTuan.hasOwnProperty(ym) ? exercisePrevTuan[ym] : null;
   var tuanJustAchieved = tuanAchieved && tuanPrev !== null && tuanPrev < tuanGoal;
@@ -3613,7 +3662,7 @@ function cleanupPackingRecord(day) {
   if (!mo) return;
   var key = String(day.d);
   var rec = mo[key];
-  if (rec && !rec.tab && !rec.checked && !rec.overrides) delete mo[key];
+  if (rec && !rec.tab && !rec.checked && !rec.overrides && !rec.needOverride) delete mo[key];
   if (mo && !Object.keys(mo).length) delete state.exercise.packing[ym];
 }
 
@@ -3656,10 +3705,79 @@ function togglePackingChecked(day, itemId) {
   saveState();
 }
 
+/* ===== 持ち物の要否の自動判定(2026-08-09 追加) =====
+   対象は id で見分ける組み込み3項目だけ(k1=シャンプー・ボディソープ / k9=日焼け止め / k10=整髪剤)。
+   それ以外の項目(固定・回数連動とも)は今までどおり常に「必要」として扱う */
+function packingMuscleTomorrow(day) {
+  var ym = ymKey(day.y, day.m);
+  var scheduled = (state.exercise.muscle[ym] || []).indexOf(String(day.d)) >= 0;
+  if (scheduled) return true;
+  return getMuscleExtraCount(ym, day.d) > 0;
+}
+function packingMorningFeelTomorrow(day) {
+  var ds = dateStrOf(day.y, day.m, day.d);
+  var ym = ymKey(day.y, day.m);
+  var shEntry = normShift((state.shifts[ym] || {})[String(day.d)]);
+  var closure = state.exercise.closureDays[ym] || [];
+  var res = getFeelcycleCount(ds, shEntry, closure.indexOf(String(day.d)) >= 0);
+  return !!(res.slots && res.slots.indexOf('朝') >= 0);
+}
+/* この項目が自動判定の対象かどうか(対象外の項目は常に必要=トグルも出さない) */
+function packingItemHasAutoRule(def) {
+  return def.id === 'k1' || def.id === 'k9' || def.id === 'k10';
+}
+/* 明日の予定だけから見た「必要/不要」(その日だけの手動上書きを含まない) */
+function packingItemAutoNeeded(def, day) {
+  if (def.id === 'k1') return packingMuscleTomorrow(day);          /* シャンプー・ボディソープ: 筋トレの予定がある日だけ */
+  if (def.id === 'k9' || def.id === 'k10') return packingMorningFeelTomorrow(day); /* 日焼け止め・整髪剤: 朝のフィールサイクルがある日だけ */
+  return true;   /* その他は今までどおり常に必要 */
+}
+function getPackingNeedOverride(day, itemId) {
+  var rec = getPackingRecord(day, false);
+  if (rec && rec.needOverride && typeof rec.needOverride[itemId] === 'boolean') return rec.needOverride[itemId];
+  return null;
+}
+/* 実際に一覧へ出す「必要/不要」(自動判定 → その日だけの手動上書きがあれば優先) */
+function packingItemNeeded(def, day) {
+  var override = getPackingNeedOverride(day, def.id);
+  if (override !== null) return override;
+  return packingItemAutoNeeded(def, day);
+}
+/* タップで必要/不要をその日だけ切り替える。自動判定と同じ値に戻したら上書きを消す(データを増やさない) */
+function togglePackingNeed(day, itemId, autoNeeded) {
+  var rec = getPackingRecord(day, true);
+  var current = (rec.needOverride && typeof rec.needOverride[itemId] === 'boolean')
+    ? rec.needOverride[itemId] : autoNeeded;
+  var next = !current;
+  if (!rec.needOverride) rec.needOverride = {};
+  if (next === autoNeeded) delete rec.needOverride[itemId];
+  else rec.needOverride[itemId] = next;
+  if (!Object.keys(rec.needOverride).length) delete rec.needOverride;
+  cleanupPackingRecord(day);
+  saveState();
+}
+
+/* 明日の予定を1行にまとめる(2026-08-09 追加。持ち物の見出しのすぐ下に出して、
+   なぜシャンプー・日焼け止めなどが必要/不要と判定されたのかを、下までスクロールしたまま確認できるようにする) */
+function packingTomorrowSummary(day) {
+  var ym = ymKey(day.y, day.m);
+  var shEntry = normShift((state.shifts[ym] || {})[String(day.d)]);
+  var parts = [];
+  parts.push(shEntry ? (shEntry.label === UNKNOWN_LABEL ? '不明' : shEntry.label) : 'シフト未確定');
+  var ds = dateStrOf(day.y, day.m, day.d);
+  var closure = state.exercise.closureDays[ym] || [];
+  var res = getFeelcycleCount(ds, shEntry, closure.indexOf(String(day.d)) >= 0);
+  if (res.count > 0) parts.push('🚴' + feelSlotsLabel(res));
+  if (packingMuscleTomorrow(day)) parts.push('💪筋トレ予定');
+  return parts.join(' ');
+}
+
 function renderPacking() {
   var day = getPackingDay();
   var w = WEEK_JA[new Date(day.y, day.m - 1, day.d).getDay()];
-  $('packing-date').textContent = day.m + '月' + day.d + '日(' + w + ')の持ち物';
+  /* 2026-08-09: 「明日の予定」を日付と同じ行にまとめて出す(下にスクロールしたまま
+     シャンプー・日焼け止めなどの要否の理由が分かるように。要望元は追加のコーディネーター指示) */
+  $('packing-date').textContent = day.m + '月' + day.d + '日(' + w + ') ' + packingTomorrowSummary(day);
 
   var tab = getPackingTab(day);
   Array.prototype.forEach.call(document.querySelectorAll('#packing-tabs .diet-tab'), function (btn) {
@@ -3668,18 +3786,46 @@ function renderPacking() {
 
   var list = $('packing-list');
   list.textContent = '';
-  state.exercise.packingDefs.forEach(function (def) {
+
+  /* 2026-08-09: 明日の予定から見て「必要」な項目を上、「不要」な項目を下に並べる(自動ソート)。
+     並び替えは安定ソート(グループ内は元の並び順を保つ)にする */
+  var rows = state.exercise.packingDefs.map(function (def) {
+    var hasRule = packingItemHasAutoRule(def);
+    var autoNeeded = packingItemAutoNeeded(def, day);
+    var needed = packingItemNeeded(def, day);
+    return { def: def, hasRule: hasRule, autoNeeded: autoNeeded, needed: needed };
+  });
+  var ordered = rows.filter(function (r) { return r.needed; })
+    .concat(rows.filter(function (r) { return !r.needed; }));
+
+  ordered.forEach(function (item) {
+    var def = item.def;
     var defaultQty = def.scales ? tab : 1;
     var override = def.scales ? getPackingOverride(day, def.id) : null;
     var qty = (override !== null) ? override : defaultQty;
     var checked = getPackingChecked(day, def.id);
 
     var row = document.createElement('div');
-    row.className = 'pk-row';
+    row.className = 'pk-row' + (item.needed ? '' : ' pk-row-unneeded');
     var name = document.createElement('span');
     name.className = 'pk-name';
     name.textContent = def.name;
     row.appendChild(name);
+
+    /* 自動判定の対象項目だけ、必要/不要をその日だけ手動で切り替えられるボタンを出す */
+    if (item.hasRule) {
+      var needBtn = document.createElement('button');
+      needBtn.type = 'button';
+      needBtn.className = 'pk-need-btn' + (item.needed ? '' : ' off');
+      needBtn.textContent = item.needed ? '必要' : '不要';
+      needBtn.setAttribute('aria-label', def.name + 'は今のところ' + (item.needed ? '必要' : '不要') +
+        'と判定されています。タップで切り替えられます');
+      needBtn.addEventListener('click', function () {
+        togglePackingNeed(day, def.id, item.autoNeeded);
+        renderPacking();
+      });
+      row.appendChild(needBtn);
+    }
 
     var qtyWrap = document.createElement('div');
     qtyWrap.className = 'pk-qty';
