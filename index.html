@@ -127,7 +127,7 @@
     flex-shrink: 0;
   }
   .cell.sat .num { color: var(--sat); }
-  .cell.sun .num { color: var(--sun); }
+  .cell.sun .num { color: var(--sun); text-decoration: underline; }
   .cell.other { background: #f4efe3; }
   .cell.other .num { color: var(--dim); font-weight: normal; }
   /* 今日はクリーム背景に埋もれないよう、やや濃いめの黄色にする */
@@ -586,7 +586,7 @@
     padding: 10px 12px;
     margin-bottom: 4px;
   }
-  .ex-count-box.achieved { background: #fff7dc; border-color: #c9a227; }
+  .ex-count-box.achieved { background: #fff7dc; border-color: #c9a227; border-width: 2px; }
   .ex-count-line { font-size: 14px; margin: 3px 0; }
   .ex-count-box.achieved #ex-feel-count { color: #b8860b; font-weight: bold; }
   .ex-feel-msg { font-size: 13px; color: #b8860b; font-weight: bold; margin-top: 2px; min-height: 1.2em; }
@@ -647,6 +647,93 @@
     white-space: nowrap;   /* 1行に収めて行の高さを抑える */
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  /* ===== 筋トレ記録ボタン・種目別内訳(2026-08-13 追加。計画.md 10-7〜10-9) ===== */
+  .ex-log-btn-row { display: flex; gap: 6px; margin: 4px 0 6px; }
+  .ex-log-btn { flex: 1 1 auto; margin: 0; padding: 8px 6px; font-size: 12px; }
+
+  /* ===== 筋トレ記録シート(運動予定シートの上に重なるモーダル) ===== */
+  .modal-back {
+    position: fixed; inset: 0; background: rgba(0,0,0,.5);
+    display: none; z-index: 20;
+  }
+  .modal-back.open { display: block; }
+  .modal {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    background: var(--cell-bg);
+    border-radius: 14px 14px 0 0;
+    max-height: 90%;
+    overflow-y: auto;
+    padding: 14px 16px calc(env(safe-area-inset-bottom) + 20px);
+    z-index: 21;
+    display: none;
+  }
+  .modal.open { display: block; }
+  .modal h3 { font-size: 15px; color: var(--navy); margin-bottom: 6px; }
+  .modal .close-x {
+    position: absolute; top: 10px; right: 12px;
+    background: #eee; border: none; border-radius: 50%;
+    width: 30px; height: 30px; font-size: 15px; cursor: pointer;
+  }
+  .mex-btn-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .mex-btn {
+    flex: 0 0 auto;
+    border: 1.5px solid #c9c1b0;
+    background: var(--cell-bg);
+    color: var(--ink);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .mex-btn .mex-part { display: block; font-size: 10px; color: #6b6355; margin-top: 1px; }
+  .mex-btn.on { background: #e8f5e9; border-color: #2e7d32; color: #1b5e20; border-width: 2.5px; }
+  .mex-prev-note {
+    font-size: 12px; color: #6b6355; background: #eef3ff;
+    border: 1px solid #b9c6ee; border-radius: 8px; padding: 8px 10px; margin: 8px 0;
+  }
+  .mex-picker-area { display: none; }
+  .mex-picker-area.show { display: block; }
+  .mex-picker-row { display: flex; gap: 14px; justify-content: center; margin: 10px 0; }
+  .mex-picker-col { text-align: center; }
+  .mex-picker-label { font-size: 12px; color: #6b6355; margin-bottom: 4px; }
+  .wheel-picker {
+    position: relative;
+    width: 110px;
+    height: 180px;
+    overflow-y: scroll;
+    scroll-snap-type: y mandatory;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid #d8d0c0;
+    border-radius: 10px;
+    background: #fff;
+  }
+  .wheel-item {
+    height: 36px;
+    line-height: 36px;
+    text-align: center;
+    scroll-snap-align: center;
+    font-size: 16px;
+    color: #aaa;
+  }
+  .wheel-item.wheel-center { color: var(--navy); font-weight: bold; font-size: 19px; }
+  .wheel-center-line {
+    position: absolute;
+    top: 50%; left: 0; right: 0; height: 36px; margin-top: -18px;
+    border-top: 1px solid #cbb; border-bottom: 1px solid #cbb;
+    pointer-events: none;
+  }
+  .mex-log-list { margin: 10px 0; }
+  .mex-log-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 2px; border-bottom: 1px solid var(--line); font-size: 13px;
+  }
+  .mex-log-row .mlr-name { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mex-log-row .mlr-val { flex: 0 0 auto; color: #6b6355; }
+  .mex-log-del {
+    flex: 0 0 auto; background: #fff; color: #b71c1c; border: 1px solid #e0a8a8;
+    border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer;
   }
 
   /* ===== 明日の持ち物(2026-08-08 追加) =====
@@ -1071,7 +1158,7 @@
   </div>
 
   <div class="ex-count-box" id="ex-feel-box">
-    <div class="ex-count-line">フィールサイクル: <span id="ex-feel-count">予定 0回 / 済 0回</span></div>
+    <div class="ex-count-line">フィールサイクル: <span id="ex-feel-count">0 / 30回</span></div>
     <div class="ex-feel-msg" id="ex-feel-msg"></div>
     <div class="ex-rest-note" id="ex-feel-rest"></div>
   </div>
@@ -1097,6 +1184,11 @@
     <div id="packing-def-list"></div>
     <button class="btn sub small" id="packing-add-item">+ 持ち物を追加</button>
   </div>
+
+  <!-- ===== 昨日・今日の予定(2026-08-12 追加、2026-08-13 昨日・今日に変更。持ち物の下までスクロールしても
+       予定を見るためにカレンダーまで戻らなくて済むように) ===== -->
+  <div class="step" style="margin-top:14px;">📅 昨日・今日の予定</div>
+  <div id="schedule-today-tomorrow"></div>
 
   <div id="ex-list"></div>
 </div>
@@ -1198,6 +1290,10 @@
   <div class="hint">取り込みで新しい種類(店舗名など)が来ると、自動でここに追加されます。</div>
   <div class="type-list" id="type-list"></div>
 
+  <div class="step">筋トレ種目</div>
+  <div class="hint">名前・部位はここで直せます(記録済みのデータはそのまま残ります)。種目そのものの追加・削除は今のところできません。</div>
+  <div id="muscle-ex-list"></div>
+
   <div class="step">スタンプの編集</div>
   <div class="hint">名前を変えると、すでに押してある日のスタンプも新しい名前になります。</div>
   <div id="stamp-def-list"></div>
@@ -1223,6 +1319,31 @@
   <button class="btn small danger" id="reset-all">全データ消去(リセット)</button>
 </div>
 
+<!-- ===== 筋トレ記録シート(2026-08-13 追加。運動予定シートの上に重なるモーダル) ===== -->
+<div class="modal-back" id="mex-modal-back"></div>
+<div class="modal" id="mex-modal">
+  <button class="close-x" id="mex-close">✕</button>
+  <h3 id="mex-title">--</h3>
+  <div class="mex-btn-list" id="mex-btn-list"></div>
+  <div class="mex-picker-area" id="mex-picker-area">
+    <div class="mex-prev-note" id="mex-prev-note"></div>
+    <div class="mex-picker-row">
+      <div class="mex-picker-col">
+        <div class="mex-picker-label">重量(kg)</div>
+        <div class="wheel-picker" id="mex-weight-wheel"><div class="wheel-center-line"></div></div>
+      </div>
+      <div class="mex-picker-col">
+        <div class="mex-picker-label">回数</div>
+        <div class="wheel-picker" id="mex-reps-wheel"><div class="wheel-center-line"></div></div>
+      </div>
+    </div>
+    <button class="btn" id="mex-add-btn">追加</button>
+  </div>
+  <div class="step">この記録の一覧</div>
+  <div class="mex-log-list" id="mex-log-list"></div>
+  <button class="btn sub small" id="mex-close-btn">閉じる</button>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -1230,6 +1351,20 @@
 
 /* ================= データ ================= */
 var STORE_KEY = 'shift-calendar-v1';
+
+/* 筋トレ種目マスタ7種(2026-08-13 追加。計画.md 10-7・10-8)。
+   旧固定3種目(ダンベルフライ・ベントオーバーロー・ラットプルダウン、常にセット実施)は廃止。
+   id は内部管理用で編集不可。name・part は設定画面から編集できる */
+var DEFAULT_MUSCLE_EXERCISES = [
+  { id: 'bulgarian',    name: 'ブルガリアンスクワット', part: '脚(お尻・もも)' },
+  { id: 'soto_momo',    name: '外もも',                 part: '脚(アウター)' },
+  { id: 'uchi_momo',    name: 'うちもも',               part: '脚(インナー)' },
+  { id: 'db_fly_upper', name: 'ダンベルフライ(上胸)',   part: '胸(上部)' },
+  { id: 'bench_press',  name: 'ベンチプレス',           part: '胸' },
+  { id: 'squat',        name: 'スクワット',             part: '脚' },
+  { id: 'leg_press',    name: 'レッグプレス',           part: '脚' }
+];
+function cloneMuscleExercise(e) { return { id: e.id, name: e.name, part: e.part }; }
 
 var DEFAULT_TYPES = [
   { label: '日勤', color: '#8d2b1e' },
@@ -1395,7 +1530,11 @@ function defaultState() {
     /* records = 実施の記録。月→日→{ feel: ["done"|"rest"|null,...], muscle: "done"|"rest"|null }
        フィールサイクルは予定回数ぶんの配列で1回ずつ独立に記録できる(2026-07-27 追加) */
     exercise: { closureDays: {}, muscle: {}, muscleAnchor: null, confirmedMonths: [], records: {},
-      packingDefs: DEFAULT_PACKING.map(clonePackingDef), packing: {} },
+      packingDefs: DEFAULT_PACKING.map(clonePackingDef), packing: {},
+      /* muscleExercises = 筋トレ種目マスタ(2026-08-13 追加)。log = 実施記録(重量・回数)。
+         既存の closureDays/muscle/muscleAnchor/records はいっさい変更しない(計画.md 10-8-1) */
+      muscleExercises: DEFAULT_MUSCLE_EXERCISES.map(cloneMuscleExercise),
+      log: {} },
     /* diet = ダイエット・食事管理(2026-07-28 追加)。既存キーには触らない */
     diet: defaultDiet()
   };
@@ -1979,6 +2118,23 @@ function markDietAchieved(ym, d) {
   if (arr.indexOf(String(d)) < 0) { arr.push(String(d)); saveState(); }
 }
 
+/* 「在庫〆日」(15日・月末に出る繰り返し予定)は、その日のシフトが希休・休みだと
+   お店に行けないため、前日に自動でずらす(2026-08-12 追加・ユーザー要望)。
+   対象は在庫〆日だけ。それ以外の繰り返し予定は今までどおり日付固定 */
+function inventoryDeadlineEffectiveDay(y, m, triggerDay) {
+  var dim = daysInMonth(y, m);
+  if (triggerDay < 1 || triggerDay > dim) return triggerDay;
+  var ym = ymKey(y, m);
+  var d = triggerDay;
+  while (d > 1) {
+    var shEntry = normShift((state.shifts[ym] || {})[String(d)]);
+    var isOff = shEntry && (shEntry.label === '休み' || shEntry.label === '希休');
+    if (!isOff) return d;
+    d -= 1;
+  }
+  return d;
+}
+
 /* その日に出る繰り返し予定の名前を並び順で返す(ONのものだけ) */
 function recurringLabelsFor(y, m, d) {
   var out = [];
@@ -1991,9 +2147,16 @@ function recurringLabelsFor(y, m, d) {
     if (r.type === 'daily') {
       hit = true;
     } else if (r.type === 'monthly' && Array.isArray(r.days)) {
-      hit = r.days.some(function (x) {
-        return (x === 'last') ? (d === dim) : (parseInt(x, 10) === d);
-      });
+      if (r.label === '在庫〆日') {
+        hit = r.days.some(function (x) {
+          var trigger = (x === 'last') ? dim : parseInt(x, 10);
+          return inventoryDeadlineEffectiveDay(y, m, trigger) === d;
+        });
+      } else {
+        hit = r.days.some(function (x) {
+          return (x === 'last') ? (d === dim) : (parseInt(x, 10) === d);
+        });
+      }
     } else if (r.type === 'weekly' && Array.isArray(r.weekdays)) {
       hit = r.weekdays.indexOf(dow) >= 0;
     }
@@ -2030,7 +2193,8 @@ function setNote(ym, d, text) {
 /* 運動予定(exercise)を洗浄。壊れた形は初期値(空)に戻す(問題2と同じ二段構えの入口洗浄) */
 function sanitizeExercise(src) {
   var out = { closureDays: {}, muscle: {}, muscleAnchor: null, confirmedMonths: [], records: {},
-    packingDefs: DEFAULT_PACKING.map(clonePackingDef), packing: {} };
+    packingDefs: DEFAULT_PACKING.map(clonePackingDef), packing: {},
+    muscleExercises: DEFAULT_MUSCLE_EXERCISES.map(cloneMuscleExercise), log: {} };
   if (!src || typeof src !== 'object' || Array.isArray(src)) return out;
   function sanitizeDayMap(v) {
     var o = {};
@@ -2126,7 +2290,78 @@ function sanitizeExercise(src) {
   }
   out.packingDefs = sanitizePackingDefs(src.packingDefs);
   out.packing = sanitizePackingData(src.packing);
+  out.muscleExercises = sanitizeMuscleExercises(src.muscleExercises);
+  out.log = sanitizeExerciseLog(src.log, out.muscleExercises);
   return out;
+}
+
+/* 筋トレ種目マスタの洗浄(2026-08-13 追加)。id重複・空文字は捨てる。
+   1件も残らなければ初期7種目に戻す(sanitizePackingDefs と同じ考え方) */
+function sanitizeMuscleExercises(src) {
+  if (!Array.isArray(src)) return DEFAULT_MUSCLE_EXERCISES.map(cloneMuscleExercise);
+  var seen = {};
+  var out = [];
+  src.forEach(function (e) {
+    if (!e || typeof e !== 'object') return;
+    if (typeof e.id !== 'string' || !e.id || seen[e.id]) return;
+    if (typeof e.name !== 'string' || !e.name.trim()) return;
+    seen[e.id] = true;
+    out.push({
+      id: e.id,
+      name: e.name.trim().slice(0, 30),
+      part: (typeof e.part === 'string') ? e.part.trim().slice(0, 20) : ''
+    });
+  });
+  return out.length ? out : DEFAULT_MUSCLE_EXERCISES.map(cloneMuscleExercise);
+}
+
+/* 筋トレ実施記録(重量・回数)の洗浄(2026-08-13 追加。計画.md 10-8-1)。
+   日付("YYYY-MM-DD")→セッション("am"/"pm"/"normal")→[{exerciseId,weight,reps}] の形。
+   壊れた日・値は捨てる。exerciseId は種目マスタに実在するものだけ認める
+   (種目マスタが先に洗浄済みであることが前提なので、呼び出し順に注意) */
+function sanitizeExerciseLog(src, exercises) {
+  var out = {};
+  if (!src || typeof src !== 'object' || Array.isArray(src)) return out;
+  var validIds = {};
+  (exercises || []).forEach(function (e) { validIds[e.id] = true; });
+  Object.keys(src).forEach(function (ds) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ds)) return;
+    var p = parseDateStrForSanitize(ds);
+    if (!p) return;
+    var dim = daysInMonth(p.y, p.m);
+    if (p.d < 1 || p.d > dim) return;
+    var sessionsObj = src[ds];
+    if (!sessionsObj || typeof sessionsObj !== 'object' || Array.isArray(sessionsObj)) return;
+    var cleanSessions = {};
+    ['am', 'pm', 'normal'].forEach(function (sn) {
+      var arr = sessionsObj[sn];
+      if (!Array.isArray(arr)) return;
+      var cleanArr = [];
+      arr.forEach(function (entry) {
+        if (!entry || typeof entry !== 'object') return;
+        if (typeof entry.exerciseId !== 'string' || !validIds[entry.exerciseId]) return;
+        var w = entry.weight, r = entry.reps;
+        if (typeof w !== 'number' || !isFinite(w) || w <= 0 || w > 400) return;
+        /* 0.5刻みからずれた値(壊れたデータ)は0.5単位に丸める */
+        w = Math.round(w * 2) / 2;
+        if (typeof r !== 'number' || !isFinite(r) || r < 1 || r > 200) return;
+        r = Math.round(r);
+        if (cleanArr.length >= 50) return; /* 1セッションに異常な件数が入り続けるのを防ぐ */
+        cleanArr.push({ exerciseId: entry.exerciseId, weight: w, reps: r });
+      });
+      if (cleanArr.length) cleanSessions[sn] = cleanArr;
+    });
+    if (Object.keys(cleanSessions).length) out[ds] = cleanSessions;
+  });
+  return out;
+}
+/* sanitizeExerciseLog 専用の軽い日付パーサ(壊れた文字列でも例外を出さない) */
+function parseDateStrForSanitize(s) {
+  var p = s.split('-');
+  if (p.length !== 3) return null;
+  var y = parseInt(p[0], 10), m = parseInt(p[1], 10), d = parseInt(p[2], 10);
+  if (!isFinite(y) || !isFinite(m) || !isFinite(d) || m < 1 || m > 12) return null;
+  return { y: y, m: m, d: d };
 }
 
 /* 明日の持ち物リスト(項目の定義)を洗浄。id重複・空文字は捨てる。1件も残らなければ初期10種に戻す */
@@ -2982,6 +3217,7 @@ $('nav-import').addEventListener('click', function () {
 $('nav-settings').addEventListener('click', function () {
   $('user-name').value = state.settings.userName;
   renderTypeList();
+  renderMuscleExerciseList();
   renderStampDefList();
   renderRecurringList();
   $('backup-result').className = 'result-box';
@@ -3200,6 +3436,135 @@ function toggleClosureDay(ym, d) {
   renderExercise();
 }
 
+/* ===== 筋トレ実施記録(重量・回数)。計画.md 10-7〜10-9 =====
+   既存の10-4-2(筋トレ予定日の自動計算・exercise.muscle)は関数もデータもいっさい変更しない。
+   金曜の扱いは、その結果に表示・記録の段階で重ねる独立した層として実装する(10-8-2) */
+
+/* その日に何セッション(am/pm/normal)の筋トレ記録欄を出すか。
+   金曜は無条件で2セッション(exercise.muscle に同じ日が入っていても増えない)。
+   フィールサイクルの金曜休館(10-4-1)とは完全に別ロジック */
+function getMuscleSessionsOf(dateStr) {
+  if (dowOfDateStr(dateStr) === 5) return ['am', 'pm'];
+  var ym = ymOfDateStr(dateStr);
+  var day = dayOfDateStr(dateStr);
+  var days = state.exercise.muscle[ym];
+  if (days && days.indexOf(day) >= 0) return ['normal'];
+  return [];
+}
+
+function findMuscleExerciseDef(exerciseId) {
+  var list = state.exercise.muscleExercises;
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].id === exerciseId) return list[i];
+  }
+  return null;
+}
+
+function getExerciseLog(dateStr, session) {
+  var mo = state.exercise.log[dateStr];
+  if (!mo || !Array.isArray(mo[session])) return [];
+  return mo[session];
+}
+
+/* チュアンドタン集計(11-7-2)用: その月の筋トレ予定セッション(金曜am/pmを含む)のうち、
+   記録済み(旧✓トグル または 新しい記録機能でのログ)のセッション数を数える(2026-08-13 方針A)。
+   非金曜日は旧✓トグルもOR判定に含めるので、旧✓トグルだけで記録していた過去月の集計は変わらない */
+function getMuscleDoneSessionCountOf(ym) {
+  var p = ym.split('-'), y = parseInt(p[0], 10), m = parseInt(p[1], 10);
+  var dim = daysInMonth(y, m);
+  var count = 0;
+  for (var d = 1; d <= dim; d++) {
+    var ds = dateStrOf(y, m, d);
+    var sessions = getMuscleSessionsOf(ds); /* 金曜=['am','pm']、通常の予定日=['normal']、予定外=[] */
+    sessions.forEach(function (s) {
+      var logged = getExerciseLog(ds, s).length > 0;
+      var oldDone = (s === 'normal') && getMuscleState(ym, d) === 'done';
+      if (logged || oldDone) count++;
+    });
+  }
+  return count;
+}
+
+/* weight は0.5kg刻み・reps は1以上の整数のみを許す(ピッカーの選択肢自体がそう作られているため、
+   通常はここで弾かれることはない。防御的なチェックとして残す) */
+function addExerciseLog(dateStr, session, exerciseId, weight, reps) {
+  if (!(weight > 0) || !(reps >= 1) || !findMuscleExerciseDef(exerciseId)) return false;
+  weight = Math.round(weight * 2) / 2;
+  reps = Math.round(reps);
+  if (!state.exercise.log[dateStr]) state.exercise.log[dateStr] = {};
+  var mo = state.exercise.log[dateStr];
+  if (!Array.isArray(mo[session])) mo[session] = [];
+  mo[session].push({ exerciseId: exerciseId, weight: weight, reps: reps });
+  saveState();
+  return true;
+}
+
+function removeExerciseLog(dateStr, session, index) {
+  var mo = state.exercise.log[dateStr];
+  if (!mo || !Array.isArray(mo[session])) return;
+  mo[session].splice(index, 1);
+  if (!mo[session].length) delete mo[session];
+  if (!Object.keys(mo).length) delete state.exercise.log[dateStr];
+  saveState();
+}
+
+/* beforeDateStr・beforeSession より前(同じ日なら am→pm→normal の順で早いセッション)の中から、
+   その種目の直近の記録を1件返す。無ければ null */
+function getPreviousRecord(exerciseId, beforeDateStr, beforeSession) {
+  var order = { am: 0, pm: 1, normal: 2 };
+  var beforeOrder = order.hasOwnProperty(beforeSession) ? order[beforeSession] : 2;
+  var candidates = [];
+  Object.keys(state.exercise.log).forEach(function (ds) {
+    if (ds > beforeDateStr) return;
+    var sessionsObj = state.exercise.log[ds];
+    Object.keys(sessionsObj).forEach(function (sn) {
+      if (ds === beforeDateStr && order[sn] >= beforeOrder) return;
+      var entries = sessionsObj[sn];
+      entries.forEach(function (entry, idx) {
+        if (entry.exerciseId !== exerciseId) return;
+        candidates.push({ date: ds, sessOrder: order[sn], idx: idx, weight: entry.weight, reps: entry.reps });
+      });
+    });
+  });
+  if (!candidates.length) return null;
+  candidates.sort(function (a, b) {
+    if (a.date !== b.date) return a.date < b.date ? 1 : -1;      /* 日付が新しい順 */
+    if (a.sessOrder !== b.sessOrder) return b.sessOrder - a.sessOrder; /* 同日ならセッションが遅い方 */
+    return b.idx - a.idx;                                          /* 同セッション内なら後で追加した方 */
+  });
+  var top = candidates[0];
+  var def = findMuscleExerciseDef(exerciseId);
+  return { date: top.date, weight: top.weight, reps: top.reps, part: def ? def.part : '' };
+}
+
+/* 月間の筋トレ内訳(種目別の実施回数)。計画.md 10-8-2。
+   予定日数(exercise.muscle)ではなく「実際に記録したログの件数」を数える。金曜(am/pm)も含める */
+function getMuscleBreakdownOf(ym) {
+  var p = ym.split('-');
+  var y = parseInt(p[0], 10), m = parseInt(p[1], 10);
+  var dim = daysInMonth(y, m);
+  var counts = {}, order = [];
+  for (var d = 1; d <= dim; d++) {
+    var ds = dateStrOf(y, m, d);
+    var sessionsObj = state.exercise.log[ds];
+    if (!sessionsObj) continue;
+    ['am', 'pm', 'normal'].forEach(function (sn) {
+      var entries = sessionsObj[sn];
+      if (!entries) return;
+      entries.forEach(function (entry) {
+        if (!counts.hasOwnProperty(entry.exerciseId)) { counts[entry.exerciseId] = 0; order.push(entry.exerciseId); }
+        counts[entry.exerciseId]++;
+      });
+    });
+  }
+  var breakdown = order.map(function (id) {
+    var def = findMuscleExerciseDef(id);
+    return { name: def ? def.name : id, count: counts[id] };
+  });
+  var total = breakdown.reduce(function (s, b) { return s + b.count; }, 0);
+  return { breakdown: breakdown, total: total };
+}
+
 /* 月ごとの「前回描画時の合計」を覚えておく一時変数(保存はしない)。
    達成の瞬間だけフラッシュを再生し、ページ再読み込み直後は再生しないための仕組み */
 var exercisePrevTotal = {};
@@ -3252,11 +3617,28 @@ function buildExerciseRow(row, ym) {
     head.appendChild(toggleBtn);
   }
 
-  if (row.isMuscleDay) {
+  /* 筋トレ記録(2026-08-13 追加。計画.md 10-7・10-8)。
+     金曜は無条件で朝・夜の2セッション、それ以外は自動計算(exercise.muscle)の日だけ1セッション */
+  var ds = dateStrOf(cur.y, cur.m, row.d);
+  var muscleSessions = getMuscleSessionsOf(ds);
+  if (muscleSessions.length) {
     var badge = document.createElement('div');
     badge.className = 'ex-muscle-badge';
-    badge.textContent = '💪 ダンベルフライ / ベントオーバーロー / ラットプルダウン';
+    badge.textContent = muscleSessions.length === 2 ? '💪 筋トレ(朝・夜)' : '💪 筋トレ';
     el.appendChild(badge);
+
+    var logBtnRow = document.createElement('div');
+    logBtnRow.className = 'ex-log-btn-row';
+    muscleSessions.forEach(function (session) {
+      var hasLog = getExerciseLog(ds, session).length > 0;
+      var btn = document.createElement('button');
+      btn.className = 'btn sub small ex-log-btn';
+      var label = session === 'am' ? '朝を記録' : session === 'pm' ? '夜を記録' : '記録する';
+      btn.textContent = label + (hasLog ? ' 記録済み✓' : '');
+      btn.addEventListener('click', function () { openMuscleLogModal(ds, session); });
+      logBtnRow.appendChild(btn);
+    });
+    el.appendChild(logBtnRow);
   }
 
   /* 実施の記録。フィールサイクル各回と筋トレを1つのまとまりに入れて余白を減らす。
@@ -3466,6 +3848,218 @@ function afterRecordChange() {
   skipExerciseRerender = false;
 }
 
+/* ===== 筋トレ記録シート(モーダル)。2026-08-13 追加。計画.md 10-7-2 =====
+   運動予定シートを閉じずに上に重ねて出す(openSheet/closeSheet とは別の独立した仕組み) */
+var mexState = { dateStr: null, session: null, exerciseId: null };
+
+/* 縦スクロールピッカー(ホイール式)を作る。ライブラリなし・素のJS。
+   values: 表示する値の配列 / initialValue: 開いたときに中央に来る値 / onChange: 確定するたびに呼ぶ */
+function createWheelPicker(container, values, initialValue, formatFn, onChange) {
+  var ITEM_H = 36;
+  Array.prototype.forEach.call(container.querySelectorAll('.wheel-item'), function (el) { el.remove(); });
+  var line = container.querySelector('.wheel-center-line');
+  var items = values.map(function (v) {
+    var el = document.createElement('div');
+    el.className = 'wheel-item';
+    el.textContent = formatFn ? formatFn(v) : String(v);
+    container.appendChild(el);
+    return el;
+  });
+  if (line) container.appendChild(line); /* 中心線を一番上に戻す(z-indexで前面表示) */
+  var padH = (180 - ITEM_H) / 2;
+  container.style.paddingTop = padH + 'px';
+  container.style.paddingBottom = padH + 'px';
+
+  var initIdx = values.indexOf(initialValue);
+  if (initIdx < 0) initIdx = 0;
+  var current = values[initIdx];
+
+  function paintCenter(idx) {
+    items.forEach(function (el, i) { el.classList.toggle('wheel-center', i === idx); });
+  }
+
+  container.scrollTop = initIdx * ITEM_H;
+  paintCenter(initIdx);
+
+  var scrollTimer = null;
+  container.addEventListener('scroll', function () {
+    if (scrollTimer) clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(function () {
+      var idx = Math.round(container.scrollTop / ITEM_H);
+      if (idx < 0) idx = 0;
+      if (idx > values.length - 1) idx = values.length - 1;
+      container.scrollTop = idx * ITEM_H; /* きっちり中央に揃える */
+      paintCenter(idx);
+      current = values[idx];
+      if (onChange) onChange(current);
+    }, 120);
+  }, { passive: true });
+
+  return { getValue: function () { return current; } };
+}
+
+function buildWeightValues() {
+  var arr = [];
+  for (var i = 1; i <= 600; i++) arr.push(i / 2); /* 0.5〜300.0kg・0.5刻み */
+  return arr;
+}
+function buildRepsValues() {
+  var arr = [];
+  for (var i = 1; i <= 100; i++) arr.push(i); /* 1〜100回・1刻み */
+  return arr;
+}
+
+function openMuscleLogModal(dateStr, session) {
+  mexState.dateStr = dateStr;
+  mexState.session = session;
+  mexState.exerciseId = null;
+  var p = parseDateStr(dateStr);
+  var sessLabel = session === 'am' ? '朝' : session === 'pm' ? '夜' : '';
+  $('mex-title').textContent = p.y + '年' + p.m + '月' + p.d + '日(' + WEEK_JA[dowOfDateStr(dateStr)] + ')' +
+    (sessLabel ? ' ' + sessLabel : '');
+  renderMexExerciseButtons();
+  $('mex-picker-area').classList.remove('show');
+  renderMexLogList();
+  $('mex-modal-back').classList.add('open');
+  $('mex-modal').classList.add('open');
+}
+function closeMuscleLogModal() {
+  $('mex-modal-back').classList.remove('open');
+  $('mex-modal').classList.remove('open');
+  /* 一覧側の「記録済み✓」表示を更新するため、開いていれば運動予定の一覧を作り直す */
+  if ($('sheet-exercise').classList.contains('open')) { renderExercise(); scrollExerciseToToday(); }
+}
+$('mex-close').addEventListener('click', closeMuscleLogModal);
+$('mex-close-btn').addEventListener('click', closeMuscleLogModal);
+$('mex-modal-back').addEventListener('click', function (ev) {
+  if (ev.target === $('mex-modal-back')) closeMuscleLogModal();
+});
+
+function renderMexExerciseButtons() {
+  var list = $('mex-btn-list');
+  list.textContent = '';
+  state.exercise.muscleExercises.forEach(function (def) {
+    var btn = document.createElement('button');
+    var isOn = mexState.exerciseId === def.id;
+    btn.className = 'mex-btn' + (isOn ? ' on' : '');
+    var nameSpan = document.createElement('span');
+    nameSpan.textContent = (isOn ? '✓ ' : '') + def.name;
+    btn.appendChild(nameSpan);
+    if (def.part) {
+      var partSpan = document.createElement('span');
+      partSpan.className = 'mex-part';
+      partSpan.textContent = def.part;
+      btn.appendChild(partSpan);
+    }
+    btn.addEventListener('click', function () { selectMexExercise(def.id); });
+    list.appendChild(btn);
+  });
+}
+
+function selectMexExercise(exerciseId) {
+  mexState.exerciseId = exerciseId;
+  renderMexExerciseButtons();
+  var prev = getPreviousRecord(exerciseId, mexState.dateStr, mexState.session);
+  var noteEl = $('mex-prev-note');
+  if (prev) {
+    noteEl.textContent = '前回: ' + prev.weight + 'kg × ' + prev.reps + '回(' + prev.date + (prev.part ? '・' + prev.part : '') + ')';
+  } else {
+    noteEl.textContent = '記録なし';
+  }
+  $('mex-picker-area').classList.add('show');
+
+  var initW = prev ? prev.weight : 40;
+  var initR = prev ? prev.reps : 10;
+  var weightPicker = createWheelPicker($('mex-weight-wheel'), buildWeightValues(), initW,
+    function (v) { return v.toFixed(1); }, function (v) { mexPickerVals.weight = v; });
+  var repsPicker = createWheelPicker($('mex-reps-wheel'), buildRepsValues(), initR,
+    function (v) { return v + '回'; }, function (v) { mexPickerVals.reps = v; });
+  mexPickerVals.weight = weightPicker.getValue();
+  mexPickerVals.reps = repsPicker.getValue();
+}
+var mexPickerVals = { weight: 40, reps: 10 };
+
+$('mex-add-btn').addEventListener('click', function () {
+  if (!mexState.exerciseId) { toast('種目を選んでください'); return; }
+  var ok = addExerciseLog(mexState.dateStr, mexState.session, mexState.exerciseId, mexPickerVals.weight, mexPickerVals.reps);
+  if (!ok) { toast('記録できませんでした'); return; }
+  toast('記録しました');
+  renderMexLogList();
+  updateExerciseCounts();
+  /* 前回記録の表示もこの場で更新(同じ種目を続けて記録するケースがあるため) */
+  selectMexExercise(mexState.exerciseId);
+});
+
+function renderMexLogList() {
+  var list = $('mex-log-list');
+  list.textContent = '';
+  var entries = getExerciseLog(mexState.dateStr, mexState.session);
+  if (!entries.length) {
+    var hint = document.createElement('div');
+    hint.className = 'hint';
+    hint.textContent = 'まだこのセッションの記録はありません。';
+    list.appendChild(hint);
+    return;
+  }
+  entries.forEach(function (entry, idx) {
+    var def = findMuscleExerciseDef(entry.exerciseId);
+    var row = document.createElement('div');
+    row.className = 'mex-log-row';
+    var name = document.createElement('span');
+    name.className = 'mlr-name';
+    name.textContent = def ? def.name : entry.exerciseId;
+    row.appendChild(name);
+    var val = document.createElement('span');
+    val.className = 'mlr-val';
+    val.textContent = entry.weight + 'kg × ' + entry.reps + '回';
+    row.appendChild(val);
+    var del = document.createElement('button');
+    del.className = 'mex-log-del';
+    del.textContent = '削除';
+    del.addEventListener('click', function () {
+      removeExerciseLog(mexState.dateStr, mexState.session, idx);
+      renderMexLogList();
+      updateExerciseCounts();
+      toast('記録を削除しました');
+    });
+    row.appendChild(del);
+    list.appendChild(row);
+  });
+}
+
+/* ================= 筋トレ種目マスタの編集(設定画面。2026-08-13 追加) ================= */
+function renderMuscleExerciseList() {
+  var list = $('muscle-ex-list');
+  list.textContent = '';
+  state.exercise.muscleExercises.forEach(function (def, idx) {
+    var row = document.createElement('div');
+    row.className = 'stampdef-row';
+    var name = document.createElement('span');
+    name.className = 'sd-name';
+    name.textContent = def.name + (def.part ? '(' + def.part + ')' : '');
+    row.appendChild(name);
+    var edit = document.createElement('button');
+    edit.textContent = '編集';
+    edit.addEventListener('click', function () { editMuscleExercise(idx); });
+    row.appendChild(edit);
+    list.appendChild(row);
+  });
+}
+function editMuscleExercise(idx) {
+  var def = state.exercise.muscleExercises[idx];
+  var name = prompt('種目名', def.name);
+  if (name === null) return;
+  name = String(name).trim();
+  if (!name) { toast('名前を入れてください'); return; }
+  var part = prompt('部位(例: 胸・脚(お尻・もも) など)', def.part || '');
+  if (part === null) return;
+  def.name = name.slice(0, 30);
+  def.part = String(part).trim().slice(0, 20);
+  saveState();
+  renderMuscleExerciseList();
+  toast('種目を更新しました');
+}
+
 function renderExercise() {
   var ym = ymKey(cur.y, cur.m);
   $('ex-month').textContent = cur.y + '年' + cur.m + '月';
@@ -3547,7 +4141,8 @@ function updateExerciseCounts() {
   /* 🌙(休む)を選んだ回は「予定」の合計から差し引く(2026-07-28 ユーザー承認)。
      達成判定(doneAll >= 30)には影響しない。都合よく調整された、という前向きな体験にする */
   var totalShown = Math.max(0, total - feelRest);
-  $('ex-feel-count').textContent = '予定 ' + totalShown + '回 / 済 ' + doneAll + '回' +
+  void totalShown; /* 2026-08-13: 表示は「達成数 / 30回」に整理。値自体は他の用途がないため未使用 */
+  $('ex-feel-count').textContent = doneAll + ' / 30回' +
     (parts.length ? '(うち' + parts.join('・') + ')' : '') + (achieved ? ' 🎉' : '');
   $('ex-feel-msg').textContent = achieved ? '🎉 今月の目標達成!' : '';
   if (justAchieved) {
@@ -3557,7 +4152,7 @@ function updateExerciseCounts() {
   }
   /* 休んだ数は控えめに(目立たせない)。0のときは何も出さない */
   var restEl = $('ex-feel-rest');
-  restEl.textContent = feelRest > 0 ? '🌙 休むことにした回数: ' + feelRest + '回' : '';
+  restEl.textContent = ''; /* 2026-08-13: 表示廃止(裏側の集計・差し引きロジックは変更しない) */
 
   /* シフトが変わって予定が減り、数えられなくなった記録があれば知らせる(問題40)。
      責める書き方はせず、事実と選べる操作だけを示す */
@@ -3584,25 +4179,37 @@ function updateExerciseCounts() {
 
   /* 筋トレ: 予定と済(2026-08-09: 臨時の筋トレ「💪+」も済に加える) */
   var muscleDays = state.exercise.muscle[ym] || [];
-  var mDone = 0, mRest = 0, muscleExtraTotal = 0;
+  var mRest = 0, muscleExtraTotal = 0;
   muscleDays.forEach(function (dk) {
     var st = getMuscleState(ym, parseInt(dk, 10));
-    if (st === 'done') mDone++;
-    else if (st === 'rest') mRest++;
+    if (st === 'rest') mRest++;
   });
+  /* チュアンドタン集計(11-7-2)専用: セッション単位(金曜am/pmも含む)で
+     「旧✓トグル or 新しい記録機能でのログ」をOR判定して数える(2026-08-13 方針A)。
+     過去の月(旧✓トグルのみで記録)の集計結果は変わらないよう、非金曜日は旧✓判定も引き続き有効にする */
+  var muscleSessionDone = getMuscleDoneSessionCountOf(ym);
   for (var md = 1; md <= dim; md++) {
     muscleExtraTotal += getMuscleExtraCount(ym, md);
   }
   /* 筋トレの🌙も同じ考え方で「予定」から差し引く(2026-07-28 ユーザー承認・フィールサイクルと揃える) */
   var muscleTotalShown = Math.max(0, muscleDays.length - mRest);
-  $('ex-muscle-count').textContent = '予定 ' + muscleTotalShown + '回 / 済 ' + (mDone + muscleExtraTotal) + '回' +
-    (muscleExtraTotal > 0 ? '(うち臨時 ' + muscleExtraTotal + '回)' : '');
-  $('ex-muscle-rest').textContent = mRest > 0 ? '🌙 ' + mRest + '回' : '';
+  void muscleTotalShown; /* 2026-08-13: 表示は下の種目別内訳に置き換え。値自体はチュアンドタン集計に引き続き使う */
+  /* 月間筋トレ内訳(2026-08-13 追加。計画.md 10-8-2)。
+     予定日数ではなく「実際に記録したログの件数」を種目別に数える。金曜(朝・夜)も含める */
+  var breakdownInfo = getMuscleBreakdownOf(ym);
+  if (breakdownInfo.breakdown.length) {
+    $('ex-muscle-count').textContent = breakdownInfo.breakdown.map(function (b) {
+      return b.name + b.count + '回';
+    }).join('・') + '(合計' + breakdownInfo.total + '回)';
+  } else {
+    $('ex-muscle-count').textContent = 'まだ記録がありません';
+  }
+  $('ex-muscle-rest').textContent = ''; /* 2026-08-13: 表示廃止(裏側の集計・差し引きロジックは変更しない) */
 
   /* チュアンドタン目標(11-7-2)。フィールサイクル済+予定外ジム+筋トレ済(臨時ぶんを含む)+旧ウォーキングデータの合計で判定する。
      「🌙 休む」はどちらの内訳にも入っていないので自然にカウント対象外になる */
   var tuanGoal = state.diet.profile.tuanGoal;
-  var tuanTotal = feelDone + feelExtra + mDone + muscleExtraTotal + walkTotal;
+  var tuanTotal = feelDone + feelExtra + muscleSessionDone + muscleExtraTotal + walkTotal;
   var tuanAchieved = tuanTotal >= tuanGoal;
   var tuanPrev = exercisePrevTuan.hasOwnProperty(ym) ? exercisePrevTuan[ym] : null;
   var tuanJustAchieved = tuanAchieved && tuanPrev !== null && tuanPrev < tuanGoal;
@@ -3710,8 +4317,8 @@ function togglePackingChecked(day, itemId) {
    それ以外の項目(固定・回数連動とも)は今までどおり常に「必要」として扱う */
 function packingMuscleTomorrow(day) {
   var ym = ymKey(day.y, day.m);
-  var scheduled = (state.exercise.muscle[ym] || []).indexOf(String(day.d)) >= 0;
-  if (scheduled) return true;
+  var ds = dateStrOf(day.y, day.m, day.d);
+  if (getMuscleSessionsOf(ds).length > 0) return true; /* 金曜(am/pm)も exercise.muscle の予定日もここに含まれる */
   return getMuscleExtraCount(ym, day.d) > 0;
 }
 function packingMorningFeelTomorrow(day) {
@@ -3772,12 +4379,61 @@ function packingTomorrowSummary(day) {
   return parts.join(' ');
 }
 
+/* 「今日」の実際の日付(new Date() 基準)。getPackingDay と対になる */
+function getTodayDay() {
+  var t = new Date();
+  return { y: t.getFullYear(), m: t.getMonth() + 1, d: t.getDate() };
+}
+
+/* 「昨日」の実際の日付(getTodayDay の1日前。2026-08-13 追加)。
+   Date オブジェクトの setDate に -1相当を渡すことで月またぎ・年またぎも自動計算させる */
+function getYesterdayDay() {
+  var t = getTodayDay();
+  var y = new Date(t.y, t.m - 1, t.d - 1);
+  return { y: y.getFullYear(), m: y.getMonth() + 1, d: y.getDate() };
+}
+
+/* シフト・運動予定・繰り返し予定をまとめた1行の予定要約(2026-08-12 追加)。
+   packingTomorrowSummary(明日専用)と中身は同じだが、今日・明日どちらの日付にも使えるよう共通化した */
+function scheduleSummaryFor(day) {
+  var ym = ymKey(day.y, day.m);
+  var shEntry = normShift((state.shifts[ym] || {})[String(day.d)]);
+  var parts = [];
+  parts.push(shEntry ? (shEntry.label === UNKNOWN_LABEL ? '不明' : shEntry.label) : '予定なし');
+  var ds = dateStrOf(day.y, day.m, day.d);
+  var closure = state.exercise.closureDays[ym] || [];
+  var res = getFeelcycleCount(ds, shEntry, closure.indexOf(String(day.d)) >= 0);
+  if (res.count > 0) parts.push('🚴' + feelSlotsLabel(res));
+  if (packingMuscleTomorrow(day)) parts.push('💪筋トレ予定');
+  var recur = recurringLabelsFor(day.y, day.m, day.d);
+  if (recur.length) parts.push('🔁 ' + recur.join('・'));
+  return parts.join(' ');
+}
+
+/* 持ち物欄の下に昨日・今日の予定を2行で出す(2026-08-12 追加、2026-08-13 昨日・今日に変更。
+   持ち物を見るのにカレンダーまでスクロールし直さなくて済むように、というユーザー要望。
+   持ち物リストの下から下方向にスクロールしても月末の日付一覧まで進んでしまい、今日の欄に
+   戻りにくいとの声を受けて、明日ではなく昨日を表示するようにした(明日の持ち物欄は対象外)) */
+function renderScheduleTodayTomorrow() {
+  var box = $('schedule-today-tomorrow');
+  if (!box) return;
+  box.textContent = '';
+  [{ label: '昨日', day: getYesterdayDay() }, { label: '今日', day: getTodayDay() }].forEach(function (item) {
+    var w = WEEK_JA[new Date(item.day.y, item.day.m - 1, item.day.d).getDay()];
+    var line = document.createElement('div');
+    line.className = 'pk-date';
+    line.textContent = item.label + ' ' + item.day.m + '/' + item.day.d + '(' + w + ') ' + scheduleSummaryFor(item.day);
+    box.appendChild(line);
+  });
+}
+
 function renderPacking() {
   var day = getPackingDay();
   var w = WEEK_JA[new Date(day.y, day.m - 1, day.d).getDay()];
   /* 2026-08-09: 「明日の予定」を日付と同じ行にまとめて出す(下にスクロールしたまま
      シャンプー・日焼け止めなどの要否の理由が分かるように。要望元は追加のコーディネーター指示) */
   $('packing-date').textContent = day.m + '月' + day.d + '日(' + w + ') ' + packingTomorrowSummary(day);
+  renderScheduleTodayTomorrow();
 
   var tab = getPackingTab(day);
   Array.prototype.forEach.call(document.querySelectorAll('#packing-tabs .diet-tab'), function (btn) {
@@ -4581,7 +5237,7 @@ function renderDietMeters(ym, d) {
     head.className = 'meter-head';
     var n = document.createElement('span');
     n.className = 'meter-name';
-    n.textContent = name;
+    n.textContent = (done ? '✓ ' : '') + name;
     var v = document.createElement('span');
     v.textContent = (unit === 'kcal')
       ? (gotVal + ' / ' + targetVal + ' kcal')
@@ -5668,6 +6324,7 @@ $('backup-restore').addEventListener('click', function () {
   $('backup-in').value = '';
   $('user-name').value = state.settings.userName;
   renderTypeList();
+  renderMuscleExerciseList();
   renderStampDefList();
   renderRecurringList();
   showBackupResult('✅ 復元しました。', false);
