@@ -130,8 +130,12 @@
   .cell.sun .num { color: var(--sun); text-decoration: underline; }
   .cell.other { background: #f4efe3; }
   .cell.other .num { color: var(--dim); font-weight: normal; }
-  /* 今日はクリーム背景に埋もれないよう、やや濃いめの黄色にする */
-  .cell.today { background: #ffef9f; }
+  /* 今日はクリーム背景に埋もれないよう強調する(2026-08-14: カラーフィルタ利用者向けにさらに濃い色へ変更) */
+  .cell.today { background: #1a1a1a; }
+  /* シフト名は通常マスでは種類ごとの色文字+淡い帯で表示するが、今日のマスは背景が黒に近いため
+     文字色を白で上書きして読めるようにする(種類ごとの色分けロジック自体は変更しない) */
+  .cell.today .shift { color: #fff !important; background: rgba(255, 255, 255, 0.18) !important; }
+  .cell.today .time { color: #f0f0f0; }
   /* 自分で書いたメモがある日の印(2026-07-28 変更)。
      絵文字では分かりにくかったので、マス右下に色つきの折り目マークを出す。
      シフト表の補足(時刻行の「●」)とは、色・位置・形で区別できる */
@@ -578,8 +582,17 @@
   }
   /* 今日の行はひと目で分かるようにする(問題45。2026-08-14 白黒表示でも分かるよう強調を強化:
      色だけに頼らず、太い二重線の枠+バッジ風ラベルで囲む) */
-  .ex-row.ex-row-today { background: #fff9e0; border: 2px solid var(--navy); border-radius: 6px; padding: 4px 6px; margin: 2px 0; box-shadow: inset 0 0 0 1px var(--navy); }
+  .ex-row.ex-row-today { background: #1a1a1a; border: 2px solid #fff; border-radius: 6px; padding: 4px 6px; margin: 2px 0; box-shadow: inset 0 0 0 1px var(--navy); color: #fff; }
   .ex-row.ex-row-today .ex-date::after { content: '📍今日'; display: inline-block; font-size: 12px; font-weight: bold; color: #fff; background: var(--navy); border-radius: 4px; padding: 1px 6px; margin-left: 6px; }
+  /* 2026-08-14: 背景を黒に近い色へ強化したため、中の文字も白系に上書きして読めるようにする
+     (種類ごとの色分け・回数の裏側の計算ロジックはいっさい変更しない。見た目の上書きのみ) */
+  .ex-row.ex-row-today .ex-date { color: #fff; }
+  .ex-row.ex-row-today .ex-shift-label { color: #fff !important; }
+  .ex-row.ex-row-today .ex-feel-tag { color: #fff; }
+  .ex-row.ex-row-today .ex-feel-tag.ex-tag-gray { color: #ccc; }
+  .ex-row.ex-row-today .ex-closure-btn { color: #fff; border-color: #fff; }
+  .ex-row.ex-row-today .ex-closure-btn.on { background: #444; color: #fff; border-color: #fff; }
+  .ex-row.ex-row-today .ex-muscle-badge { background: #4a2f10; color: #ffcf9e; }
   .ex-count-box {
     background: #eef3ff;
     border: 1px solid #b9c6ee;
@@ -3301,6 +3314,11 @@ function getFeelcycleCount(dateStr, shiftEntry, isManualClosure) {
   var label = shiftEntry.label;
   var memo = shiftEntry.memo || '';
 
+  /* 10-11: 土日早番だけの例外。「早番→1回」の一般ルールより必ず前に置く(平日早番は影響なし) */
+  if (label === '早番' && (dow === 0 || dow === 6)) {
+    return { count: 0, reason: '早番(土日)→筋トレ' };
+  }
+
   if (label === UNKNOWN_LABEL) return { count: 0, reason: '不明', excludedFromTotal: true };
   if (label === '希休') return { count: 0, reason: '希休' };
   /* slots = 各回が朝か晩か(2026-07-28 追加)。同じ2回でも「朝+晩」と「朝2回」がある */
@@ -3446,6 +3464,12 @@ function toggleClosureDay(ym, d) {
    フィールサイクルの金曜休館(10-4-1)とは完全に別ロジック */
 function getMuscleSessionsOf(dateStr) {
   if (dowOfDateStr(dateStr) === 5) return ['am', 'pm'];
+
+  /* 10-11: 土日早番も金曜と同じ2セッション(朝・夜)。exercise.muscle を見るより前に判定する */
+  var dow = dowOfDateStr(dateStr);
+  var label = shiftLabelOfDate(dateStr);
+  if (label === '早番' && (dow === 0 || dow === 6)) return ['am', 'pm'];
+
   var ym = ymOfDateStr(dateStr);
   var day = dayOfDateStr(dateStr);
   var days = state.exercise.muscle[ym];
@@ -4143,8 +4167,8 @@ function updateExerciseCounts() {
      達成判定(doneAll >= 30)には影響しない。都合よく調整された、という前向きな体験にする */
   var totalShown = Math.max(0, total - feelRest);
   void totalShown; /* 2026-08-13: 表示は「達成数 / 30回」に整理。値自体は他の用途がないため未使用 */
-  $('ex-feel-count').textContent = doneAll + ' / 30回' +
-    (parts.length ? '(うち' + parts.join('・') + ')' : '') + (achieved ? ' 🎉' : '');
+  void parts; /* 2026-08-14: 表示は「◯ / 30回」のみに簡略化(裏側の合計計算は変更しない) */
+  $('ex-feel-count').textContent = doneAll + ' / 30回' + (achieved ? ' 🎉' : '');
   $('ex-feel-msg').textContent = achieved ? '🎉 今月の目標達成!' : '';
   if (justAchieved) {
     box.classList.remove('flash');
@@ -4199,9 +4223,10 @@ function updateExerciseCounts() {
      予定日数ではなく「実際に記録したログの件数」を種目別に数える。金曜(朝・夜)も含める */
   var breakdownInfo = getMuscleBreakdownOf(ym);
   if (breakdownInfo.breakdown.length) {
+    /* 2026-08-14: 表示は種目別内訳のみに簡略化(「(合計◯回)」は削除。裏側の合計計算は変更しない) */
     $('ex-muscle-count').textContent = breakdownInfo.breakdown.map(function (b) {
       return b.name + b.count + '回';
-    }).join('・') + '(合計' + breakdownInfo.total + '回)';
+    }).join('・');
   } else {
     $('ex-muscle-count').textContent = 'まだ記録がありません';
   }
