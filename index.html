@@ -576,9 +576,10 @@
     font-size: 15px;
     cursor: pointer;
   }
-  /* 今日の行はひと目で分かるようにする(問題45) */
-  .ex-row.ex-row-today { background: #fff9e0; border-left: 3px solid var(--navy); padding-left: 6px; }
-  .ex-row.ex-row-today .ex-date::after { content: ' 今日'; font-size: 11px; color: var(--navy); }
+  /* 今日の行はひと目で分かるようにする(問題45。2026-08-14 白黒表示でも分かるよう強調を強化:
+     色だけに頼らず、太い二重線の枠+バッジ風ラベルで囲む) */
+  .ex-row.ex-row-today { background: #fff9e0; border: 2px solid var(--navy); border-radius: 6px; padding: 4px 6px; margin: 2px 0; box-shadow: inset 0 0 0 1px var(--navy); }
+  .ex-row.ex-row-today .ex-date::after { content: '📍今日'; display: inline-block; font-size: 12px; font-weight: bold; color: #fff; background: var(--navy); border-radius: 4px; padding: 1px 6px; margin-left: 6px; }
   .ex-count-box {
     background: #eef3ff;
     border: 1px solid #b9c6ee;
@@ -4410,15 +4411,17 @@ function scheduleSummaryFor(day) {
   return parts.join(' ');
 }
 
-/* 持ち物欄の下に昨日・今日の予定を2行で出す(2026-08-12 追加、2026-08-13 昨日・今日に変更。
+/* 持ち物欄の下に昨日・今日・明日の予定を3行で出す(2026-08-12 追加、2026-08-13 昨日・今日に変更。
    持ち物を見るのにカレンダーまでスクロールし直さなくて済むように、というユーザー要望。
    持ち物リストの下から下方向にスクロールしても月末の日付一覧まで進んでしまい、今日の欄に
-   戻りにくいとの声を受けて、明日ではなく昨日を表示するようにした(明日の持ち物欄は対象外)) */
+   戻りにくいとの声を受けて、明日ではなく昨日を表示するようにした(明日の持ち物欄は対象外)。
+   2026-08-14 追加: 明日の予定も見たいとの要望で「明日」行を追加。明日の日付は
+   getPackingDay()(持ち物欄の対象日=翌日)をそのまま流用する。関数名は変更しない) */
 function renderScheduleTodayTomorrow() {
   var box = $('schedule-today-tomorrow');
   if (!box) return;
   box.textContent = '';
-  [{ label: '昨日', day: getYesterdayDay() }, { label: '今日', day: getTodayDay() }].forEach(function (item) {
+  [{ label: '昨日', day: getYesterdayDay() }, { label: '今日', day: getTodayDay() }, { label: '明日', day: getPackingDay() }].forEach(function (item) {
     var w = WEEK_JA[new Date(item.day.y, item.day.m - 1, item.day.d).getDay()];
     var line = document.createElement('div');
     line.className = 'pk-date';
