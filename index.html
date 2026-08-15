@@ -215,6 +215,8 @@
     white-space: nowrap;
     overflow: hidden;
   }
+  /* 「今日」のマス(背景が濃い黒 #1a1a1a)ではメモ印だけ明るい色に上書きして視認性を確保する */
+  .cell.today .memo-dot { color: #ffb84d; }
   /* マス下部の運動予定(🚴回数・💪)。シフト名の表示を邪魔しない小さな1行 */
   .cell .cell-ex {
     font-size: 9px;
@@ -592,7 +594,7 @@
   .ex-row.ex-row-today .ex-feel-tag.ex-tag-gray { color: #ccc; }
   .ex-row.ex-row-today .ex-closure-btn { color: #fff; border-color: #fff; }
   .ex-row.ex-row-today .ex-closure-btn.on { background: #444; color: #fff; border-color: #fff; }
-  .ex-row.ex-row-today .ex-muscle-badge { background: #4a2f10; color: #ffcf9e; }
+  .ex-row.ex-row-today .ex-muscle-badge { background: #4a2f10; color: #fff; }
   .ex-count-box {
     background: #eef3ff;
     border: 1px solid #b9c6ee;
