@@ -1193,6 +1193,8 @@
     <button class="diet-tab" data-ptab="1">1回分</button>
     <button class="diet-tab" data-ptab="2">2回分</button>
   </div>
+  <!-- 2026-08-18 追加: 回数の数え方の注意書き(筋トレも1回に数える・寝巻きは数えない) -->
+  <div class="hint" style="margin:4px 0 6px;">運動の回数は筋トレも1回に数えます(朝晩フィールサイクル+筋トレの日も2回分)。※寝巻きは数えません</div>
   <div id="packing-list"></div>
   <button class="btn sub small" id="packing-edit-toggle">持ち物リストを編集</button>
   <div id="packing-edit-area" style="display:none;">
@@ -1504,7 +1506,9 @@ function defaultDiet() {
    固定(scales:false)= 回数に関係なく常に1つ。回数連動(scales:true)= 1回分なら1・2回分なら2が既定。
    2026-08-09: k1(シャンプー等)・k9(日焼け止め)・k10(整髪剤)は、id を見て
    packingItemNeeded() が明日の予定から要否を自動判定する(詳細はそちらのコメント参照)。
-   k9・k10 は個数を回数連動から「常に1個」に変更(要否判定のほうで意味を持たせるため) */
+   k9・k10 は個数を回数連動から「常に1個」に変更(要否判定のほうで意味を持たせるため)。
+   2026-08-18 追加: k11(袋)は特別な回数連動で「運動回数+1個」(1回分なら2個・2回分なら3個)。
+   個数の計算は renderPacking() 側で id を見て分岐する */
 var DEFAULT_PACKING = [
   { id: 'k1', name: 'シャンプー・ボディソープ', unit: '本', scales: false },
   { id: 'k2', name: 'クリーム', unit: '個', scales: false },
@@ -1515,7 +1519,8 @@ var DEFAULT_PACKING = [
   { id: 'k7', name: 'クレンジング', unit: '', scales: true },
   { id: 'k8', name: '化粧水美容液など', unit: '', scales: true },
   { id: 'k9', name: '日焼け止め', unit: '', scales: false },
-  { id: 'k10', name: '整髪剤', unit: '', scales: false }
+  { id: 'k10', name: '整髪剤', unit: '', scales: false },
+  { id: 'k11', name: '袋', unit: '個', scales: true }
 ];
 function clonePackingDef(d) { return { id: d.id, name: d.name, unit: d.unit, scales: d.scales === true }; }
 
@@ -2209,7 +2214,7 @@ function setNote(ym, d, text) {
 /* 運動予定(exercise)を洗浄。壊れた形は初期値(空)に戻す(問題2と同じ二段構えの入口洗浄) */
 function sanitizeExercise(src) {
   var out = { closureDays: {}, muscle: {}, muscleAnchor: null, confirmedMonths: [], records: {},
-    packingDefs: DEFAULT_PACKING.map(clonePackingDef), packing: {},
+    packingDefs: DEFAULT_PACKING.map(clonePackingDef), packing: {}, bagAdded: true,
     muscleExercises: DEFAULT_MUSCLE_EXERCISES.map(cloneMuscleExercise), log: {} };
   if (!src || typeof src !== 'object' || Array.isArray(src)) return out;
   function sanitizeDayMap(v) {
@@ -2305,6 +2310,17 @@ function sanitizeExercise(src) {
     });
   }
   out.packingDefs = sanitizePackingDefs(src.packingDefs);
+  /* 袋(k11)の一回きりの移行(2026-08-18 追加)。袋より前に保存された持ち物リストへ
+     袋を1度だけ足す。bagAdded フラグを保存するので、ユーザーが袋を削除しても復活しない */
+  out.bagAdded = src.bagAdded === true;
+  if (!out.bagAdded) {
+    var hasBag = out.packingDefs.some(function (d) { return d.id === 'k11'; });
+    if (!hasBag && out.packingDefs.length < 30) {
+      var bagDef = DEFAULT_PACKING.filter(function (d) { return d.id === 'k11'; })[0];
+      if (bagDef) out.packingDefs.push(clonePackingDef(bagDef));
+    }
+    out.bagAdded = true;
+  }
   out.packing = sanitizePackingData(src.packing);
   out.muscleExercises = sanitizeMuscleExercises(src.muscleExercises);
   out.log = sanitizeExerciseLog(src.log, out.muscleExercises);
@@ -4264,15 +4280,19 @@ function getPackingDay() {
   return { y: t.getFullYear(), m: t.getMonth() + 1, d: t.getDate() };
 }
 
-/* 既存の getFeelcycleCount をそのまま使い、フィールサイクル回数から既定タブを決める。
-   2回(朝晩・朝2)なら「2回分」、それ以外(1回・0回・未確定)は安全側で「1回分」 */
+/* 既存の getFeelcycleCount をそのまま使い、運動回数から既定タブを決める。
+   2026-08-18 変更(ユーザー要望): 筋トレも運動1回として数える。
+   フィールサイクル回数+筋トレ(あれば1)の合計が2回以上なら「2回分」
+   (朝晩フィールサイクル+筋トレのように合計3回の日も、タブは2回分までなので「2回分」)。
+   合計1回以下(未確定含む)は安全側で「1回分」 */
 function packingAutoTab(day) {
   var ds = dateStrOf(day.y, day.m, day.d);
   var ym = ymKey(day.y, day.m);
   var shEntry = normShift((state.shifts[ym] || {})[String(day.d)]);
   var closure = state.exercise.closureDays[ym] || [];
   var res = getFeelcycleCount(ds, shEntry, closure.indexOf(String(day.d)) >= 0);
-  return (res.count === 2) ? 2 : 1;
+  var total = res.count + (packingMuscleTomorrow(day) ? 1 : 0);
+  return (total >= 2) ? 2 : 1;
 }
 
 function getPackingRecord(day, createIfMissing) {
@@ -4486,7 +4506,8 @@ function renderPacking() {
 
   ordered.forEach(function (item) {
     var def = item.def;
-    var defaultQty = def.scales ? tab : 1;
+    /* 袋(k11)だけは運動回数+1個(1回分なら2個・2回分なら3個。2026-08-18 ユーザー要望) */
+    var defaultQty = def.scales ? (def.id === 'k11' ? tab + 1 : tab) : 1;
     var override = def.scales ? getPackingOverride(day, def.id) : null;
     var qty = (override !== null) ? override : defaultQty;
     var checked = getPackingChecked(day, def.id);
