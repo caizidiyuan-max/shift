@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<!-- documents-app build 2026-08-19-01 -->
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>書類作成（請求書・契約書）</title>
+<style>
+  :root {
+    /* シフトカレンダーと同じクリーム紙の配色 */
+    --navy: #3a4470;
+    --navy-dark: #2b3355;
+    --red: #c0453f;
+    --line: #e5ded0;
+    --bg: #faf6ee;
+    --cell-bg: #fffdf8;
+    --ink: #3a3630;
+    --dim: #b6ae9e;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+  header {
+    background: var(--navy);
+    color: #fff;
+    padding: calc(env(safe-area-inset-top) + 10px) 12px 10px;
+    text-align: center;
+  }
+  header h1 { font-size: 18px; }
+  header .sub { font-size: 11px; opacity: .8; margin-top: 2px; }
+
+  .tabs {
+    display: flex;
+    gap: 6px;
+    padding: 10px 10px 0;
+    max-width: 860px;
+    margin: 0 auto;
+  }
+  .tab {
+    flex: 1;
+    padding: 9px 4px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--cell-bg);
+    color: var(--ink);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .tab.on { background: var(--navy); color: #fff; border-color: var(--navy); font-weight: bold; }
+
+  main { max-width: 860px; margin: 0 auto; padding: 12px 10px calc(env(safe-area-inset-bottom) + 24px); }
+  .pane { display: none; }
+  .pane.on { display: block; }
+
+  .card {
+    background: var(--cell-bg);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .card h2 { font-size: 14px; margin-bottom: 8px; color: var(--navy); }
+  .hint { font-size: 11px; color: var(--dim); margin-top: 4px; line-height: 1.5; }
+
+  label.fld { display: block; font-size: 12px; margin: 8px 0 2px; color: #6b6355; }
+  input[type=text], input[type=date], input[type=number], select, textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--ink);
+    font-size: 14px;
+    font-family: inherit;
+  }
+  textarea { resize: vertical; }
+  .row2 { display: flex; gap: 8px; }
+  .row2 > div { flex: 1; }
+
+  button.primary, button.ghost, button.danger {
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    border: 1px solid var(--navy);
+  }
+  button.primary { background: var(--navy); color: #fff; font-weight: bold; }
+  button.ghost { background: #fff; color: var(--navy); }
+  button.danger { background: #fff; color: var(--red); border-color: var(--red); }
+  .btnrow { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+
+  /* 明細テーブル */
+  table.items { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.items th, table.items td { border: 1px solid var(--line); padding: 4px; }
+  table.items th { background: var(--bg); font-weight: normal; font-size: 11px; color: #6b6355; }
+  table.items input, table.items select { padding: 6px 4px; font-size: 13px; border: none; background: transparent; }
+  table.items td.num { width: 62px; }
+  table.items td.tax { width: 70px; }
+  table.items td.amt { width: 90px; text-align: right; padding-right: 6px; white-space: nowrap; }
+  table.items td.del { width: 34px; text-align: center; }
+  table.items td.del button { border: none; background: none; color: var(--red); font-size: 16px; cursor: pointer; }
+
+  .totals { margin-top: 8px; font-size: 13px; text-align: right; line-height: 1.9; }
+  .totals .grand { font-size: 16px; font-weight: bold; color: var(--navy); }
+
+  /* 書類一覧 */
+  .doclist { list-style: none; }
+  .doclist li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--cell-bg);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 8px;
+  }
+  .doclist .kind {
+    font-size: 11px;
+    color: #fff;
+    background: var(--navy);
+    border-radius: 4px;
+    padding: 2px 6px;
+    white-space: nowrap;
+  }
+  .doclist .kind.contract { background: #6d5a2e; }
+  .doclist .meta { flex: 1; min-width: 0; }
+  .doclist .meta .t { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .doclist .meta .d { font-size: 11px; color: var(--dim); }
+  .doclist button { padding: 6px 10px; font-size: 12px; }
+  .empty { text-align: center; color: var(--dim); font-size: 13px; padding: 24px 0; }
+
+  /* ===== プレビュー(印刷レイアウト) ===== */
+  #preview-wrap {
+    position: fixed;
+    inset: 0;
+    background: rgba(58,54,48,.55);
+    display: none;
+    z-index: 50;
+    overflow: auto;
+    padding: 16px 8px;
+  }
+  #preview-wrap.on { display: block; }
+  #preview-bar {
+    max-width: 720px;
+    margin: 0 auto 8px;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+  .sheet {
+    background: #fff;
+    color: #222;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 40px 44px;
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  .sheet h1.doc-title {
+    text-align: center;
+    font-size: 24px;
+    letter-spacing: .5em;
+    text-indent: .5em;
+    margin-bottom: 22px;
+    font-weight: bold;
+  }
+  .sheet .head-flex { display: flex; justify-content: space-between; gap: 16px; }
+  .sheet .to-block { max-width: 55%; }
+  .sheet .to-name { font-size: 17px; border-bottom: 1px solid #222; padding-bottom: 2px; margin-bottom: 6px; }
+  .sheet .from-block { text-align: left; font-size: 12px; min-width: 220px; }
+  .sheet .from-block .co { font-size: 14px; font-weight: bold; }
+  .sheet .docmeta { text-align: right; font-size: 12px; margin-bottom: 10px; }
+  .sheet .lead { margin: 14px 0 6px; }
+  .sheet .total-box {
+    display: inline-block;
+    border: 2px solid #222;
+    padding: 8px 22px;
+    font-size: 16px;
+    font-weight: bold;
+    margin: 8px 0 14px;
+  }
+  .sheet table.p-items { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 12px; }
+  .sheet table.p-items th, .sheet table.p-items td { border: 1px solid #444; padding: 5px 6px; }
+  .sheet table.p-items th { background: #eee9dd; font-weight: normal; }
+  .sheet table.p-items td.r { text-align: right; white-space: nowrap; }
+  .sheet table.p-items td.c { text-align: center; }
+  .sheet .sum-table { margin-left: auto; margin-top: 8px; border-collapse: collapse; font-size: 12px; }
+  .sheet .sum-table td { border: 1px solid #444; padding: 4px 10px; }
+  .sheet .sum-table td:first-child { background: #eee9dd; }
+  .sheet .sum-table td:last-child { text-align: right; min-width: 110px; }
+  .sheet .note { margin-top: 14px; font-size: 12px; white-space: pre-wrap; }
+  .sheet .bank { margin-top: 10px; font-size: 12px; border: 1px solid #444; padding: 8px 10px; white-space: pre-wrap; }
+  .sheet .stamp-space { height: 70px; }
+  /* 契約書 */
+  .sheet .contract-body { white-space: pre-wrap; margin-top: 8px; }
+  .sheet .sign-area { margin-top: 34px; display: flex; gap: 32px; }
+  .sheet .sign-area > div { flex: 1; font-size: 12px; }
+  .sheet .sign-area .party { font-weight: bold; margin-bottom: 6px; }
+  .sheet .sign-line { border-bottom: 1px solid #222; height: 26px; margin-top: 14px; }
+  .sheet .seal { display: inline-block; color: #999; font-size: 11px; margin-left: 6px; }
+
+  @media print {
+    body > header, .tabs, main, #preview-bar { display: none !important; }
+    body { background: #fff; }
+    #preview-wrap { position: static; display: block !important; background: #fff; padding: 0; overflow: visible; }
+    .sheet { max-width: none; margin: 0; padding: 0; font-size: 12px; }
+    @page { size: A4; margin: 18mm 16mm; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>書類作成</h1>
+  <div class="sub">請求書・見積書・納品書・領収書・契約書</div>
+</header>
+
+<div class="tabs">
+  <button class="tab on" data-tab="list">書類一覧</button>
+  <button class="tab" data-tab="edit">新規作成</button>
+  <button class="tab" data-tab="settings">自社・取引先</button>
+</div>
+
+<main>
+
+  <!-- ===== 一覧 ===== -->
+  <section class="pane on" id="pane-list">
+    <ul class="doclist" id="doclist"></ul>
+    <div class="empty" id="doclist-empty">まだ書類がありません。「新規作成」から作成してください。</div>
+  </section>
+
+  <!-- ===== 作成・編集 ===== -->
+  <section class="pane" id="pane-edit">
+
+    <div class="card">
+      <h2>書類の種類</h2>
+      <select id="f-kind">
+        <option value="invoice">請求書</option>
+        <option value="estimate">見積書</option>
+        <option value="delivery">納品書</option>
+        <option value="receipt">領収書</option>
+        <option value="contract">契約書</option>
+      </select>
+      <div class="hint" id="kind-hint"></div>
+    </div>
+
+    <div class="card">
+      <h2>基本情報</h2>
+      <div class="row2">
+        <div>
+          <label class="fld">書類番号</label>
+          <input type="text" id="f-number" placeholder="例: INV-2026-001">
+        </div>
+        <div>
+          <label class="fld">発行日</label>
+          <input type="date" id="f-date">
+        </div>
+      </div>
+      <div class="row2" id="due-row">
+        <div>
+          <label class="fld" id="due-label">お支払期限</label>
+          <input type="date" id="f-due">
+        </div>
+        <div>
+          <label class="fld">件名</label>
+          <input type="text" id="f-subject" placeholder="例: 8月分業務委託料">
+        </div>
+      </div>
+      <label class="fld">宛先（取引先）</label>
+      <select id="f-client"></select>
+      <input type="text" id="f-client-free" placeholder="または宛名を直接入力（例: 株式会社◯◯）" style="margin-top:6px;">
+      <div class="hint">取引先はプルダウンから選ぶか、直接入力できます。直接入力があればそちらを優先します。</div>
+    </div>
+
+    <!-- 金銭書類用: 明細 -->
+    <div class="card" id="card-items">
+      <h2>明細</h2>
+      <table class="items">
+        <thead>
+          <tr><th>品目・内容</th><th>数量</th><th>単価</th><th>税率</th><th>金額</th><th></th></tr>
+        </thead>
+        <tbody id="items-body"></tbody>
+      </table>
+      <div class="btnrow">
+        <button class="ghost" id="btn-add-item" type="button">＋ 行を追加</button>
+      </div>
+      <div class="totals" id="totals"></div>
+      <label class="fld" style="margin-top:10px;">
+        <input type="checkbox" id="f-withholding" style="width:auto;margin-right:4px;">
+        源泉徴収（10.21%）を差し引く
+      </label>
+      <div class="hint">個人事業主への原稿料・デザイン料などで源泉徴収がある場合にチェックします。</div>
+    </div>
+
+    <!-- 領収書用 -->
+    <div class="card" id="card-receipt" style="display:none;">
+      <h2>領収書の内容</h2>
+      <label class="fld">但し書き</label>
+      <input type="text" id="f-proviso" placeholder="例: 但し、業務委託料として">
+    </div>
+
+    <!-- 契約書用 -->
+    <div class="card" id="card-contract" style="display:none;">
+      <h2>契約書の内容</h2>
+      <label class="fld">ひな形を読み込む</label>
+      <div class="btnrow" style="margin-top:4px;">
+        <button class="ghost" type="button" id="btn-tpl-gyomu">業務委託契約書</button>
+        <button class="ghost" type="button" id="btn-tpl-nda">秘密保持契約書</button>
+      </div>
+      <label class="fld">契約書タイトル</label>
+      <input type="text" id="f-contract-title" placeholder="例: 業務委託契約書">
+      <label class="fld">甲（相手方）</label>
+      <input type="text" id="f-party-a" placeholder="例: 株式会社◯◯">
+      <label class="fld">乙（自分・自社）</label>
+      <input type="text" id="f-party-b" placeholder="自社設定から自動入力されます">
+      <label class="fld">本文（条文）</label>
+      <textarea id="f-contract-body" rows="16" placeholder="ひな形ボタンを押すと条文が入ります。自由に編集できます。"></textarea>
+      <div class="hint">ひな形は一般的な例文です。重要な契約は内容をよく確認し、必要に応じて専門家にご相談ください。</div>
+    </div>
+
+    <div class="card">
+      <h2>備考</h2>
+      <textarea id="f-note" rows="3" placeholder="例: お振込手数料は貴社にてご負担願います。"></textarea>
+    </div>
+
+    <div class="btnrow">
+      <button class="primary" id="btn-save" type="button">保存</button>
+      <button class="ghost" id="btn-preview" type="button">プレビュー / 印刷（PDF）</button>
+      <button class="ghost" id="btn-new" type="button">新規（クリア）</button>
+      <button class="danger" id="btn-delete" type="button" style="display:none;">この書類を削除</button>
+    </div>
+  </section>
+
+  <!-- ===== 設定 ===== -->
+  <section class="pane" id="pane-settings">
+    <div class="card">
+      <h2>自社（発行者）情報</h2>
+      <label class="fld">名前・屋号・会社名</label>
+      <input type="text" id="s-name" placeholder="例: 山田 太郎 / 株式会社◯◯">
+      <label class="fld">住所</label>
+      <input type="text" id="s-address" placeholder="例: 〒100-0001 東京都千代田区…">
+      <div class="row2">
+        <div>
+          <label class="fld">電話番号</label>
+          <input type="text" id="s-tel" placeholder="例: 03-1234-5678">
+        </div>
+        <div>
+          <label class="fld">メール</label>
+          <input type="text" id="s-email" placeholder="例: info@example.com">
+        </div>
+      </div>
+      <label class="fld">インボイス登録番号（任意）</label>
+      <input type="text" id="s-invoice-no" placeholder="例: T1234567890123">
+      <label class="fld">振込先（請求書に表示）</label>
+      <textarea id="s-bank" rows="3" placeholder="例: ◯◯銀行 △△支店 普通 1234567 ヤマダタロウ"></textarea>
+      <div class="btnrow">
+        <button class="primary" type="button" id="btn-save-settings">自社情報を保存</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>取引先</h2>
+      <div class="row2">
+        <div>
+          <label class="fld">名前（宛名）</label>
+          <input type="text" id="c-name" placeholder="例: 株式会社◯◯ 御中">
+        </div>
+        <div>
+          <label class="fld">住所（任意）</label>
+          <input type="text" id="c-address">
+        </div>
+      </div>
+      <div class="btnrow">
+        <button class="ghost" type="button" id="btn-add-client">＋ 取引先を追加</button>
+      </div>
+      <ul class="doclist" id="clientlist" style="margin-top:10px;"></ul>
+    </div>
+  </section>
+
+</main>
+
+<!-- プレビュー -->
+<div id="preview-wrap">
+  <div id="preview-bar">
+    <button class="primary" type="button" id="btn-print">印刷 / PDF保存</button>
+    <button class="ghost" type="button" id="btn-close-preview" style="background:#fff;">閉じる</button>
+  </div>
+  <div class="sheet" id="sheet"></div>
+</div>
+
+<script>
+'use strict';
+
+/* ===== 定数 ===== */
+var LS_KEY = 'documents-app-v1';
+var KIND_LABEL = { invoice: '請求書', estimate: '見積書', delivery: '納品書', receipt: '領収書', contract: '契約書' };
+var KIND_PREFIX = { invoice: 'INV', estimate: 'EST', delivery: 'DLV', receipt: 'RCT', contract: 'CTR' };
+var KIND_HINT = {
+  invoice: '取引先に代金を請求する書類です。振込先・支払期限を記載します。',
+  estimate: '正式な発注前に金額を提示する書類です。有効期限を発行日から記載します。',
+  delivery: '納品した品目・数量を伝える書類です。',
+  receipt: '代金を受け取ったことを証明する書類です。但し書きを記載します。',
+  contract: '業務委託契約書・秘密保持契約書のひな形から作成できます。'
+};
+var WITHHOLDING_RATE = 0.1021;
+
+/* ===== 契約書ひな形 ===== */
+var TPL_GYOMU = {
+  title: '業務委託契約書',
+  body: '{甲}（以下「甲」という。）と{乙}（以下「乙」という。）とは、甲が乙に業務を委託することに関し、次のとおり業務委託契約（以下「本契約」という。）を締結する。\n\n第1条（目的）\n甲は乙に対し、別途甲乙間で合意する業務（以下「本件業務」という。）を委託し、乙はこれを受託する。\n\n第2条（委託料）\n1. 本件業務の委託料は、別途甲乙間で合意した金額とする。\n2. 甲は、乙の発行する請求書に基づき、翌月末日までに乙の指定する銀行口座に振り込む方法により支払う。振込手数料は甲の負担とする。\n\n第3条（業務の遂行）\n乙は、善良な管理者の注意をもって本件業務を遂行する。\n\n第4条（再委託）\n乙は、甲の事前の書面による承諾を得た場合を除き、本件業務の全部又は一部を第三者に再委託してはならない。\n\n第5条（秘密保持）\n甲及び乙は、本契約に関連して知り得た相手方の秘密情報を、相手方の事前の書面による承諾なく第三者に開示又は漏洩してはならない。本条の義務は、本契約終了後も3年間存続する。\n\n第6条（成果物の権利）\n本件業務の成果物に関する著作権（著作権法第27条及び第28条の権利を含む。）その他の知的財産権は、委託料の完済をもって乙から甲に移転する。ただし、乙が従前から保有していた権利はこの限りでない。\n\n第7条（契約期間）\n本契約の有効期間は、契約締結日から1年間とする。ただし、期間満了の1か月前までにいずれの当事者からも書面による申し出がないときは、同一条件でさらに1年間更新されるものとし、以後も同様とする。\n\n第8条（解除）\n甲又は乙は、相手方が本契約に違反し、相当の期間を定めて催告したにもかかわらず是正されないときは、本契約を解除することができる。\n\n第9条（損害賠償）\n甲又は乙は、本契約に違反して相手方に損害を与えたときは、その直接かつ現実に生じた通常の損害を賠償する。\n\n第10条（協議）\n本契約に定めのない事項又は疑義が生じた事項については、甲乙誠意をもって協議のうえ解決する。\n\n本契約締結の証として、本書2通を作成し、甲乙記名押印のうえ、各1通を保有する。'
+};
+var TPL_NDA = {
+  title: '秘密保持契約書',
+  body: '{甲}（以下「甲」という。）と{乙}（以下「乙」という。）とは、両者間の取引の検討・遂行（以下「本目的」という。）に関して開示される秘密情報の取扱いについて、次のとおり秘密保持契約（以下「本契約」という。）を締結する。\n\n第1条（秘密情報）\n本契約において「秘密情報」とは、本目的に関して、開示当事者が受領当事者に対して開示する技術上・営業上その他一切の情報をいう。ただし、次の各号のいずれかに該当する情報は秘密情報に含まれない。\n(1) 開示の時点で既に公知であった情報、又は開示後に受領当事者の責によらず公知となった情報\n(2) 開示の時点で受領当事者が既に保有していた情報\n(3) 受領当事者が正当な権限を有する第三者から秘密保持義務を負うことなく適法に入手した情報\n(4) 受領当事者が秘密情報によらず独自に開発した情報\n\n第2条（秘密保持義務）\n受領当事者は、秘密情報を善良な管理者の注意をもって管理し、開示当事者の事前の書面による承諾なく第三者に開示又は漏洩してはならない。\n\n第3条（目的外使用の禁止）\n受領当事者は、秘密情報を本目的以外に使用してはならない。\n\n第4条（複製の制限）\n受領当事者は、本目的に必要な範囲を超えて秘密情報を複製してはならない。\n\n第5条（返還・廃棄）\n受領当事者は、開示当事者から請求があったとき又は本契約が終了したときは、秘密情報及びその複製物を速やかに返還又は廃棄する。\n\n第6条（有効期間）\n本契約の有効期間は、契約締結日から1年間とする。ただし、第2条及び第3条の義務は、本契約終了後も3年間存続する。\n\n第7条（損害賠償）\n受領当事者が本契約に違反して開示当事者に損害を与えたときは、その損害を賠償する。\n\n第8条（協議）\n本契約に定めのない事項又は疑義が生じた事項については、甲乙誠意をもって協議のうえ解決する。\n\n本契約締結の証として、本書2通を作成し、甲乙記名押印のうえ、各1通を保有する。'
+};
+
+/* ===== 状態 ===== */
+function defaultState() {
+  return { company: { name: '', address: '', tel: '', email: '', invoiceNo: '', bank: '' }, clients: [], docs: [] };
+}
+function loadState() {
+  try {
+    var d = JSON.parse(localStorage.getItem(LS_KEY));
+    if (!d || typeof d !== 'object') return defaultState();
+    var s = defaultState();
+    if (d.company && typeof d.company === 'object') {
+      Object.keys(s.company).forEach(function (k) { if (typeof d.company[k] === 'string') s.company[k] = d.company[k]; });
+    }
+    if (Array.isArray(d.clients)) s.clients = d.clients.filter(function (c) { return c && typeof c.name === 'string'; });
+    if (Array.isArray(d.docs)) s.docs = d.docs.filter(function (x) { return x && typeof x.id === 'string'; });
+    return s;
+  } catch (e) { return defaultState(); }
+}
+function saveState() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) { alert('保存に失敗しました。端末の空き容量をご確認ください。'); }
+}
+var state = loadState();
+var editingId = null; /* 編集中の書類id。null なら新規 */
+
+/* ===== ユーティリティ ===== */
+function $(id) { return document.getElementById(id); }
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+function yen(n) { return '¥' + Math.round(n).toLocaleString('ja-JP'); }
+function todayStr() {
+  var d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function jpDate(iso) {
+  if (!iso) return '';
+  var p = iso.split('-');
+  if (p.length !== 3) return iso;
+  return Number(p[0]) + '年' + Number(p[1]) + '月' + Number(p[2]) + '日';
+}
+function newId() { return 'd' + Date.now() + Math.random().toString(36).slice(2, 7); }
+function nextNumber(kind) {
+  var y = new Date().getFullYear();
+  var prefix = KIND_PREFIX[kind] + '-' + y + '-';
+  var max = 0;
+  state.docs.forEach(function (d) {
+    if (d.number && d.number.indexOf(prefix) === 0) {
+      var n = parseInt(d.number.slice(prefix.length), 10);
+      if (!isNaN(n) && n > max) max = n;
+    }
+  });
+  return prefix + String(max + 1).padStart(3, '0');
+}
+
+/* ===== タブ ===== */
+document.querySelectorAll('.tab').forEach(function (b) {
+  b.addEventListener('click', function () { showTab(b.dataset.tab); });
+});
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach(function (b) { b.classList.toggle('on', b.dataset.tab === name); });
+  document.querySelectorAll('.pane').forEach(function (p) { p.classList.remove('on'); });
+  $('pane-' + name).classList.add('on');
+  if (name === 'list') renderList();
+  if (name === 'settings') renderSettings();
+}
+
+/* ===== 種類切り替え ===== */
+$('f-kind').addEventListener('change', onKindChange);
+function onKindChange() {
+  var k = $('f-kind').value;
+  $('kind-hint').textContent = KIND_HINT[k];
+  $('card-items').style.display = (k === 'contract' || k === 'receipt') ? 'none' : '';
+  $('card-receipt').style.display = (k === 'receipt') ? '' : 'none';
+  $('card-contract').style.display = (k === 'contract') ? '' : 'none';
+  if (k === 'receipt') $('card-items').style.display = ''; /* 領収書も金額は明細から計算 */
+  $('due-row').style.display = (k === 'contract') ? 'none' : '';
+  $('due-label').textContent = k === 'estimate' ? '有効期限' : (k === 'delivery' ? '納品日' : 'お支払期限');
+  if (!editingId) $('f-number').value = nextNumber(k);
+  if (k === 'contract' && !$('f-party-b').value) $('f-party-b').value = state.company.name;
+}
+
+/* ===== 明細行 ===== */
+function addItemRow(item) {
+  item = item || { name: '', qty: 1, price: 0, taxRate: 10 };
+  var tr = document.createElement('tr');
+  tr.innerHTML =
+    '<td><input type="text" class="i-name" placeholder="品目"></td>' +
+    '<td class="num"><input type="number" class="i-qty" min="0" step="any"></td>' +
+    '<td class="num"><input type="number" class="i-price" min="0" step="any"></td>' +
+    '<td class="tax"><select class="i-tax"><option value="10">10%</option><option value="8">8%（軽減）</option><option value="0">対象外</option></select></td>' +
+    '<td class="amt i-amt">¥0</td>' +
+    '<td class="del"><button type="button" title="行を削除">×</button></td>';
+  tr.querySelector('.i-name').value = item.name;
+  tr.querySelector('.i-qty').value = item.qty;
+  tr.querySelector('.i-price').value = item.price;
+  tr.querySelector('.i-tax').value = String(item.taxRate);
+  tr.querySelectorAll('input,select').forEach(function (el) { el.addEventListener('input', recalc); });
+  tr.querySelector('.del button').addEventListener('click', function () { tr.remove(); recalc(); });
+  $('items-body').appendChild(tr);
+  recalc();
+}
+$('btn-add-item').addEventListener('click', function () { addItemRow(); });
+$('f-withholding').addEventListener('change', recalc);
+
+function readItems() {
+  var items = [];
+  $('items-body').querySelectorAll('tr').forEach(function (tr) {
+    var name = tr.querySelector('.i-name').value.trim();
+    var qty = parseFloat(tr.querySelector('.i-qty').value) || 0;
+    var price = parseFloat(tr.querySelector('.i-price').value) || 0;
+    var taxRate = parseInt(tr.querySelector('.i-tax').value, 10);
+    if (name || qty * price !== 0) items.push({ name: name, qty: qty, price: price, taxRate: taxRate });
+  });
+  return items;
+}
+function calcTotals(items, withholding) {
+  var sub = 0, tax10 = 0, tax8 = 0, base10 = 0, base8 = 0;
+  items.forEach(function (it) {
+    var amt = it.qty * it.price;
+    sub += amt;
+    if (it.taxRate === 10) { base10 += amt; }
+    else if (it.taxRate === 8) { base8 += amt; }
+  });
+  tax10 = Math.floor(base10 * 0.10);
+  tax8 = Math.floor(base8 * 0.08);
+  var wh = withholding ? Math.floor(sub * WITHHOLDING_RATE) : 0;
+  return { sub: sub, base10: base10, base8: base8, tax10: tax10, tax8: tax8, wh: wh, grand: sub + tax10 + tax8 - wh };
+}
+function recalc() {
+  var trs = $('items-body').querySelectorAll('tr');
+  trs.forEach(function (tr) {
+    var qty = parseFloat(tr.querySelector('.i-qty').value) || 0;
+    var price = parseFloat(tr.querySelector('.i-price').value) || 0;
+    tr.querySelector('.i-amt').textContent = yen(qty * price);
+  });
+  var t = calcTotals(readItems(), $('f-withholding').checked);
+  var html = '小計（税抜）: ' + yen(t.sub) + '<br>';
+  if (t.base10) html += '消費税（10%）: ' + yen(t.tax10) + '<br>';
+  if (t.base8) html += '消費税（8%）: ' + yen(t.tax8) + '<br>';
+  if (t.wh) html += '源泉徴収（10.21%）: −' + yen(t.wh) + '<br>';
+  html += '<span class="grand">合計: ' + yen(t.grand) + '</span>';
+  $('totals').innerHTML = html;
+}
+
+/* ===== 契約書ひな形 ===== */
+function applyTemplate(tpl) {
+  if ($('f-contract-body').value.trim() && !confirm('本文をひな形で置き換えます。よろしいですか？')) return;
+  $('f-contract-title').value = tpl.title;
+  if (!$('f-subject').value) $('f-subject').value = tpl.title;
+  if (!$('f-party-b').value) $('f-party-b').value = state.company.name;
+  $('f-contract-body').value = tpl.body;
+}
+$('btn-tpl-gyomu').addEventListener('click', function () { applyTemplate(TPL_GYOMU); });
+$('btn-tpl-nda').addEventListener('click', function () { applyTemplate(TPL_NDA); });
+
+/* ===== フォーム <-> 書類データ ===== */
+function clearForm(kind) {
+  editingId = null;
+  $('btn-delete').style.display = 'none';
+  $('f-kind').value = kind || 'invoice';
+  $('f-date').value = todayStr();
+  $('f-due').value = '';
+  $('f-subject').value = '';
+  $('f-client').value = '';
+  $('f-client-free').value = '';
+  $('f-note').value = '';
+  $('f-proviso').value = '';
+  $('f-withholding').checked = false;
+  $('f-contract-title').value = '';
+  $('f-party-a').value = '';
+  $('f-party-b').value = '';
+  $('f-contract-body').value = '';
+  $('items-body').innerHTML = '';
+  addItemRow();
+  onKindChange();
+}
+function readForm() {
+  return {
+    id: editingId || newId(),
+    kind: $('f-kind').value,
+    number: $('f-number').value.trim(),
+    date: $('f-date').value,
+    due: $('f-due').value,
+    subject: $('f-subject').value.trim(),
+    clientId: $('f-client').value,
+    clientFree: $('f-client-free').value.trim(),
+    items: readItems(),
+    withholding: $('f-withholding').checked,
+    note: $('f-note').value,
+    proviso: $('f-proviso').value.trim(),
+    contractTitle: $('f-contract-title').value.trim(),
+    partyA: $('f-party-a').value.trim(),
+    partyB: $('f-party-b').value.trim(),
+    contractBody: $('f-contract-body').value,
+    updatedAt: Date.now()
+  };
+}
+function fillForm(doc) {
+  editingId = doc.id;
+  $('btn-delete').style.display = '';
+  $('f-kind').value = doc.kind;
+  $('f-number').value = doc.number || '';
+  $('f-date').value = doc.date || todayStr();
+  $('f-due').value = doc.due || '';
+  $('f-subject').value = doc.subject || '';
+  renderClientSelect();
+  $('f-client').value = doc.clientId || '';
+  $('f-client-free').value = doc.clientFree || '';
+  $('f-note').value = doc.note || '';
+  $('f-proviso').value = doc.proviso || '';
+  $('f-withholding').checked = !!doc.withholding;
+  $('f-contract-title').value = doc.contractTitle || '';
+  $('f-party-a').value = doc.partyA || '';
+  $('f-party-b').value = doc.partyB || '';
+  $('f-contract-body').value = doc.contractBody || '';
+  $('items-body').innerHTML = '';
+  (doc.items && doc.items.length ? doc.items : [null]).forEach(function (it) { addItemRow(it || undefined); });
+  onKindChange();
+  $('f-number').value = doc.number || ''; /* onKindChange で上書きされないよう再設定 */
+}
+function clientNameOf(doc) {
+  if (doc.clientFree) return doc.clientFree;
+  var c = state.clients.filter(function (x) { return x.id === doc.clientId; })[0];
+  return c ? c.name : '';
+}
+
+/* ===== 保存・削除 ===== */
+$('btn-save').addEventListener('click', function () {
+  var doc = readForm();
+  if (doc.kind === 'contract') {
+    if (!doc.contractTitle) { alert('契約書タイトルを入力してください。'); return; }
+  } else if (!clientNameOf(doc)) { alert('宛先を選択するか入力してください。'); return; }
+  var i = state.docs.findIndex(function (d) { return d.id === doc.id; });
+  if (i >= 0) state.docs[i] = doc; else state.docs.unshift(doc);
+  editingId = doc.id;
+  $('btn-delete').style.display = '';
+  saveState();
+  alert('保存しました。');
+});
+$('btn-new').addEventListener('click', function () { clearForm($('f-kind').value); });
+$('btn-delete').addEventListener('click', function () {
+  if (!editingId) return;
+  if (!confirm('この書類を削除します。よろしいですか？')) return;
+  state.docs = state.docs.filter(function (d) { return d.id !== editingId; });
+  saveState();
+  clearForm();
+  showTab('list');
+});
+
+/* ===== 一覧 ===== */
+function renderList() {
+  var ul = $('doclist');
+  ul.innerHTML = '';
+  $('doclist-empty').style.display = state.docs.length ? 'none' : '';
+  state.docs.forEach(function (d) {
+    var li = document.createElement('li');
+    var t = calcTotals(d.items || [], d.withholding);
+    var title = d.kind === 'contract' ? (d.contractTitle || '契約書') : (d.subject || clientNameOf(d) || '(無題)');
+    var sub = (d.number ? d.number + '　' : '') + jpDate(d.date) + (d.kind !== 'contract' ? '　' + yen(t.grand) : '');
+    li.innerHTML =
+      '<span class="kind' + (d.kind === 'contract' ? ' contract' : '') + '">' + esc(KIND_LABEL[d.kind]) + '</span>' +
+      '<div class="meta"><div class="t">' + esc(title) + '</div><div class="d">' + esc(sub) + '</div></div>' +
+      '<button class="ghost b-edit" type="button">編集</button>' +
+      '<button class="ghost b-copy" type="button">複製</button>' +
+      '<button class="ghost b-prev" type="button">印刷</button>';
+    li.querySelector('.b-edit').addEventListener('click', function () { fillForm(d); showTab('edit'); });
+    li.querySelector('.b-copy').addEventListener('click', function () {
+      var copy = JSON.parse(JSON.stringify(d));
+      copy.id = newId();
+      copy.number = nextNumber(copy.kind);
+      copy.date = todayStr();
+      state.docs.unshift(copy);
+      saveState();
+      renderList();
+    });
+    li.querySelector('.b-prev').addEventListener('click', function () { openPreview(d); });
+    ul.appendChild(li);
+  });
+}
+
+/* ===== 設定 ===== */
+function renderSettings() {
+  $('s-name').value = state.company.name;
+  $('s-address').value = state.company.address;
+  $('s-tel').value = state.company.tel;
+  $('s-email').value = state.company.email;
+  $('s-invoice-no').value = state.company.invoiceNo;
+  $('s-bank').value = state.company.bank;
+  renderClientList();
+}
+$('btn-save-settings').addEventListener('click', function () {
+  state.company = {
+    name: $('s-name').value.trim(),
+    address: $('s-address').value.trim(),
+    tel: $('s-tel').value.trim(),
+    email: $('s-email').value.trim(),
+    invoiceNo: $('s-invoice-no').value.trim(),
+    bank: $('s-bank').value
+  };
+  saveState();
+  alert('自社情報を保存しました。');
+});
+$('btn-add-client').addEventListener('click', function () {
+  var name = $('c-name').value.trim();
+  if (!name) { alert('取引先の名前を入力してください。'); return; }
+  state.clients.push({ id: newId(), name: name, address: $('c-address').value.trim() });
+  $('c-name').value = '';
+  $('c-address').value = '';
+  saveState();
+  renderClientList();
+  renderClientSelect();
+});
+function renderClientList() {
+  var ul = $('clientlist');
+  ul.innerHTML = '';
+  state.clients.forEach(function (c) {
+    var li = document.createElement('li');
+    li.innerHTML = '<div class="meta"><div class="t">' + esc(c.name) + '</div><div class="d">' + esc(c.address || '') + '</div></div>' +
+      '<button class="danger b-del" type="button">削除</button>';
+    li.querySelector('.b-del').addEventListener('click', function () {
+      if (!confirm('「' + c.name + '」を削除しますか？（作成済みの書類には影響しません）')) return;
+      state.clients = state.clients.filter(function (x) { return x.id !== c.id; });
+      saveState();
+      renderClientList();
+      renderClientSelect();
+    });
+    ul.appendChild(li);
+  });
+}
+function renderClientSelect() {
+  var sel = $('f-client');
+  var cur = sel.value;
+  sel.innerHTML = '<option value="">（選択してください）</option>' +
+    state.clients.map(function (c) { return '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>'; }).join('');
+  sel.value = cur;
+}
+
+/* ===== プレビュー ===== */
+$('btn-preview').addEventListener('click', function () { openPreview(readForm()); });
+$('btn-close-preview').addEventListener('click', function () { $('preview-wrap').classList.remove('on'); });
+$('btn-print').addEventListener('click', function () { window.print(); });
+
+function fromBlockHtml() {
+  var co = state.company;
+  var h = '<div class="co">' + esc(co.name) + '</div>';
+  if (co.address) h += esc(co.address) + '<br>';
+  if (co.tel) h += 'TEL: ' + esc(co.tel) + '<br>';
+  if (co.email) h += esc(co.email) + '<br>';
+  if (co.invoiceNo) h += '登録番号: ' + esc(co.invoiceNo) + '<br>';
+  return h;
+}
+function itemsTableHtml(doc, t) {
+  var rows = doc.items.map(function (it) {
+    return '<tr><td>' + esc(it.name) + (it.taxRate === 8 ? ' <small>※</small>' : '') + '</td>' +
+      '<td class="c">' + (it.qty || '') + '</td>' +
+      '<td class="r">' + (it.price ? yen(it.price) : '') + '</td>' +
+      '<td class="r">' + yen(it.qty * it.price) + '</td></tr>';
+  }).join('');
+  var sum = '<table class="sum-table">' +
+    '<tr><td>小計（税抜）</td><td>' + yen(t.sub) + '</td></tr>' +
+    (t.base10 ? '<tr><td>消費税（10%対象 ' + yen(t.base10) + '）</td><td>' + yen(t.tax10) + '</td></tr>' : '') +
+    (t.base8 ? '<tr><td>消費税（8%対象 ' + yen(t.base8) + '）</td><td>' + yen(t.tax8) + '</td></tr>' : '') +
+    (t.wh ? '<tr><td>源泉徴収税額（10.21%）</td><td>−' + yen(t.wh) + '</td></tr>' : '') +
+    '<tr><td><b>合計</b></td><td><b>' + yen(t.grand) + '</b></td></tr>' +
+    '</table>';
+  return '<table class="p-items"><thead><tr><th>品目・内容</th><th style="width:56px;">数量</th><th style="width:90px;">単価</th><th style="width:100px;">金額</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table>' +
+    (doc.items.some(function (it) { return it.taxRate === 8; }) ? '<div style="font-size:11px;margin-top:2px;">※は軽減税率（8%）対象</div>' : '') +
+    sum;
+}
+function openPreview(doc) {
+  var sheet = $('sheet');
+  var t = calcTotals(doc.items || [], doc.withholding);
+  var client = clientNameOf(doc);
+  var html = '';
+
+  if (doc.kind === 'contract') {
+    var body = (doc.contractBody || '').replace(/\{甲\}/g, doc.partyA || '甲').replace(/\{乙\}/g, doc.partyB || state.company.name || '乙');
+    html =
+      '<h1 class="doc-title">' + esc(doc.contractTitle || '契約書') + '</h1>' +
+      '<div class="contract-body">' + esc(body) + '</div>' +
+      '<div style="margin-top:26px;">' + esc(jpDate(doc.date)) + '</div>' +
+      '<div class="sign-area">' +
+        '<div><div class="party">甲</div>' + esc(doc.partyA || '') + '<div class="sign-line"></div><span class="seal">印</span></div>' +
+        '<div><div class="party">乙</div>' + esc(doc.partyB || state.company.name || '') + (state.company.address ? '<br>' + esc(state.company.address) : '') + '<div class="sign-line"></div><span class="seal">印</span></div>' +
+      '</div>';
+  } else {
+    var titles = { invoice: '請 求 書', estimate: '見 積 書', delivery: '納 品 書', receipt: '領 収 書' };
+    var meta = (doc.number ? 'No. ' + esc(doc.number) + '<br>' : '') + '発行日: ' + esc(jpDate(doc.date));
+    if (doc.kind === 'invoice' && doc.due) meta += '<br>お支払期限: ' + esc(jpDate(doc.due));
+    if (doc.kind === 'estimate' && doc.due) meta += '<br>有効期限: ' + esc(jpDate(doc.due));
+    if (doc.kind === 'delivery' && doc.due) meta += '<br>納品日: ' + esc(jpDate(doc.due));
+
+    var lead = '';
+    if (doc.kind === 'invoice') lead = '下記のとおりご請求申し上げます。';
+    if (doc.kind === 'estimate') lead = '下記のとおりお見積り申し上げます。';
+    if (doc.kind === 'delivery') lead = '下記のとおり納品いたします。';
+    if (doc.kind === 'receipt') lead = (doc.proviso || '但し、上記の代金として') + '、上記金額を正に領収いたしました。';
+
+    html =
+      '<h1 class="doc-title">' + titles[doc.kind] + '</h1>' +
+      '<div class="docmeta">' + meta + '</div>' +
+      '<div class="head-flex">' +
+        '<div class="to-block"><div class="to-name">' + esc(client) + '</div>' +
+          (doc.subject ? '<div>件名: ' + esc(doc.subject) + '</div>' : '') +
+          '<div class="lead">' + esc(doc.kind === 'receipt' ? '' : lead) + '</div>' +
+          '<div class="total-box">' + (doc.kind === 'invoice' ? 'ご請求金額' : '合計金額') + '　' + yen(t.grand) + '（税込）</div>' +
+          (doc.kind === 'receipt' ? '<div>' + esc(lead) + '</div>' : '') +
+        '</div>' +
+        '<div class="from-block">' + fromBlockHtml() + '<div class="stamp-space"></div></div>' +
+      '</div>' +
+      itemsTableHtml(doc, t) +
+      (doc.kind === 'invoice' && state.company.bank ? '<div class="bank"><b>お振込先</b><br>' + esc(state.company.bank) + '</div>' : '') +
+      (doc.note ? '<div class="note"><b>備考</b><br>' + esc(doc.note) + '</div>' : '');
+  }
+
+  sheet.innerHTML = html;
+  $('preview-wrap').classList.add('on');
+}
+
+/* ===== 初期化 ===== */
+renderClientSelect();
+clearForm();
+renderList();
+</script>
+</body>
+</html>
