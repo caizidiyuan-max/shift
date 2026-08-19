@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- documents-app build 2026-08-19-01 -->
+<!-- documents-app build 2026-08-19-02 -->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -200,6 +200,26 @@
   .sheet .stamp-space { height: 70px; }
   /* 契約書 */
   .sheet .contract-body { white-space: pre-wrap; margin-top: 8px; }
+  /* 経費精算書などの承認欄 */
+  .sheet .approve { display: flex; justify-content: flex-end; gap: 0; margin-bottom: 10px; }
+  .sheet .approve div {
+    border: 1px solid #444;
+    width: 78px;
+    text-align: center;
+    font-size: 11px;
+    padding-top: 3px;
+    height: 66px;
+  }
+  .sheet .approve div + div { border-left: none; }
+  /* 送付状などの「記」書き */
+  .sheet .ki { text-align: center; font-weight: bold; margin: 18px 0 8px; }
+  .sheet .ki-list { margin: 0 auto; max-width: 70%; }
+  .sheet .ki-list div { border-bottom: 1px dotted #999; padding: 4px 2px; }
+  .sheet .ijo { text-align: right; margin-top: 14px; }
+  /* 議事録の情報表 */
+  .sheet table.info { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  .sheet table.info th, .sheet table.info td { border: 1px solid #444; padding: 6px 8px; text-align: left; }
+  .sheet table.info th { background: #eee9dd; font-weight: normal; width: 90px; white-space: nowrap; }
   .sheet .sign-area { margin-top: 34px; display: flex; gap: 32px; }
   .sheet .sign-area > div { flex: 1; font-size: 12px; }
   .sheet .sign-area .party { font-weight: bold; margin-bottom: 6px; }
@@ -242,11 +262,23 @@
     <div class="card">
       <h2>書類の種類</h2>
       <select id="f-kind">
-        <option value="invoice">請求書</option>
-        <option value="estimate">見積書</option>
-        <option value="delivery">納品書</option>
-        <option value="receipt">領収書</option>
-        <option value="contract">契約書</option>
+        <optgroup label="経理の書類">
+          <option value="invoice">請求書</option>
+          <option value="estimate">見積書</option>
+          <option value="order">発注書</option>
+          <option value="orderack">注文請書</option>
+          <option value="delivery">納品書</option>
+          <option value="inspection">検収書</option>
+          <option value="receipt">領収書</option>
+          <option value="payment">支払明細書</option>
+          <option value="expense">経費精算書</option>
+        </optgroup>
+        <optgroup label="秘書・総務の書類">
+          <option value="contract">契約書</option>
+          <option value="cover">送付状</option>
+          <option value="poa">委任状</option>
+          <option value="minutes">議事録</option>
+        </optgroup>
       </select>
       <div class="hint" id="kind-hint"></div>
     </div>
@@ -263,13 +295,13 @@
           <input type="date" id="f-date">
         </div>
       </div>
-      <div class="row2" id="due-row">
-        <div>
+      <div class="row2">
+        <div id="due-row">
           <label class="fld" id="due-label">お支払期限</label>
           <input type="date" id="f-due">
         </div>
         <div>
-          <label class="fld">件名</label>
+          <label class="fld" id="subject-label">件名</label>
           <input type="text" id="f-subject" placeholder="例: 8月分業務委託料">
         </div>
       </div>
@@ -292,11 +324,13 @@
         <button class="ghost" id="btn-add-item" type="button">＋ 行を追加</button>
       </div>
       <div class="totals" id="totals"></div>
-      <label class="fld" style="margin-top:10px;">
-        <input type="checkbox" id="f-withholding" style="width:auto;margin-right:4px;">
-        源泉徴収（10.21%）を差し引く
-      </label>
-      <div class="hint">個人事業主への原稿料・デザイン料などで源泉徴収がある場合にチェックします。</div>
+      <div id="withholding-row">
+        <label class="fld" style="margin-top:10px;">
+          <input type="checkbox" id="f-withholding" style="width:auto;margin-right:4px;">
+          源泉徴収（10.21%）を差し引く
+        </label>
+        <div class="hint">個人事業主への原稿料・デザイン料などで源泉徴収がある場合にチェックします。</div>
+      </div>
     </div>
 
     <!-- 領収書用 -->
@@ -323,6 +357,34 @@
       <label class="fld">本文（条文）</label>
       <textarea id="f-contract-body" rows="16" placeholder="ひな形ボタンを押すと条文が入ります。自由に編集できます。"></textarea>
       <div class="hint">ひな形は一般的な例文です。重要な契約は内容をよく確認し、必要に応じて専門家にご相談ください。</div>
+    </div>
+
+    <!-- 送付状・委任状・議事録用 -->
+    <div class="card" id="card-misc" style="display:none;">
+      <h2 id="misc-title">内容</h2>
+      <div id="misc-poa" style="display:none;">
+        <label class="fld">受任者（代理人）氏名</label>
+        <input type="text" id="f-agent-name" placeholder="例: 山田 花子">
+        <label class="fld">受任者（代理人）住所</label>
+        <input type="text" id="f-agent-address" placeholder="例: 東京都◯◯区…">
+      </div>
+      <div id="misc-minutes" style="display:none;">
+        <div class="row2">
+          <div>
+            <label class="fld">開催場所</label>
+            <input type="text" id="f-place" placeholder="例: 本社 会議室A / オンライン">
+          </div>
+          <div>
+            <label class="fld">開催時間</label>
+            <input type="text" id="f-time" placeholder="例: 10:00〜11:00">
+          </div>
+        </div>
+        <label class="fld">出席者</label>
+        <input type="text" id="f-attendees" placeholder="例: 田中、佐藤、鈴木（書記）">
+      </div>
+      <label class="fld" id="misc-body-label">内容</label>
+      <textarea id="f-misc-body" rows="8"></textarea>
+      <div class="hint" id="misc-hint"></div>
     </div>
 
     <div class="card">
@@ -400,14 +462,38 @@
 
 /* ===== 定数 ===== */
 var LS_KEY = 'documents-app-v1';
-var KIND_LABEL = { invoice: '請求書', estimate: '見積書', delivery: '納品書', receipt: '領収書', contract: '契約書' };
-var KIND_PREFIX = { invoice: 'INV', estimate: 'EST', delivery: 'DLV', receipt: 'RCT', contract: 'CTR' };
+var KIND_LABEL = {
+  invoice: '請求書', estimate: '見積書', order: '発注書', orderack: '注文請書',
+  delivery: '納品書', inspection: '検収書', receipt: '領収書', payment: '支払明細書',
+  expense: '経費精算書', contract: '契約書', cover: '送付状', poa: '委任状', minutes: '議事録'
+};
+var KIND_PREFIX = {
+  invoice: 'INV', estimate: 'EST', order: 'ORD', orderack: 'OAK',
+  delivery: 'DLV', inspection: 'INS', receipt: 'RCT', payment: 'PAY',
+  expense: 'EXP', contract: 'CTR', cover: 'CVR', poa: 'POA', minutes: 'MIN'
+};
+/* 明細（数量×単価）を使う金銭系の書類 */
+var MONEY_KINDS = ['invoice', 'estimate', 'order', 'orderack', 'delivery', 'inspection', 'receipt', 'payment', 'expense'];
+/* 期限・期日欄のラベル(空なら欄を隠す) */
+var DUE_LABEL = {
+  invoice: 'お支払期限', estimate: '有効期限', order: '希望納期', orderack: '納期',
+  delivery: '納品日', inspection: '検収日', payment: 'お支払日',
+  expense: '', receipt: '', contract: '', cover: '', poa: '', minutes: ''
+};
 var KIND_HINT = {
   invoice: '取引先に代金を請求する書類です。振込先・支払期限を記載します。',
-  estimate: '正式な発注前に金額を提示する書類です。有効期限を発行日から記載します。',
+  estimate: '正式な発注前に金額を提示する書類です。有効期限を記載します。',
+  order: '取引先に商品・業務を発注する書類です（注文書）。',
+  orderack: '受けた注文の内容を確認し、お請けしたことを伝える書類です。',
   delivery: '納品した品目・数量を伝える書類です。',
+  inspection: '納品物を検査し、受け入れたことを伝える書類です。',
   receipt: '代金を受け取ったことを証明する書類です。但し書きを記載します。',
-  contract: '業務委託契約書・秘密保持契約書のひな形から作成できます。'
+  payment: '取引先への支払内容を通知する書類です（支払通知書）。',
+  expense: '立て替えた経費を精算するための社内書類です。申請者・承認者の欄が付きます。',
+  contract: '業務委託契約書・秘密保持契約書のひな形から作成できます。',
+  cover: '書類を送るときに同封する「書類送付のご案内」です。同封書類の一覧を記載します。',
+  poa: '手続きなどを代理人に委任するための書類です。',
+  minutes: '会議の日時・出席者・決定事項を記録する書類です。'
 };
 var WITHHOLDING_RATE = 0.1021;
 
@@ -492,20 +578,56 @@ function showTab(name) {
 $('f-kind').addEventListener('change', onKindChange);
 function onKindChange() {
   var k = $('f-kind').value;
+  var isMoney = MONEY_KINDS.indexOf(k) >= 0;
   $('kind-hint').textContent = KIND_HINT[k];
-  $('card-items').style.display = (k === 'contract' || k === 'receipt') ? 'none' : '';
+  $('card-items').style.display = isMoney ? '' : 'none';
   $('card-receipt').style.display = (k === 'receipt') ? '' : 'none';
   $('card-contract').style.display = (k === 'contract') ? '' : 'none';
-  if (k === 'receipt') $('card-items').style.display = ''; /* 領収書も金額は明細から計算 */
-  $('due-row').style.display = (k === 'contract') ? 'none' : '';
-  $('due-label').textContent = k === 'estimate' ? '有効期限' : (k === 'delivery' ? '納品日' : 'お支払期限');
+  $('due-row').style.display = DUE_LABEL[k] ? '' : 'none';
+  $('due-label').textContent = DUE_LABEL[k] || '';
+  $('subject-label').textContent = (k === 'minutes') ? '会議名' : '件名';
+  $('withholding-row').style.display = (k === 'expense') ? 'none' : '';
+  /* 宛先欄: 委任状・議事録・経費精算書では使わない */
+  var noClient = (k === 'poa' || k === 'minutes' || k === 'expense');
+  $('f-client').style.display = noClient ? 'none' : '';
+  $('f-client-free').style.display = noClient ? 'none' : '';
+  $('f-client').previousElementSibling.style.display = noClient ? 'none' : '';
+  /* 送付状・委任状・議事録の入力欄 */
+  var misc = (k === 'cover' || k === 'poa' || k === 'minutes');
+  $('card-misc').style.display = misc ? '' : 'none';
+  $('misc-poa').style.display = (k === 'poa') ? '' : 'none';
+  $('misc-minutes').style.display = (k === 'minutes') ? '' : 'none';
+  if (k === 'cover') {
+    $('misc-title').textContent = '同封書類';
+    $('misc-body-label').textContent = '同封書類（1行に1つ）';
+    $('f-misc-body').placeholder = '例:\n請求書 1通\n納品書 1通';
+    $('misc-hint').textContent = '挨拶文は自動で入ります。件名は空欄なら「書類送付のご案内」になります。';
+  } else if (k === 'poa') {
+    $('misc-title').textContent = '委任の内容';
+    $('misc-body-label').textContent = '委任事項（1行に1つ）';
+    $('f-misc-body').placeholder = '例:\n◯◯に関する契約の締結に関する一切の件\n上記に付随する一切の件';
+    $('misc-hint').textContent = '委任者はあなた（自社設定の名前・住所）として出力されます。';
+  } else if (k === 'minutes') {
+    $('misc-title').textContent = '会議の内容';
+    $('misc-body-label').textContent = '議題・決定事項';
+    $('f-misc-body').placeholder = '例:\n1. ◯◯について\n・△△と決定した。\n・次回までに□□を確認する（担当: 田中）。';
+    $('misc-hint').textContent = '会議名は上の「件名」に入力してください。';
+  }
+  /* まだ何も入力していない明細行は、種類に合わせた既定税率に揃える */
+  $('items-body').querySelectorAll('tr').forEach(function (tr) {
+    if (!tr.querySelector('.i-name').value.trim() && !(parseFloat(tr.querySelector('.i-price').value) > 0)) {
+      tr.querySelector('.i-tax').value = (k === 'expense') ? '0' : '10';
+    }
+  });
+  recalc();
   if (!editingId) $('f-number').value = nextNumber(k);
   if (k === 'contract' && !$('f-party-b').value) $('f-party-b').value = state.company.name;
 }
 
 /* ===== 明細行 ===== */
 function addItemRow(item) {
-  item = item || { name: '', qty: 1, price: 0, taxRate: 10 };
+  /* 経費精算書は実費(税込)をそのまま合計するため税率初期値は「対象外」 */
+  item = item || { name: '', qty: 1, price: 0, taxRate: $('f-kind').value === 'expense' ? 0 : 10 };
   var tr = document.createElement('tr');
   tr.innerHTML =
     '<td><input type="text" class="i-name" placeholder="品目"></td>' +
@@ -594,6 +716,12 @@ function clearForm(kind) {
   $('f-party-a').value = '';
   $('f-party-b').value = '';
   $('f-contract-body').value = '';
+  $('f-agent-name').value = '';
+  $('f-agent-address').value = '';
+  $('f-place').value = '';
+  $('f-time').value = '';
+  $('f-attendees').value = '';
+  $('f-misc-body').value = '';
   $('items-body').innerHTML = '';
   addItemRow();
   onKindChange();
@@ -616,6 +744,12 @@ function readForm() {
     partyA: $('f-party-a').value.trim(),
     partyB: $('f-party-b').value.trim(),
     contractBody: $('f-contract-body').value,
+    agentName: $('f-agent-name').value.trim(),
+    agentAddress: $('f-agent-address').value.trim(),
+    place: $('f-place').value.trim(),
+    time: $('f-time').value.trim(),
+    attendees: $('f-attendees').value.trim(),
+    miscBody: $('f-misc-body').value,
     updatedAt: Date.now()
   };
 }
@@ -637,6 +771,12 @@ function fillForm(doc) {
   $('f-party-a').value = doc.partyA || '';
   $('f-party-b').value = doc.partyB || '';
   $('f-contract-body').value = doc.contractBody || '';
+  $('f-agent-name').value = doc.agentName || '';
+  $('f-agent-address').value = doc.agentAddress || '';
+  $('f-place').value = doc.place || '';
+  $('f-time').value = doc.time || '';
+  $('f-attendees').value = doc.attendees || '';
+  $('f-misc-body').value = doc.miscBody || '';
   $('items-body').innerHTML = '';
   (doc.items && doc.items.length ? doc.items : [null]).forEach(function (it) { addItemRow(it || undefined); });
   onKindChange();
@@ -653,6 +793,12 @@ $('btn-save').addEventListener('click', function () {
   var doc = readForm();
   if (doc.kind === 'contract') {
     if (!doc.contractTitle) { alert('契約書タイトルを入力してください。'); return; }
+  } else if (doc.kind === 'poa') {
+    if (!doc.agentName) { alert('受任者（代理人）の氏名を入力してください。'); return; }
+  } else if (doc.kind === 'minutes') {
+    if (!doc.subject) { alert('会議名を「件名」に入力してください。'); return; }
+  } else if (doc.kind === 'expense') {
+    /* 社内書類のため宛先は不要 */
   } else if (!clientNameOf(doc)) { alert('宛先を選択するか入力してください。'); return; }
   var i = state.docs.findIndex(function (d) { return d.id === doc.id; });
   if (i >= 0) state.docs[i] = doc; else state.docs.unshift(doc);
@@ -679,10 +825,13 @@ function renderList() {
   state.docs.forEach(function (d) {
     var li = document.createElement('li');
     var t = calcTotals(d.items || [], d.withholding);
-    var title = d.kind === 'contract' ? (d.contractTitle || '契約書') : (d.subject || clientNameOf(d) || '(無題)');
-    var sub = (d.number ? d.number + '　' : '') + jpDate(d.date) + (d.kind !== 'contract' ? '　' + yen(t.grand) : '');
+    var isMoney = MONEY_KINDS.indexOf(d.kind) >= 0;
+    var title = d.kind === 'contract' ? (d.contractTitle || '契約書')
+      : d.kind === 'poa' ? (d.subject || d.agentName || '委任状')
+      : (d.subject || clientNameOf(d) || '(無題)');
+    var sub = (d.number ? d.number + '　' : '') + jpDate(d.date) + (isMoney ? '　' + yen(t.grand) : '');
     li.innerHTML =
-      '<span class="kind' + (d.kind === 'contract' ? ' contract' : '') + '">' + esc(KIND_LABEL[d.kind]) + '</span>' +
+      '<span class="kind' + (isMoney ? '' : ' contract') + '">' + esc(KIND_LABEL[d.kind]) + '</span>' +
       '<div class="meta"><div class="t">' + esc(title) + '</div><div class="d">' + esc(sub) + '</div></div>' +
       '<button class="ghost b-edit" type="button">編集</button>' +
       '<button class="ghost b-copy" type="button">複製</button>' +
@@ -808,31 +957,102 @@ function openPreview(doc) {
         '<div><div class="party">甲</div>' + esc(doc.partyA || '') + '<div class="sign-line"></div><span class="seal">印</span></div>' +
         '<div><div class="party">乙</div>' + esc(doc.partyB || state.company.name || '') + (state.company.address ? '<br>' + esc(state.company.address) : '') + '<div class="sign-line"></div><span class="seal">印</span></div>' +
       '</div>';
+  } else if (doc.kind === 'cover') {
+    var lines = (doc.miscBody || '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+    html =
+      '<div class="docmeta">' + '発行日: ' + esc(jpDate(doc.date)) + '</div>' +
+      '<div class="head-flex">' +
+        '<div class="to-block"><div class="to-name">' + esc(client) + '</div></div>' +
+        '<div class="from-block">' + fromBlockHtml() + '</div>' +
+      '</div>' +
+      '<h1 class="doc-title" style="letter-spacing:.2em;text-indent:.2em;font-size:20px;margin-top:14px;">' + esc(doc.subject || '書類送付のご案内') + '</h1>' +
+      '<div>拝啓　時下ますますご清栄のこととお慶び申し上げます。平素は格別のお引き立てを賜り、厚く御礼申し上げます。<br>' +
+      'さて、下記の書類をお送りいたしますので、ご査収のほどよろしくお願い申し上げます。</div>' +
+      '<div style="text-align:right;margin-top:8px;">敬具</div>' +
+      '<div class="ki">記</div>' +
+      '<div class="ki-list">' + lines.map(function (s) { return '<div>' + esc(s) + '</div>'; }).join('') + '</div>' +
+      (doc.note ? '<div class="note">' + esc(doc.note) + '</div>' : '') +
+      '<div class="ijo">以上</div>';
+  } else if (doc.kind === 'poa') {
+    var matters = (doc.miscBody || '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+    html =
+      '<h1 class="doc-title">委 任 状</h1>' +
+      '<div>私は、下記の者を代理人と定め、下記の事項に関する一切の権限を委任します。</div>' +
+      '<div class="ki">記</div>' +
+      '<div style="margin:0 auto;max-width:80%;">' +
+        '<div><b>受任者（代理人）</b></div>' +
+        (doc.agentAddress ? '<div>住所　' + esc(doc.agentAddress) + '</div>' : '') +
+        '<div>氏名　' + esc(doc.agentName) + '</div>' +
+        '<div style="margin-top:12px;"><b>委任事項</b></div>' +
+        (matters.length
+          ? matters.map(function (s, i) { return '<div>' + (i + 1) + '. ' + esc(s) + '</div>'; }).join('')
+          : '') +
+      '</div>' +
+      (doc.note ? '<div class="note">' + esc(doc.note) + '</div>' : '') +
+      '<div class="ijo">以上</div>' +
+      '<div style="margin-top:26px;">' + esc(jpDate(doc.date)) + '</div>' +
+      '<div class="sign-area"><div style="max-width:60%;">' +
+        '<div class="party">委任者</div>' +
+        (state.company.address ? esc(state.company.address) + '<br>' : '') +
+        esc(state.company.name) +
+        '<div class="sign-line"></div><span class="seal">印</span>' +
+      '</div></div>';
+  } else if (doc.kind === 'minutes') {
+    html =
+      '<h1 class="doc-title" style="letter-spacing:.2em;text-indent:.2em;">議 事 録</h1>' +
+      '<table class="info">' +
+        '<tr><th>会議名</th><td>' + esc(doc.subject) + '</td></tr>' +
+        '<tr><th>日時</th><td>' + esc(jpDate(doc.date)) + (doc.time ? '　' + esc(doc.time) : '') + '</td></tr>' +
+        (doc.place ? '<tr><th>場所</th><td>' + esc(doc.place) + '</td></tr>' : '') +
+        (doc.attendees ? '<tr><th>出席者</th><td>' + esc(doc.attendees) + '</td></tr>' : '') +
+      '</table>' +
+      '<div style="margin-top:14px;"><b>議題・決定事項</b></div>' +
+      '<div class="contract-body">' + esc(doc.miscBody || '') + '</div>' +
+      (doc.note ? '<div class="note"><b>備考</b><br>' + esc(doc.note) + '</div>' : '') +
+      '<div style="margin-top:20px;font-size:12px;">作成: ' + esc(state.company.name) + '</div>';
   } else {
-    var titles = { invoice: '請 求 書', estimate: '見 積 書', delivery: '納 品 書', receipt: '領 収 書' };
+    var titles = {
+      invoice: '請 求 書', estimate: '見 積 書', order: '発 注 書', orderack: '注 文 請 書',
+      delivery: '納 品 書', inspection: '検 収 書', receipt: '領 収 書',
+      payment: '支 払 明 細 書', expense: '経 費 精 算 書'
+    };
     var meta = (doc.number ? 'No. ' + esc(doc.number) + '<br>' : '') + '発行日: ' + esc(jpDate(doc.date));
-    if (doc.kind === 'invoice' && doc.due) meta += '<br>お支払期限: ' + esc(jpDate(doc.due));
-    if (doc.kind === 'estimate' && doc.due) meta += '<br>有効期限: ' + esc(jpDate(doc.due));
-    if (doc.kind === 'delivery' && doc.due) meta += '<br>納品日: ' + esc(jpDate(doc.due));
+    if (DUE_LABEL[doc.kind] && doc.due) meta += '<br>' + esc(DUE_LABEL[doc.kind]) + ': ' + esc(jpDate(doc.due));
 
     var lead = '';
     if (doc.kind === 'invoice') lead = '下記のとおりご請求申し上げます。';
     if (doc.kind === 'estimate') lead = '下記のとおりお見積り申し上げます。';
+    if (doc.kind === 'order') lead = '下記のとおり発注いたします。';
+    if (doc.kind === 'orderack') lead = '下記のとおり御注文をお請けいたしました。';
     if (doc.kind === 'delivery') lead = '下記のとおり納品いたします。';
+    if (doc.kind === 'inspection') lead = '下記のとおり検収いたしましたので、ご通知申し上げます。';
+    if (doc.kind === 'payment') lead = '下記のとおりお支払いいたしますので、ご確認ください。';
     if (doc.kind === 'receipt') lead = (doc.proviso || '但し、上記の代金として') + '、上記金額を正に領収いたしました。';
+
+    var boxLabel = { invoice: 'ご請求金額', order: '発注金額', payment: 'お支払金額', expense: '精算金額' }[doc.kind] || '合計金額';
+    var toBlock;
+    if (doc.kind === 'expense') {
+      toBlock = '<div class="to-block">' +
+        (doc.subject ? '<div>件名: ' + esc(doc.subject) + '</div>' : '') +
+        '<div class="lead">下記のとおり経費を精算いたします。</div>' +
+        '<div class="total-box">' + boxLabel + '　' + yen(t.grand) + '</div>' +
+        '</div>' +
+        '<div class="from-block"><div style="font-size:11px;color:#666;">申請者</div>' + fromBlockHtml() +
+        '<div class="approve"><div>申請者</div><div>承認</div><div>経理</div></div></div>';
+    } else {
+      toBlock = '<div class="to-block"><div class="to-name">' + esc(client) + '</div>' +
+        (doc.subject ? '<div>件名: ' + esc(doc.subject) + '</div>' : '') +
+        '<div class="lead">' + esc(doc.kind === 'receipt' ? '' : lead) + '</div>' +
+        '<div class="total-box">' + boxLabel + '　' + yen(t.grand) + '（税込）</div>' +
+        (doc.kind === 'receipt' ? '<div>' + esc(lead) + '</div>' : '') +
+        '</div>' +
+        '<div class="from-block">' + fromBlockHtml() + '<div class="stamp-space"></div></div>';
+    }
 
     html =
       '<h1 class="doc-title">' + titles[doc.kind] + '</h1>' +
       '<div class="docmeta">' + meta + '</div>' +
-      '<div class="head-flex">' +
-        '<div class="to-block"><div class="to-name">' + esc(client) + '</div>' +
-          (doc.subject ? '<div>件名: ' + esc(doc.subject) + '</div>' : '') +
-          '<div class="lead">' + esc(doc.kind === 'receipt' ? '' : lead) + '</div>' +
-          '<div class="total-box">' + (doc.kind === 'invoice' ? 'ご請求金額' : '合計金額') + '　' + yen(t.grand) + '（税込）</div>' +
-          (doc.kind === 'receipt' ? '<div>' + esc(lead) + '</div>' : '') +
-        '</div>' +
-        '<div class="from-block">' + fromBlockHtml() + '<div class="stamp-space"></div></div>' +
-      '</div>' +
+      '<div class="head-flex">' + toBlock + '</div>' +
       itemsTableHtml(doc, t) +
       (doc.kind === 'invoice' && state.company.bank ? '<div class="bank"><b>お振込先</b><br>' + esc(state.company.bank) + '</div>' : '') +
       (doc.note ? '<div class="note"><b>備考</b><br>' + esc(doc.note) + '</div>' : '');
