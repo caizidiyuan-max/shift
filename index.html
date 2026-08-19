@@ -131,7 +131,7 @@
   .cell.other { background: #f4efe3; }
   .cell.other .num { color: var(--dim); font-weight: normal; }
   /* 今日はクリーム背景に埋もれないよう強調する(2026-08-14: カラーフィルタ利用者向けにさらに濃い色へ変更) */
-  .cell.today { background: #1a1a1a; }
+  .cell.today { background: #4d4d4d; }
   /* シフト名は通常マスでは種類ごとの色文字+淡い帯で表示するが、今日のマスは背景が黒に近いため
      文字色を白で上書きして読めるようにする(種類ごとの色分けロジック自体は変更しない) */
   .cell.today .shift { color: #fff !important; background: rgba(255, 255, 255, 0.18) !important; }
@@ -148,6 +148,15 @@
     border-style: solid;
     border-color: transparent transparent #1565c0 transparent;  /* 青系の三角 */
     pointer-events: none;
+  }
+  /* 今日のマス(背景#4d4d4d)は青#1565c0だと沈んで見えなくなる(実測コントラスト比 約1.47:1)ため、
+     今日のマスの三角だけミント色に変更する。
+     2026-08-19: 従来のミント色(#69f0ae)はメモ印のオレンジ(#ffb84d)と白黒フィルタでの
+     明るさがほぼ同じ(輝度601換算 192 対 193 でわずか0.9差)で見分けにくかったため、
+     より明るいペールミントに変更(実測コントラスト比 約7.61:1、WCAG AA基準4.5:1をクリア。
+     輝度601換算は約235.7となり、メモ印との差が約42.7に拡大。形・位置・サイズは変更なし) */
+  .cell.today.has-note::after {
+    border-color: transparent transparent #c8ffe6 transparent;
   }
   .cell.today .num { background: var(--navy); color: #fff; text-align: center; }
   .cell.selected { outline: 2px solid var(--navy); outline-offset: -2px; }
@@ -215,8 +224,11 @@
     white-space: nowrap;
     overflow: hidden;
   }
-  /* 「今日」のマス(背景が濃い黒 #1a1a1a)ではメモ印だけ明るい色に上書きして視認性を確保する */
+  /* 「今日」のマス(背景がダーク #4d4d4d)ではメモ印・スタンプ文字・運動予定行だけ
+     明るい色に上書きして視認性を確保する(2026-08-18 微調整。他のマスの色は変更しない) */
   .cell.today .memo-dot { color: #ffb84d; }
+  .cell.today .cell-stamps { color: #f0f0f0; }
+  .cell.today .cell-ex { color: #f0f0f0; }
   /* マス下部の運動予定(🚴回数・💪)。シフト名の表示を邪魔しない小さな1行 */
   .cell .cell-ex {
     font-size: 9px;
@@ -584,7 +596,7 @@
   }
   /* 今日の行はひと目で分かるようにする(問題45。2026-08-14 白黒表示でも分かるよう強調を強化:
      色だけに頼らず、太い二重線の枠+バッジ風ラベルで囲む) */
-  .ex-row.ex-row-today { background: #1a1a1a; border: 2px solid #fff; border-radius: 6px; padding: 4px 6px; margin: 2px 0; box-shadow: inset 0 0 0 1px var(--navy); color: #fff; }
+  .ex-row.ex-row-today { background: #4d4d4d; border: 2px solid #fff; border-radius: 6px; padding: 4px 6px; margin: 2px 0; box-shadow: inset 0 0 0 1px var(--navy); color: #fff; }
   .ex-row.ex-row-today .ex-date::after { content: '📍今日'; display: inline-block; font-size: 12px; font-weight: bold; color: #fff; background: var(--navy); border-radius: 4px; padding: 1px 6px; margin-left: 6px; }
   /* 2026-08-14: 背景を黒に近い色へ強化したため、中の文字も白系に上書きして読めるようにする
      (種類ごとの色分け・回数の裏側の計算ロジックはいっさい変更しない。見た目の上書きのみ) */
@@ -1193,8 +1205,6 @@
     <button class="diet-tab" data-ptab="1">1回分</button>
     <button class="diet-tab" data-ptab="2">2回分</button>
   </div>
-  <!-- 2026-08-18 追加: 回数の数え方の注意書き(筋トレも1回に数える・寝巻きは数えない) -->
-  <div class="hint" style="margin:4px 0 6px;">運動の回数は筋トレも1回に数えます(朝晩フィールサイクル+筋トレの日も2回分)。※寝巻きは数えません</div>
   <div id="packing-list"></div>
   <button class="btn sub small" id="packing-edit-toggle">持ち物リストを編集</button>
   <div id="packing-edit-area" style="display:none;">
@@ -1506,9 +1516,7 @@ function defaultDiet() {
    固定(scales:false)= 回数に関係なく常に1つ。回数連動(scales:true)= 1回分なら1・2回分なら2が既定。
    2026-08-09: k1(シャンプー等)・k9(日焼け止め)・k10(整髪剤)は、id を見て
    packingItemNeeded() が明日の予定から要否を自動判定する(詳細はそちらのコメント参照)。
-   k9・k10 は個数を回数連動から「常に1個」に変更(要否判定のほうで意味を持たせるため)。
-   2026-08-18 追加: k11(袋)は特別な回数連動で「運動回数+1個」(1回分なら2個・2回分なら3個)。
-   個数の計算は renderPacking() 側で id を見て分岐する */
+   k9・k10 は個数を回数連動から「常に1個」に変更(要否判定のほうで意味を持たせるため) */
 var DEFAULT_PACKING = [
   { id: 'k1', name: 'シャンプー・ボディソープ', unit: '本', scales: false },
   { id: 'k2', name: 'クリーム', unit: '個', scales: false },
@@ -1519,8 +1527,7 @@ var DEFAULT_PACKING = [
   { id: 'k7', name: 'クレンジング', unit: '', scales: true },
   { id: 'k8', name: '化粧水美容液など', unit: '', scales: true },
   { id: 'k9', name: '日焼け止め', unit: '', scales: false },
-  { id: 'k10', name: '整髪剤', unit: '', scales: false },
-  { id: 'k11', name: '袋', unit: '個', scales: true }
+  { id: 'k10', name: '整髪剤', unit: '', scales: false }
 ];
 function clonePackingDef(d) { return { id: d.id, name: d.name, unit: d.unit, scales: d.scales === true }; }
 
@@ -2214,7 +2221,7 @@ function setNote(ym, d, text) {
 /* 運動予定(exercise)を洗浄。壊れた形は初期値(空)に戻す(問題2と同じ二段構えの入口洗浄) */
 function sanitizeExercise(src) {
   var out = { closureDays: {}, muscle: {}, muscleAnchor: null, confirmedMonths: [], records: {},
-    packingDefs: DEFAULT_PACKING.map(clonePackingDef), packing: {}, bagAdded: true,
+    packingDefs: DEFAULT_PACKING.map(clonePackingDef), packing: {},
     muscleExercises: DEFAULT_MUSCLE_EXERCISES.map(cloneMuscleExercise), log: {} };
   if (!src || typeof src !== 'object' || Array.isArray(src)) return out;
   function sanitizeDayMap(v) {
@@ -2310,17 +2317,6 @@ function sanitizeExercise(src) {
     });
   }
   out.packingDefs = sanitizePackingDefs(src.packingDefs);
-  /* 袋(k11)の一回きりの移行(2026-08-18 追加)。袋より前に保存された持ち物リストへ
-     袋を1度だけ足す。bagAdded フラグを保存するので、ユーザーが袋を削除しても復活しない */
-  out.bagAdded = src.bagAdded === true;
-  if (!out.bagAdded) {
-    var hasBag = out.packingDefs.some(function (d) { return d.id === 'k11'; });
-    if (!hasBag && out.packingDefs.length < 30) {
-      var bagDef = DEFAULT_PACKING.filter(function (d) { return d.id === 'k11'; })[0];
-      if (bagDef) out.packingDefs.push(clonePackingDef(bagDef));
-    }
-    out.bagAdded = true;
-  }
   out.packing = sanitizePackingData(src.packing);
   out.muscleExercises = sanitizeMuscleExercises(src.muscleExercises);
   out.log = sanitizeExerciseLog(src.log, out.muscleExercises);
@@ -4280,18 +4276,17 @@ function getPackingDay() {
   return { y: t.getFullYear(), m: t.getMonth() + 1, d: t.getDate() };
 }
 
-/* 既存の getFeelcycleCount をそのまま使い、運動回数から既定タブを決める。
-   2026-08-18 変更(ユーザー要望): 筋トレも運動1回として数える。
-   フィールサイクル回数+筋トレ(あれば1)の合計が2回以上なら「2回分」
-   (朝晩フィールサイクル+筋トレのように合計3回の日も、タブは2回分までなので「2回分」)。
-   合計1回以下(未確定含む)は安全側で「1回分」 */
+/* 既存の getFeelcycleCount と getMuscleSessionsOf をそのまま使い、
+   フィールサイクル回数+筋トレセッション数の合計から既定タブを決める(2026-08-19 変更)。
+   合計が2以上なら「2回分」、1以下は「1回分」(上限2、持ち物タブが2種類しかないため頭打ち) */
 function packingAutoTab(day) {
   var ds = dateStrOf(day.y, day.m, day.d);
   var ym = ymKey(day.y, day.m);
   var shEntry = normShift((state.shifts[ym] || {})[String(day.d)]);
   var closure = state.exercise.closureDays[ym] || [];
   var res = getFeelcycleCount(ds, shEntry, closure.indexOf(String(day.d)) >= 0);
-  var total = res.count + (packingMuscleTomorrow(day) ? 1 : 0);
+  var muscleCount = getMuscleSessionsOf(ds).length;
+  var total = res.count + muscleCount;
   return (total >= 2) ? 2 : 1;
 }
 
@@ -4506,8 +4501,7 @@ function renderPacking() {
 
   ordered.forEach(function (item) {
     var def = item.def;
-    /* 袋(k11)だけは運動回数+1個(1回分なら2個・2回分なら3個。2026-08-18 ユーザー要望) */
-    var defaultQty = def.scales ? (def.id === 'k11' ? tab + 1 : tab) : 1;
+    var defaultQty = def.scales ? tab : 1;
     var override = def.scales ? getPackingOverride(day, def.id) : null;
     var qty = (override !== null) ? override : defaultQty;
     var checked = getPackingChecked(day, def.id);
