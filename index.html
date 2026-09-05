@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- shift-calendar build 2026-08-09-02 -->
+<!-- shift-calendar build 2026-08-24-01 -->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -634,6 +634,22 @@
     color: #6b5a30;
     margin-bottom: 8px;
   }
+  /* 13章(2026-08-24): 筋トレの間隔があいたときの知らせ。カレンダーのすぐ上に1行だけ出す。
+     ふだんは display:none で高さゼロ = カレンダーの位置がガタつかない。
+     白黒表示でも分かるよう、⚠記号・文字・左端の太い縦線・枠線の4つで伝える(色は補助) */
+  .muscle-gap-note { display: none; flex-shrink: 0; }
+  .muscle-gap-note.show {
+    display: block;
+    background: #fff6e0;
+    border: 1px solid #eccd85;
+    border-left: 5px solid #c98b1e;   /* 白黒でも「太い縦線」として形で分かる */
+    border-radius: 8px;
+    color: #6b5a30;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 6px 10px;
+    margin: 4px 6px 0;
+  }
   @keyframes ex-flash {
     0% { background-color: #fff7dc; }
     35% { background-color: #ffe58a; }
@@ -651,6 +667,8 @@
   .ex-row-body { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }
   .ex-feel-tag { font-size: 13px; font-weight: bold; color: #1a6fc9; }
   .ex-feel-tag.ex-tag-gray { color: #999; font-weight: normal; }
+  /* 14章: フィールサイクルのブースト表示。太字で白黒でも判別できるようにする */
+  .ex-tag-boost { font-weight: bold; }
   /* 休館ボタンは視覚的ノイズにならないよう控えめに。ただし当たり判定は40px確保 */
   .ex-closure-btn {
     flex-shrink: 0;
@@ -1139,6 +1157,9 @@
   <div class="sat">土</div><div class="sun">日</div>
 </div>
 
+<!-- 13章(2026-08-24): 筋トレの間隔があいたときだけ1行出る知らせ。ふだんは高さゼロで見えない -->
+<div class="muscle-gap-note" id="muscle-gap-note"></div>
+
 <div id="grid"></div>
 
 <div id="di-bar">
@@ -1186,7 +1207,7 @@
   </div>
 
   <div class="ex-count-box" id="ex-feel-box">
-    <div class="ex-count-line">フィールサイクル: <span id="ex-feel-count">0 / 30回</span></div>
+    <div class="ex-count-line">フィールサイクル: <span id="ex-feel-count">0 / 0回</span></div>
     <div class="ex-feel-msg" id="ex-feel-msg"></div>
     <div class="ex-rest-note" id="ex-feel-rest"></div>
   </div>
@@ -1520,7 +1541,6 @@ function defaultDiet() {
 var DEFAULT_PACKING = [
   { id: 'k1', name: 'シャンプー・ボディソープ', unit: '本', scales: false },
   { id: 'k2', name: 'クリーム', unit: '個', scales: false },
-  { id: 'k3', name: 'スパチュラ', unit: '本', scales: false },
   { id: 'k4', name: '全身クリーム', unit: '個', scales: false },
   { id: 'k5', name: 'ピンクタオル', unit: '枚', scales: false },
   { id: 'k6', name: '洗顔料', unit: '', scales: true },
@@ -1529,7 +1549,12 @@ var DEFAULT_PACKING = [
   { id: 'k9', name: '日焼け止め', unit: '', scales: false },
   { id: 'k10', name: '整髪剤', unit: '', scales: false }
 ];
-function clonePackingDef(d) { return { id: d.id, name: d.name, unit: d.unit, scales: d.scales === true }; }
+/* baseExtra = 2026-09-06 追加。「1回分の基準数+回数ごとに+1」用の上乗せ数(既定0)。
+   詳細は defaultQty の計算箇所(renderPacking内)とサニタイズ(sanitizePackingDefs)を参照 */
+function clonePackingDef(d) {
+  var baseExtra = (typeof d.baseExtra === 'number' && isFinite(d.baseExtra)) ? d.baseExtra : 0;
+  return { id: d.id, name: d.name, unit: d.unit, scales: d.scales === true, baseExtra: baseExtra };
+}
 
 function defaultState() {
   return {
@@ -2406,15 +2431,82 @@ function sanitizePackingDefs(src) {
     /* 2026-08-09: 日焼け止め(k9)・整髪剤(k10)は「回数連動」をやめて常に1個にする仕様変更。
        前バージョンで scales:true として保存されていた既存データも、ここで強制的に揃える */
     if (d.id === 'k9' || d.id === 'k10') scales = false;
+    /* 2026-09-06追加: baseExtra(1回分の基準数への上乗せ数)。数値以外・負の値は0に丸め、
+       上限3程度に収める(壊れたデータや異常値が入り続けるのを防ぐ) */
+    var baseExtra = d.baseExtra;
+    if (typeof baseExtra !== 'number' || !isFinite(baseExtra)) baseExtra = 0;
+    baseExtra = Math.max(0, Math.min(3, Math.round(baseExtra)));
     out.push({
       id: d.id,
       name: d.name.trim().slice(0, 40),
       unit: (typeof d.unit === 'string') ? d.unit.slice(0, 10) : '',
-      scales: scales
+      scales: scales,
+      baseExtra: baseExtra
     });
   });
+  /* 2026-09-06 追加: 持ち物リスト整理の移行処理(検証\2026-09-06-持ち物リスト整理-修正.md 参照)。
+     スパチュラ削除・クリームの位置移動・Tシャツ/短パンの追加・ブラジャー/パンツの個数ルール変更を
+     1回だけ(何度読み込んでも結果が変わらない形で)まとめて適用する */
+  out = migratePackingDefs(out);
   if (out.length > 30) out = out.slice(0, 30);
   return out.length ? out : DEFAULT_PACKING.map(clonePackingDef);
+}
+
+/* sanitizePackingDefs 専用の移行処理(2026-09-06 追加)。冪等(何度実行しても結果が同じ)であることが必須。
+   判定は基本的に name(項目名)で行う。ユーザーが「持ち物を追加」機能で作ったカスタム項目は
+   id に規則性が無い(id: 'pk'+タイムスタンプ)ため、name一致を主な判定手段にしている。
+   どのルールにも当てはまらない項目(将来ユーザーが追加する未知の項目)はここでは一切動かさない、
+   つまり削除・並び替えの対象は「名前が一致した項目」だけで、他は元の位置のまま残る */
+function migratePackingDefs(list) {
+  /* 1) スパチュラを削除。id:k3 が本来の目印だが、念のため name 一致でも拾う */
+  list = list.filter(function (d) { return d.id !== 'k3' && d.name !== 'スパチュラ'; });
+
+  /* 2) クリームを「化粧水美容液など」の直後に移動(既にその位置にあれば何もしない) */
+  var creamIdx = -1, moistIdx = -1;
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].name === 'クリーム') creamIdx = i;
+    if (list[i].name === '化粧水美容液など') moistIdx = i;
+  }
+  if (creamIdx >= 0 && moistIdx >= 0 && creamIdx !== moistIdx + 1) {
+    var cream = list.splice(creamIdx, 1)[0];
+    if (creamIdx < moistIdx) moistIdx--; /* 抜いた分だけ後ろの項目の番号が1つずつ前にずれる */
+    list.splice(moistIdx + 1, 0, cream);
+  }
+
+  /* 3) Tシャツ・短パンを追加(名前が既にあれば重複追加しない)。
+     挿入位置は「ブラジャーの直前」。ブラジャーが無いユーザーは
+     「クリーム」または「化粧水美容液など」の直後をフォールバックにする */
+  var toAdd = [];
+  if (!list.some(function (d) { return d.name === 'Tシャツ'; })) {
+    toAdd.push({ id: 'k11', name: 'Tシャツ', unit: '枚', scales: true, baseExtra: 1 });
+  }
+  if (!list.some(function (d) { return d.name === '短パン'; })) {
+    toAdd.push({ id: 'k12', name: '短パン', unit: '枚', scales: true, baseExtra: 1 });
+  }
+  if (toAdd.length) {
+    var braIdx = -1, creamIdx2 = -1, moistIdx2 = -1;
+    for (var j = 0; j < list.length; j++) {
+      if (list[j].name === 'ブラジャー' && braIdx < 0) braIdx = j;
+      if (list[j].name === 'クリーム') creamIdx2 = j;
+      if (list[j].name === '化粧水美容液など') moistIdx2 = j;
+    }
+    var insertAt = (braIdx >= 0) ? braIdx
+      : (creamIdx2 >= 0) ? creamIdx2 + 1
+      : (moistIdx2 >= 0) ? moistIdx2 + 1
+      : list.length;
+    Array.prototype.splice.apply(list, [insertAt, 0].concat(toAdd));
+  }
+
+  /* 4) ブラジャー・パンツは「1回分の基準数+1」に統一。念のため毎回 scales:true を強制する
+     (既に scales:true・baseExtra:1 なら実質なにも変わらない = 冪等) */
+  list.forEach(function (d) {
+    if (d.name === 'ブラジャー' || d.name === 'パンツ') {
+      d.scales = true;
+      d.baseExtra = 1;
+    }
+  });
+
+  return list;
 }
 
 /* 明日の持ち物の記録(タブ・チェック・その日だけの数量上書き)を洗浄。月→日→{tab,checked,overrides} */
@@ -2768,7 +2860,8 @@ function buildStampCellText(names, maxW) {
 function buildCellExerciseLine(ym, d, shEntry, maxW, stampNames) {
   var closure = state.exercise.closureDays[ym] || [];
   var ds = dateStrOf(cur.y, cur.m, d);
-  var res = getFeelcycleCount(ds, shEntry, closure.indexOf(String(d)) >= 0);
+  var plan = computeFeelcycleBoostPlan(ym); /* 14章: 不足分の自動割り振り */
+  var res = getFeelcycleCountBoosted(ds, shEntry, closure.indexOf(String(d)) >= 0, plan);
 
   var extraN = getExtraCount(ym, d);
   var feelMark = '', feelMarkShort = '', hasFeel = res.count > 0 || extraN > 0;
@@ -2806,6 +2899,10 @@ function buildCellExerciseLine(ym, d, shEntry, maxW, stampNames) {
   var n = res.count + extraN, cands;
   var slotTxt = feelSlotsLabel(res);
   if (extraN > 0) slotTxt = slotTxt ? slotTxt + '+' + extraN : '追加' + extraN;
+  /* 14-7: ブーストされた日は目印(⤴)を1文字追加する。数字だけのフォールバック表示でも同様 */
+  var boostMark = res.boosted ? '⤴' : '';
+  slotTxt += boostMark;
+  var nTxt = n + boostMark;
   if (hasFeel && hasMuscle) {
     cands = [
       '🚴' + slotTxt + feelMark + ' 💪筋トレ' + mMark,
@@ -2814,7 +2911,7 @@ function buildCellExerciseLine(ym, d, shEntry, maxW, stampNames) {
       '🚴' + slotTxt + feelMark + '💪' + mMark,
       '🚴' + slotTxt + feelMarkShort + '💪' + mMark,
       '🚴' + slotTxt + '💪' + mMark,
-      '🚴' + n + feelMarkShort + '💪' + mMark,
+      '🚴' + nTxt + feelMarkShort + '💪' + mMark,
       '🚴💪'                                  /* 最後の受け皿(必ず収まる短さ) */
     ];
   } else if (hasFeel) {
@@ -2824,7 +2921,7 @@ function buildCellExerciseLine(ym, d, shEntry, maxW, stampNames) {
       '🚴' + slotTxt + feelMarkShort,
       '🚴' + slotTxt,
       slotTxt,
-      '🚴' + n
+      '🚴' + nTxt
     ];
   } else if (hasMuscle) {
     cands = [
@@ -2876,6 +2973,12 @@ function render() {
 
   var grid = $('grid');
   grid.textContent = '';
+
+  /* 13章: 筋トレ間隔の知らせ(カレンダーの上の1行)を、描き直すたびに更新する。
+     表示中の月とは関係なく、いつでも「今日」を基準にした同じ内容が出る。
+     ここで先に出し入れしておくのは、この下の grid.clientHeight を測る前に高さを確定させるため
+     (あとから1行増えると、行の高さをそろえる 1px 調整がズレてしまう) */
+  try { updateMuscleGapNote(); } catch (e) { /* 失敗してもカレンダー描画は続ける */ }
 
   var first = new Date(cur.y, cur.m - 1, 1);
   var offset = (first.getDay() + 6) % 7; /* 月曜始まり */
@@ -3358,6 +3461,70 @@ function getFeelcycleCount(dateStr, shiftEntry, isManualClosure) {
   return { count: 2, reason: label + '(デフォルト2回)', slots: ['朝', '晩'] };
 }
 
+/* 14章: フィールサイクルの自動調整(計画.md 14-4)。
+   月ごとに1回だけ計算する「ブースト計画」。今日までの実際の回数+今日以降の予定本数を合計し、
+   30に届かなければ、今日以降の「休み」の日(手動休館・金曜は自動的に対象外)に日付が早い順で
+   +1ずつ割り振る。読むだけで state を書き換えない・saveState() も呼ばない。
+   getFeelcycleCount()(10-4-1)自体は1文字も変更しない */
+function computeFeelcycleBoostPlan(ym) {
+  var t = new Date();
+  var todayDs = dateStrOf(t.getFullYear(), t.getMonth() + 1, t.getDate()); /* 実際の今日。cur.y/cur.m は使わない */
+  var p = ym.split('-');
+  var y = parseInt(p[0], 10), m = parseInt(p[1], 10);
+  var dim = daysInMonth(y, m);
+  var monthShifts = state.shifts[ym] || {};
+  var closure = state.exercise.closureDays[ym] || [];
+
+  var baseTotal = 0;
+  var candidates = []; /* ブーストしてよい日(日にちの文字列)。d が昇順のため自然に日付順で並ぶ */
+
+  for (var d = 1; d <= dim; d++) {
+    var ds = dateStrOf(y, m, d);
+    var shEntry = normShift(monthShifts[String(d)]);
+    var isManual = closure.indexOf(String(d)) >= 0;
+    var base = getFeelcycleCount(ds, shEntry, isManual); /* 既存関数そのまま・変更なし */
+
+    if (ds < todayDs) {
+      /* 過去: 実際に行った回数(済 + 予定外)。記録されなかった枠は0として扱う */
+      var actual = 0;
+      for (var i = 0; i < base.count; i++) {
+        if (getFeelState(ym, d, i) === 'done') actual++;
+      }
+      actual += getExtraCount(ym, d);
+      baseTotal += actual;
+    } else {
+      /* 今日・未来: 予定の本数(ブースト前)から、🌙(rest)にした分だけ差し引く(2026-09-06 追記・計画14-15)。
+         ✓(done)の状態は見ない。対象スロットは通常のcount個に加え、ブースト時の3枠目(index=count)も含める。
+         シフト未確定・不明の日は今までどおり含めない */
+      if (!base.excludedFromTotal) {
+        var restCount = 0;
+        for (var i = 0; i <= base.count; i++) {
+          if (getFeelState(ym, d, i) === 'rest') restCount++;
+        }
+        var effectiveCount = Math.max(0, base.count - restCount);
+        baseTotal += effectiveCount;
+      }
+      if (base.reason === '休み') candidates.push(String(d)); /* ここが唯一のブースト候補条件(🌙で埋まっていても候補から外れない) */
+    }
+  }
+
+  var deficit = Math.max(0, 30 - baseTotal);
+  var boostedDays = candidates.slice(0, deficit); /* 足りなければ candidates 全部(1日1回だけ) */
+  var total = baseTotal + boostedDays.length;
+
+  return { boostedDays: boostedDays, total: total, baseTotal: baseTotal };
+}
+
+/* 14章: 既存 getFeelcycleCount() の結果を、上のプランで包むだけの薄いラッパー。既存関数は書き換えない */
+function getFeelcycleCountBoosted(dateStr, shiftEntry, isManualClosure, plan) {
+  var base = getFeelcycleCount(dateStr, shiftEntry, isManualClosure); /* 既存そのまま */
+  var d = dayOfDateStr(dateStr);
+  if (plan.boostedDays.indexOf(d) >= 0) {
+    return { count: base.count + 1, reason: base.reason, slots: base.slots, boosted: true };
+  }
+  return base;
+}
+
 /* 朝晩の内訳を短い文字にする(「朝晩」「朝2」「朝」など)。予定0回なら空文字 */
 function feelSlotsLabel(res) {
   if (!res || !res.count) return '';
@@ -3524,6 +3691,71 @@ function getMuscleDoneSessionCountOf(ym) {
   return count;
 }
 
+/* ===== 13章: 筋トレの間隔があいたら警告(2026-08-24 追加。計画.md 13章) =====
+   既存の判定・集計(ensureMuscleScheduleUpTo / getMuscleSessionsOf / getMuscleDoneSessionCountOf)は
+   1文字も変更せず、「予定かどうかに関係なく、その日に記録があるか」だけを見る関数を新しく足す。
+   ここは state を読むだけ。書き換えないので saveState() は呼ばない(新しい保存データも増やさない) */
+
+var MUSCLE_GAP_WARN_DAYS = 3;    /* 何日空いたら知らせるか(13-9 の確認でユーザーが選んだ (A)3日) */
+var MUSCLE_GAP_LIMIT_DAYS = 400; /* さかのぼる上限。記録が1件も無いときに無限に探さないため */
+
+/* その日に筋トレを「実際にやった」と数えられるか。
+   ①種目ログ(重量・回数)が1件でもある ②旧「✓ 済」トグル ③臨時の筋トレ(💪+)
+   のどれか1つでも当てはまれば true。🌙(rest)と「予定日なだけで記録が無い日」は数えない。
+   ①を見ないと、種目ログでちゃんと記録しているのに嘘の警告が出てしまう(13-3) */
+function didMuscleOn(dateStr) {
+  try {
+    var mo = state.exercise.log[dateStr];
+    if (mo) {
+      for (var s in mo) {
+        if (Object.prototype.hasOwnProperty.call(mo, s) && Array.isArray(mo[s]) && mo[s].length > 0) return true;
+      }
+    }
+    var ym = ymOfDateStr(dateStr);
+    var d = parseInt(dayOfDateStr(dateStr), 10);
+    if (getMuscleState(ym, d) === 'done') return true;
+    if (getMuscleExtraCount(ym, d) > 0) return true;
+  } catch (e) { /* 壊れたデータでも「やっていない」扱いにして、アプリを止めない */ }
+  return false;
+}
+
+/* 今日から1日ずつさかのぼって、最後に筋トレをやった日と空き日数を探す。
+   さかのぼった回数がそのまま空き日数になるので、月またぎ・年またぎ・うるう年でもズレない。
+   今日から過去だけを見るため、空き日数がマイナスになることはない(未来の記録は数えない) */
+function getMuscleGapInfo() {
+  try {
+    /* 記録がまったく無いときは、400回まわさずその場で終わる(13-3 の早期終了) */
+    if (!Object.keys(state.exercise.records).length && !Object.keys(state.exercise.log).length) {
+      return { found: false, gap: 0, lastDate: null };
+    }
+  } catch (e) { return { found: false, gap: 0, lastDate: null }; }
+  /* 「今日」は起動時の変数(now / cur)を流用せず、必ずその場で取り直す(開きっぱなしの日またぎ対策) */
+  var t = new Date();
+  var ds = dateStrOf(t.getFullYear(), t.getMonth() + 1, t.getDate());
+  for (var i = 0; i <= MUSCLE_GAP_LIMIT_DAYS; i++) {
+    if (didMuscleOn(ds)) return { found: true, gap: i, lastDate: ds };
+    ds = addDaysToDateStr(ds, -1);
+  }
+  return { found: false, gap: 0, lastDate: null };
+}
+
+/* カレンダーの上の1行を出し入れする。押せないただの表示(ボタンにしない・閉じるボタンも付けない)。
+   文面は事実だけ。責める言葉・励ます言葉・音・振動・点滅は使わない(13-6) */
+function updateMuscleGapNote() {
+  var el = $('muscle-gap-note');
+  if (!el) return;
+  el.textContent = '';
+  el.className = 'muscle-gap-note';   /* まず消す(高さゼロに戻す) */
+  var info;
+  try { info = getMuscleGapInfo(); } catch (e) { return; }
+  if (!info || !info.found) return;                   /* 記録が1件も無いときは何も出さない */
+  if (!(info.gap >= MUSCLE_GAP_WARN_DAYS)) return;    /* 2日以内。NaN のときもここで出さない */
+  var p = parseDateStr(info.lastDate);
+  if (!(p.m >= 1) || !(p.d >= 1)) return;             /* 日付が読めないときは出さない */
+  el.textContent = '⚠ 筋トレが' + info.gap + '日空いています(最後: ' + p.m + '月' + p.d + '日)';
+  el.className = 'muscle-gap-note show';
+}
+
 /* weight は0.5kg刻み・reps は1以上の整数のみを許す(ピッカーの選択肢自体がそう作られているため、
    通常はここで弾かれることはない。防御的なチェックとして残す) */
 function addExerciseLog(dateStr, session, exerciseId, weight, reps) {
@@ -3640,11 +3872,11 @@ function buildExerciseRow(row, ym) {
   /* 回数と休館ボタンは日付と同じ1行にまとめる(行を低くして一覧を見やすくする) */
   var countSpan = document.createElement('span');
   var isOff = row.res.count === 0;
-  countSpan.className = 'ex-feel-tag' + (isOff ? ' ex-tag-gray' : '');
+  countSpan.className = 'ex-feel-tag' + (isOff ? ' ex-tag-gray' : '') + (row.res.boosted ? ' ex-tag-boost' : '');
   /* 「2回」だけでなく朝晩の別も見せる(例: 2回(朝晩) / 2回(朝2)) */
   var slotTxt = feelSlotsLabel(row.res);
   countSpan.textContent = row.res.count > 0
-    ? row.res.count + '回' + (slotTxt ? '(' + slotTxt + ')' : '')
+    ? row.res.count + '回' + (slotTxt ? '(' + slotTxt + ')' : '') + (row.res.boosted ? ' ⤴ブースト' : '')
     : row.res.reason;
   head.appendChild(countSpan);
 
@@ -3859,11 +4091,12 @@ function trimOrphanRecords(ym) {
   var monthShifts = state.shifts[ym] || {};
   var closure = state.exercise.closureDays[ym] || [];
   var muscleDays = state.exercise.muscle[ym] || [];
+  var plan = computeFeelcycleBoostPlan(ym); /* 14章: 先頭で1回だけ計算する(日ごとに呼び直さない) */
   for (var d = 1; d <= dim; d++) {
     var rec = mo[String(d)];
     if (!rec) continue;
-    var res = getFeelcycleCount(dateStrOf(y, m, d), normShift(monthShifts[String(d)]),
-      closure.indexOf(String(d)) >= 0);
+    var res = getFeelcycleCountBoosted(dateStrOf(y, m, d), normShift(monthShifts[String(d)]),
+      closure.indexOf(String(d)) >= 0, plan);
     if (Array.isArray(rec.feel)) {
       rec.feel = rec.feel.slice(0, res.count);
       while (rec.feel.length && rec.feel[rec.feel.length - 1] === null) rec.feel.pop();
@@ -4025,6 +4258,7 @@ $('mex-add-btn').addEventListener('click', function () {
   toast('記録しました');
   renderMexLogList();
   updateExerciseCounts();
+  updateMuscleGapNote(); /* 13章: ここは render() を通らないので、知らせだけその場で更新する */
   /* 前回記録の表示もこの場で更新(同じ種目を続けて記録するケースがあるため) */
   selectMexExercise(mexState.exerciseId);
 });
@@ -4059,6 +4293,7 @@ function renderMexLogList() {
       removeExerciseLog(mexState.dateStr, mexState.session, idx);
       renderMexLogList();
       updateExerciseCounts();
+      updateMuscleGapNote(); /* 13章: 取り消しでも同じく更新する(消した結果また空くことがある) */
       toast('記録を削除しました');
     });
     row.appendChild(del);
@@ -4109,7 +4344,7 @@ function renderExercise() {
   var muscleDays = ensureMuscleScheduleUpTo(ym);
   if (muscleDays === null) muscleDays = []; /* 基準日未設定(通常はここに来る前に ensureMuscleAnchorIfNeeded で確定済み) */
 
-  var total = 0;
+  var plan = computeFeelcycleBoostPlan(ym); /* 14章: 先頭で1回だけ計算する(日ごとに呼び直さない) */
   var list = $('ex-list');
   list.textContent = '';
   for (var d = 1; d <= dim; d++) {
@@ -4117,8 +4352,7 @@ function renderExercise() {
     var dow = dowOfDateStr(ds);
     var shEntry = normShift(monthShifts[String(d)]);
     var isManual = closure.indexOf(String(d)) >= 0;
-    var res = getFeelcycleCount(ds, shEntry, isManual);
-    if (!res.excludedFromTotal) total += res.count;
+    var res = getFeelcycleCountBoosted(ds, shEntry, isManual, plan);
     var isMuscleDay = muscleDays.indexOf(String(d)) >= 0;
     list.appendChild(buildExerciseRow({
       d: d, dow: dow, shEntry: shEntry, res: res, isManual: isManual,
@@ -4138,13 +4372,14 @@ function updateExerciseCounts() {
   var monthShifts = state.shifts[ym] || {};
   var closure = state.exercise.closureDays[ym] || [];
 
-  var total = 0, feelDone = 0, feelRest = 0, feelExtra = 0, walkTotal = 0;
+  var plan = computeFeelcycleBoostPlan(ym); /* 14章: 先頭で1回だけ計算する(日ごとに呼び直さない) */
+  var total = plan.total; /* 14-4: 分母は plan.total をそのまま使う。ループ内で積み上げ直さない(二重計算防止) */
+  var feelDone = 0, feelRest = 0, feelExtra = 0, walkTotal = 0;
   var orphanDays = [];   /* 予定より多く記録が残っている日(問題40) */
   for (var d = 1; d <= dim; d++) {
     var ds = dateStrOf(cur.y, cur.m, d);
     var shEntry = normShift(monthShifts[String(d)]);
-    var res = getFeelcycleCount(ds, shEntry, closure.indexOf(String(d)) >= 0);
-    if (!res.excludedFromTotal) total += res.count;
+    var res = getFeelcycleCountBoosted(ds, shEntry, closure.indexOf(String(d)) >= 0, plan);
     for (var i = 0; i < res.count; i++) {
       var st = getFeelState(ym, d, i);
       if (st === 'done') feelDone++;
@@ -4177,12 +4412,19 @@ function updateExerciseCounts() {
   if (feelExtra > 0) parts.push('追加 ' + feelExtra + '回');
   var box = $('ex-feel-box');
   box.classList.toggle('achieved', achieved);
-  /* 🌙(休む)を選んだ回は「予定」の合計から差し引く(2026-07-28 ユーザー承認)。
-     達成判定(doneAll >= 30)には影響しない。都合よく調整された、という前向きな体験にする */
-  var totalShown = Math.max(0, total - feelRest);
-  void totalShown; /* 2026-08-13: 表示は「達成数 / 30回」に整理。値自体は他の用途がないため未使用 */
   void parts; /* 2026-08-14: 表示は「◯ / 30回」のみに簡略化(裏側の合計計算は変更しない) */
-  $('ex-feel-count').textContent = doneAll + ' / 30回' + (achieved ? ' 🎉' : '');
+  /* 2026-08-24: 分母を固定の月間目標30から「今月の予定本数」に変更(ユーザー承認)。
+     分母には total(computeFeelcycleBoostPlan が計算した今月の予定の合計。14章参照)をそのまま使う。
+     2026-09-06追記(14-15): 🌙(休む)にした回は、その回ぶんの予定を1本減らす
+     (computeFeelcycleBoostPlan内でeffectiveCount = max(0, base.count − 🌙の数)として基準合計に反映)。
+     ただし14章の自動調整(ブースト機構)により、まだ上乗せされていない「休み」の日が残っていれば
+     そちらへ自動で1本肩代わりされ、その場合は分母が変わらない。肩代わりできる休みの日が無いときだけ
+     そのぶん分母が下がる(例: 予定20本の月で3本を🌙にして肩代わり先が無ければ「5 / 19回」のように
+     分母が下がる。肩代わりできれば「5 / 20回」のまま)。✓(行った)を押しても分母は変わらない
+     (もともと予定に入っていた分をこなすだけのため)。詳しい数値例は計画.md 14-15-3参照。
+     お祝い演出(achieved / justAchieved)は今までどおり実際に30回行ったときのままで、分母には連動させない */
+  void feelRest; /* 2026-08-24: 🌙の集計は残すが、この表示では使わない(上のコメント参照) */
+  $('ex-feel-count').textContent = doneAll + ' / ' + total + '回' + (achieved ? ' 🎉' : '');
   $('ex-feel-msg').textContent = achieved ? '🎉 今月の目標達成!' : '';
   if (justAchieved) {
     box.classList.remove('flash');
@@ -4193,15 +4435,16 @@ function updateExerciseCounts() {
   var restEl = $('ex-feel-rest');
   restEl.textContent = ''; /* 2026-08-13: 表示廃止(裏側の集計・差し引きロジックは変更しない) */
 
-  /* シフトが変わって予定が減り、数えられなくなった記録があれば知らせる(問題40)。
-     責める書き方はせず、事実と選べる操作だけを示す */
+  /* 予定の回数が減り、数えられなくなった記録があれば知らせる(問題40)。
+     原因はシフト変更とは限らない(14章: フィールサイクルの自動調整で対象日が変わることでも起きる)ため、
+     原因を決め打ちせず、事実と選べる操作だけを示す(2026-09-05 文言修正) */
   var noteEl = $('ex-orphan-note');
   noteEl.textContent = '';
   noteEl.className = 'ex-orphan-note';
   if (orphanDays.length) {
     noteEl.className = 'ex-orphan-note show';
     var msg = document.createElement('span');
-    msg.textContent = 'シフトが変わったため、' + orphanDays.join('日・') + '日 の記録の一部が予定の回数に収まらなくなっています(数には入っていません)。';
+    msg.textContent = orphanDays.join('日・') + '日 の記録の一部が、今の予定の回数に収まらなくなっています(数には入っていません)。';
     noteEl.appendChild(msg);
     var btn = document.createElement('button');
     btn.className = 'btn sub small';
@@ -4501,7 +4744,9 @@ function renderPacking() {
 
   ordered.forEach(function (item) {
     var def = item.def;
-    var defaultQty = def.scales ? tab : 1;
+    /* 2026-09-06: 「1回分の基準数+回数ごとに+1」ルール(baseExtra)を追加。
+       通常の項目は baseExtra が無い(0)ので、今までどおり「1回分→1・2回分→2」のまま変わらない */
+    var defaultQty = def.scales ? (tab + (def.baseExtra || 0)) : 1;
     var override = def.scales ? getPackingOverride(day, def.id) : null;
     var qty = (override !== null) ? override : defaultQty;
     var checked = getPackingChecked(day, def.id);
@@ -6365,6 +6610,12 @@ $('backup-restore').addEventListener('click', function () {
     s.settings.userName = d.settings.userName;
   }
   state = s;
+  /* 2026-08-26: 復元直後は「前回の記録数」を覚えている入れ物をリセットする(問題6の修正)。
+     こうしないと復元前の少ない回数と復元後の多い回数を比べてしまい、
+     何もしていないのに「たった今達成した」お祝いの光る演出が誤って出てしまう。
+     全データ消去(reset-all)側は前から同じ考え方でリセットしている。 */
+  exercisePrevTotal = {};
+  exercisePrevTuan = {};
   saveState();
   $('backup-in').value = '';
   $('user-name').value = state.settings.userName;
@@ -6384,6 +6635,7 @@ $('reset-all').addEventListener('click', function () {
   state = defaultState();
   selected = null;
   exercisePrevTotal = {};
+  exercisePrevTuan = {}; /* 2026-08-26: チュアンドタン用の入れ物も同様に初期化(問題6の修正) */
   $('user-name').value = '';
   $('backup-in').value = '';
   renderTypeList();
@@ -6391,6 +6643,13 @@ $('reset-all').addEventListener('click', function () {
   renderRecurringList();
   showBackupResult('全データを消去しました。最初の状態に戻っています。', false);
   render();
+});
+
+/* 13章: アプリを開きっぱなしで日付が変わったとき用。画面をもう一度表示したときに
+   筋トレ間隔の知らせだけを計算し直す。setInterval(一定時間ごとの自動更新)は電池を使うので使わない */
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState !== 'visible') return;
+  try { updateMuscleGapNote(); } catch (e) { /* 失敗しても何もしない */ }
 });
 
 /* ================= 起動 ================= */
