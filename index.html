@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- shift-calendar build 2026-08-24-01 -->
+<!-- shift-calendar build 2026-09-14-08 -->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -281,8 +281,9 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  /* メモを書くボタン(日付を選んでいないときは隠す) */
-  #di-note-btn {
+  /* メモを書くボタン(日付を選んでいないときは隠す)。
+     15章 ステップ25(2026-09-14): 予約欄の開閉ボタン #di-book-btn も同じ見た目(値は変えていない) */
+  #di-note-btn, #di-book-btn {
     flex: 0 0 auto;
     background: #fff;
     color: var(--navy);
@@ -294,10 +295,11 @@
     font-weight: bold;
     cursor: pointer;
   }
+  #di-book-btn { white-space: nowrap; }   /* 15章 ステップ25: 「🎫予約2▾」が2行に折れないように */
   #di-bar .di-info { cursor: pointer; }   /* タップで全文を表示する */
   @media (max-width: 360px) {
     #di-bar { padding: 4px 12px; }
-    #di-note-btn { min-height: 28px; }
+    #di-note-btn, #di-book-btn { min-height: 28px; }
   }
   #chip-area {
     display: flex;
@@ -607,6 +609,8 @@
   .ex-row.ex-row-today .ex-closure-btn { color: #fff; border-color: #fff; }
   .ex-row.ex-row-today .ex-closure-btn.on { background: #444; color: #fff; border-color: #fff; }
   .ex-row.ex-row-today .ex-muscle-badge { background: #4a2f10; color: #fff; }
+  /* 2026-09-14 step24手直し: 枠の呼び名(朝・晩・15章の予定外)も暗い背景で読めるよう白に上書き(見た目のみ) */
+  .ex-row.ex-row-today .rec-label { color: #fff; }
   .ex-count-box {
     background: #eef3ff;
     border: 1px solid #b9c6ee;
@@ -621,6 +625,10 @@
   .ex-count-box.achieved #ex-tuan-count { color: #b8860b; font-weight: bold; }
   /* 休んだ記録は控えめに(責める見た目にしない)。ただし読める濃さは確保する */
   .ex-rest-note { font-size: 11px; color: #6f6a5c; font-weight: normal; }
+  /* 15章 ステップ23: 予約状況の箱(#ex-book-box)。2行目は太字、状態は ◎ ⏳ 📅 の記号と文字で区別(色は使わない) */
+  .ex-book-next { font-weight: bold; }
+  .ex-book-note { font-size: 11px; color: #6f6a5c; font-weight: normal; line-height: 1.5; margin-top: 2px; }
+  .ex-book-note:empty { display: none; }
   /* 予定の回数に収まらない記録のお知らせ(事実だけを穏やかに伝える) */
   .ex-orphan-note { display: none; }
   .ex-orphan-note.show {
@@ -782,71 +790,10 @@
     border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer;
   }
 
-  /* ===== 明日の持ち物(2026-08-08 追加) =====
-     クリーム基調・角丸のチップ/ボタンで既存デザインに馴染ませる。
-     「済」の見た目は実施の記録(rec-btn.is-done)と同じ緑系にして意味を揃える */
-  /* 2026-08-09: 日付にシフト・運動予定の要約を続けて出すため、折り返しても読みやすいよう行間を確保 */
+  /* ===== 予定の要約行(昨日・今日・明日の予定。renderScheduleTodayTomorrow が使う) =====
+     2026-08-09: 日付にシフト・運動予定の要約を続けて出すため、折り返しても読みやすいよう行間を確保。
+     2026-09-14: 計画.md 17章で旧「明日の準備」欄を廃止。クラス名 .pk-date はそのまま残す */
   .pk-date { font-size: 12px; color: #6b6355; margin: -4px 0 6px; line-height: 1.5; }
-  .pk-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 2px;
-    border-bottom: 1px solid var(--line);
-  }
-  /* 2026-08-09: 明日の予定から見て「不要」と自動判定された項目。否定的な表現は使わず、
-     淡く見せるだけにとどめる(罰しない設計) */
-  .pk-row.pk-row-unneeded { opacity: .55; }
-  .pk-name { flex: 1 1 auto; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pk-need-btn {
-    flex: 0 0 auto;
-    border: 1.5px solid #b9c6ee;
-    background: #eef3ff;
-    color: #1a4a9e;
-    border-radius: 8px;
-    padding: 0 8px;
-    min-height: 32px;
-    font-size: 11px;
-    font-weight: bold;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-  .pk-need-btn.off { border-color: #c9c1b0; background: var(--cell-bg); color: #948c7d; font-weight: normal; }
-  .pk-qty {
-    flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    color: #6b6355;
-  }
-  .pk-qty button {
-    width: 28px;
-    min-height: 28px;
-    border: 1px solid #c9c1b0;
-    background: var(--cell-bg);
-    color: var(--navy);
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: bold;
-    cursor: pointer;
-  }
-  .pk-qty button:disabled { opacity: .35; }
-  .pk-qty .pk-qty-num { min-width: 16px; text-align: center; font-weight: bold; color: var(--ink); }
-  .pk-check {
-    flex: 0 0 auto;
-    border: 1.5px solid #c9c1b0;
-    background: var(--cell-bg);
-    color: var(--navy);
-    border-radius: 8px;
-    padding: 0 10px;
-    min-height: 36px;
-    font-size: 12px;
-    font-weight: bold;
-    cursor: pointer;
-    white-space: nowrap;
-  }
-  .pk-check.on { background: #e8f5e9; border-color: #2e7d32; color: #1b5e20; }
 
   /* ===== 実施の記録(済 / 休む) ===== */
   .rec-group { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; margin-top: 2px; }
@@ -907,6 +854,66 @@
     border-color: #a34700;
     color: #7a3400;
   }
+
+  /* ===== 15章(2026-09-14): フィールサイクルの予約時刻プルダウン(共通部品 buildBookingSelect) =====
+     日付タップ欄・運動予定シートの一覧行で共用。既存クラスは変更しない。
+     白黒表示でも分かるよう、予約済みは「文字(時刻)+太字+2pxの実線枠」で区別する(色だけに頼らない) */
+  .book-wrap { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+  .book-sel {
+    font-size: 13px; font-family: inherit; min-height: 32px; padding: 0 22px 0 8px;
+    border: 1.5px solid #c9c1b0; border-radius: 8px; background-color: #fff; color: var(--navy);
+    -webkit-appearance: none; appearance: none;   /* 端末ごとの見た目の差を減らす。▾ は下の background で描く */
+    background-image: linear-gradient(45deg, transparent 50%, var(--navy) 50%),
+                      linear-gradient(135deg, var(--navy) 50%, transparent 50%);
+    background-position: calc(100% - 13px) 50%, calc(100% - 8px) 50%;
+    background-size: 5px 5px; background-repeat: no-repeat;
+    cursor: pointer;
+  }
+  .book-sel.is-booked { font-weight: bold; border: 2px solid var(--navy); }   /* 白黒でも太さと枠で分かる */
+  .rec-group .book-sel { min-height: 40px; }        /* 一覧行では済/🌙ボタン(.rec-btn)と同じ高さ */
+  /* 手直し(2026-09-14-03b): 一覧行の1枠ぶん「ラベル・済・🌙・プルダウン」をひとまとめにする箱。
+     行に入りきらないときは枠ごと次の行へ折り返す(プルダウンだけが離れて別の組の予約に見えないように)。
+     「その他…」の時刻入力を開いて箱が行幅を超えるときだけ、箱の中で時刻入力が折り返す */
+  .rec-slot { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px; flex: 0 1 auto; max-width: 100%; }
+  .rec-slot .book-wrap { flex-wrap: wrap; max-width: 100%; }
+  .book-other { display: none; align-items: center; gap: 4px; }
+  .book-other.show { display: inline-flex; }
+  .book-other input[type=time] {
+    font-size: 13px; font-family: inherit; min-height: 32px; padding: 0 6px;
+    border: 1.5px solid #c9c1b0; border-radius: 8px; background: #fff; color: var(--navy);
+  }
+  .book-other button {
+    font-size: 12px; font-family: inherit; font-weight: bold; min-height: 32px; padding: 0 8px;
+    background: #fff; color: var(--navy); border: 2px solid var(--navy); border-radius: 8px; cursor: pointer;
+  }
+  /* 15章 ステップ22(2026-09-14)→ ステップ25(同日 B案): 日付タップ欄の予約プルダウン(#di-bar の直下)。
+     #di-bar の「🎫予約▾」ボタンを押したときだけ .show で出す。それ以外は display:none で高さゼロ。
+     開閉と出す条件は renderBookBar() で判定する。#chip-area と同じ背景・区切り線。
+     ステップ25: 横スクロールをやめて折り返す。折り返しは「枠名+プルダウン」のかたまり(.book-item)単位 */
+  #book-bar { display: none; flex-shrink: 0; }
+  #book-bar.show {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;   /* 縦4px・横10px */
+    padding: 2px 8px; background: var(--cell-bg); border-bottom: 1px solid var(--line);
+  }
+  /* 1枠ぶん「枠名+プルダウン(+その他の入力)」のかたまり。行に入りきらなければ、かたまりごと次の行へ */
+  #book-bar .book-item { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; flex: 0 1 auto; max-width: 100%; }
+  #book-bar .book-item .book-wrap { flex-wrap: wrap; max-width: 100%; }   /* その他…の入力はかたまりの中で改行してよい */
+  #book-bar .book-slot { font-size: 11px; color: #6b6355; flex: 0 0 auto; }
+  /* 修正 2026-09-14-07 V4: 6行の月でカレンダーが縮みすぎないよう、この欄の中だけ薄くする(28px)。
+     .book-sel 本体・一覧行(40px)には影響しない */
+  #book-bar .book-sel,
+  #book-bar .book-other input[type=time],
+  #book-bar .book-other button { min-height: 28px; }
+  /* 15章 ステップ24(2026-09-14): 🌙(休む)にした枠に予約時刻が残っているときの注意文(一覧行の直下)。
+     ふだんは display:none で高さゼロ。白黒でも分かるよう、文字+左端の太い縦線+枠線で伝える(色は補助)。
+     今日の行(暗い背景)でも読めるよう、背景と文字色を自分で持つ */
+  .book-rest-note { display: none; flex: 0 0 100%; }
+  .book-rest-note.show {
+    display: block; margin-top: 2px; padding: 4px 8px;
+    background: #fff6e0; color: #4a3d1c; border: 1px solid #b8a36a; border-left: 4px solid #4a3d1c;
+    border-radius: 6px; font-size: 11px; line-height: 1.5;
+  }
+  .book-rest-note div + div { margin-top: 4px; padding-top: 4px; border-top: 1px dashed #b8a36a; }   /* 2枠ぶん出るときの区切り(線の形で分かる) */
 
   /* 済: 小さい状態から「ぐわっと」大きく育って現れ、最後に等倍へ落ち着く */
   @keyframes rec-stamp-pop {
@@ -1165,8 +1172,12 @@
 <div id="di-bar">
   <span class="di-date" id="di-date">--</span>
   <span class="di-info" id="di-info"></span>
+  <!-- 15章 ステップ25(2026-09-14 B案): 予約欄の開閉ボタン。条件外の日は display:none -->
+  <button id="di-book-btn" aria-expanded="false" aria-controls="book-bar" style="display:none">🎫予約▾</button>
   <button id="di-note-btn" aria-label="この日のメモを書く">📝 メモ</button>
 </div>
+<!-- 15章(2026-09-14): 選択中の日の予約時刻。🎫予約▾ を押したときだけ .show(それ以外は高さゼロ) -->
+<div id="book-bar"></div>
 <div id="chip-area">
   <div id="stamp-chip-row"></div>
   <button id="edit-stamps-btn">編集</button>
@@ -1211,6 +1222,12 @@
     <div class="ex-feel-msg" id="ex-feel-msg"></div>
     <div class="ex-rest-note" id="ex-feel-rest"></div>
   </div>
+  <!-- 15章 ステップ23(2026-09-14): フィールサイクルの予約状況。表示中の月に関係なく、常に実際の今日が基準 -->
+  <div class="ex-count-box" id="ex-book-box">
+    <div class="ex-count-line" id="ex-book-held">🎫 予約 0 / 3本: なし</div>
+    <div class="ex-count-line ex-book-next" id="ex-book-next"></div>
+    <div class="ex-book-note" id="ex-book-note"></div>
+  </div>
   <div class="ex-count-line ex-muscle-line">筋トレ: <span id="ex-muscle-count">予定 0回 / 済 0回</span> <span class="ex-rest-note" id="ex-muscle-rest"></span></div>
   <div class="ex-orphan-note" id="ex-orphan-note"></div>
 
@@ -1219,23 +1236,8 @@
     <div class="ex-feel-msg" id="ex-tuan-msg"></div>
   </div>
 
-  <!-- ===== 明日の持ち物(2026-08-08 追加) ===== -->
-  <div class="step" style="margin-top:14px;">🎒 明日の持ち物</div>
-  <div class="pk-date" id="packing-date">--</div>
-  <div class="diet-tabs" id="packing-tabs">
-    <button class="diet-tab" data-ptab="1">1回分</button>
-    <button class="diet-tab" data-ptab="2">2回分</button>
-  </div>
-  <div id="packing-list"></div>
-  <button class="btn sub small" id="packing-edit-toggle">持ち物リストを編集</button>
-  <div id="packing-edit-area" style="display:none;">
-    <div class="hint">名前を変えても記録は残ります。追加するときは「回数に応じて個数が変わるか」を選べます。</div>
-    <div id="packing-def-list"></div>
-    <button class="btn sub small" id="packing-add-item">+ 持ち物を追加</button>
-  </div>
-
-  <!-- ===== 昨日・今日の予定(2026-08-12 追加、2026-08-13 昨日・今日に変更。持ち物の下までスクロールしても
-       予定を見るためにカレンダーまで戻らなくて済むように) ===== -->
+  <!-- ===== 昨日・今日の予定(2026-08-12 追加、2026-08-13 昨日・今日に変更。運動予定一覧の上に出して、
+       予定を見るためにカレンダーまで戻らなくて済むように。2026-09-14: この上にあった旧「明日の準備」欄は計画.md 17章で廃止) ===== -->
   <div class="step" style="margin-top:14px;">📅 昨日・今日の予定</div>
   <div id="schedule-today-tomorrow"></div>
 
@@ -1357,6 +1359,8 @@
 
   <div class="step">バックアップ</div>
   <div class="notice">データはこのスマホのこのブラウザだけに保存されます。機種変更・履歴の削除で消えることがあるので、<b>月1回(シフト取り込みのついで)のバックアップをおすすめします。</b></div>
+  <!-- 15章 ステップ24(2026-09-14): PC↔スマホ共有は既存のバックアップをそのまま使う(15-2 決定7)。ボタンは増やさない -->
+  <div class="hint">PCとスマホの両方で使うときは、片方で「書き出し」→ テキストを自分の好きな方法で運ぶ → もう片方で「読み込み」。読み込みは上書きなので、最後に印を付けた側から書き出してください</div>
   <button class="btn sub" id="backup-out">書き出し(テキストをコピー)</button>
   <div class="step" style="margin-top:14px;">バックアップから復元</div>
   <textarea id="backup-in" placeholder="書き出したテキストをここに貼り付け"></textarea>
@@ -1533,29 +1537,6 @@ function defaultDiet() {
   };
 }
 
-/* 明日の持ち物(2026-08-08 追加。計画は検証\2026-08-08-持ち物チェックリスト.md 参照)。
-   固定(scales:false)= 回数に関係なく常に1つ。回数連動(scales:true)= 1回分なら1・2回分なら2が既定。
-   2026-08-09: k1(シャンプー等)・k9(日焼け止め)・k10(整髪剤)は、id を見て
-   packingItemNeeded() が明日の予定から要否を自動判定する(詳細はそちらのコメント参照)。
-   k9・k10 は個数を回数連動から「常に1個」に変更(要否判定のほうで意味を持たせるため) */
-var DEFAULT_PACKING = [
-  { id: 'k1', name: 'シャンプー・ボディソープ', unit: '本', scales: false },
-  { id: 'k2', name: 'クリーム', unit: '個', scales: false },
-  { id: 'k4', name: '全身クリーム', unit: '個', scales: false },
-  { id: 'k5', name: 'ピンクタオル', unit: '枚', scales: false },
-  { id: 'k6', name: '洗顔料', unit: '', scales: true },
-  { id: 'k7', name: 'クレンジング', unit: '', scales: true },
-  { id: 'k8', name: '化粧水美容液など', unit: '', scales: true },
-  { id: 'k9', name: '日焼け止め', unit: '', scales: false },
-  { id: 'k10', name: '整髪剤', unit: '', scales: false }
-];
-/* baseExtra = 2026-09-06 追加。「1回分の基準数+回数ごとに+1」用の上乗せ数(既定0)。
-   詳細は defaultQty の計算箇所(renderPacking内)とサニタイズ(sanitizePackingDefs)を参照 */
-function clonePackingDef(d) {
-  var baseExtra = (typeof d.baseExtra === 'number' && isFinite(d.baseExtra)) ? d.baseExtra : 0;
-  return { id: d.id, name: d.name, unit: d.unit, scales: d.scales === true, baseExtra: baseExtra };
-}
-
 function defaultState() {
   return {
     version: 1,
@@ -1583,7 +1564,6 @@ function defaultState() {
     /* records = 実施の記録。月→日→{ feel: ["done"|"rest"|null,...], muscle: "done"|"rest"|null }
        フィールサイクルは予定回数ぶんの配列で1回ずつ独立に記録できる(2026-07-27 追加) */
     exercise: { closureDays: {}, muscle: {}, muscleAnchor: null, confirmedMonths: [], records: {},
-      packingDefs: DEFAULT_PACKING.map(clonePackingDef), packing: {},
       /* muscleExercises = 筋トレ種目マスタ(2026-08-13 追加)。log = 実施記録(重量・回数)。
          既存の closureDays/muscle/muscleAnchor/records はいっさい変更しない(計画.md 10-8-1) */
       muscleExercises: DEFAULT_MUSCLE_EXERCISES.map(cloneMuscleExercise),
@@ -2246,7 +2226,6 @@ function setNote(ym, d, text) {
 /* 運動予定(exercise)を洗浄。壊れた形は初期値(空)に戻す(問題2と同じ二段構えの入口洗浄) */
 function sanitizeExercise(src) {
   var out = { closureDays: {}, muscle: {}, muscleAnchor: null, confirmedMonths: [], records: {},
-    packingDefs: DEFAULT_PACKING.map(clonePackingDef), packing: {},
     muscleExercises: DEFAULT_MUSCLE_EXERCISES.map(cloneMuscleExercise), log: {} };
   if (!src || typeof src !== 'object' || Array.isArray(src)) return out;
   function sanitizeDayMap(v) {
@@ -2313,6 +2292,15 @@ function sanitizeExercise(src) {
           while (feel.length && feel[feel.length - 1] === null) feel.pop(); /* 末尾の空きは詰める */
           if (feel.length) clean.feel = feel;
         }
+        /* booked = フィールサイクルの予約時刻(2026-09-14 追加。計画.md 15-3)。
+           各値を normalizeBookTime に通し、"H:MM"(時0〜23・分0〜59)に揃えられたものだけ残す。
+           それ以外(true / "8時" / "25:00" など)は null。最大10本・末尾の null は詰め、空ならキーごと落とす。
+           固定の3つに含まれるかは見ない(「その他…」で入れた任意の時刻を捨てないため) */
+        if (Array.isArray(rec.booked)) {
+          var booked = rec.booked.slice(0, 10).map(function (v) { return normalizeBookTime(v); });
+          while (booked.length && booked[booked.length - 1] === null) booked.pop();
+          if (booked.length) clean.booked = booked;
+        }
         if (rec.muscle === 'done' || rec.muscle === 'rest') clean.muscle = rec.muscle;
         /* extra = 予定外に行った回数(2026-07-28 追加)。0〜20の整数だけ認める。
            このキーが無い旧データを読んでも壊れない(単に追加0回として扱う) */
@@ -2336,20 +2324,18 @@ function sanitizeExercise(src) {
           mex = Math.floor(mex);
           if (mex > 0) clean.muscleExtra = Math.min(mex, 20);
         }
-        if (clean.feel || clean.muscle || clean.extra || clean.walk || clean.muscleExtra) cleanMo[String(n)] = clean;
+        if (!isEmptyRecord(clean)) cleanMo[String(n)] = clean;  /* 何か1つでもあれば残す(16章で共通判定に統一) */
       });
       if (Object.keys(cleanMo).length) out.records[ym] = cleanMo;
     });
   }
-  out.packingDefs = sanitizePackingDefs(src.packingDefs);
-  out.packing = sanitizePackingData(src.packing);
   out.muscleExercises = sanitizeMuscleExercises(src.muscleExercises);
   out.log = sanitizeExerciseLog(src.log, out.muscleExercises);
   return out;
 }
 
 /* 筋トレ種目マスタの洗浄(2026-08-13 追加)。id重複・空文字は捨てる。
-   1件も残らなければ初期7種目に戻す(sanitizePackingDefs と同じ考え方) */
+   1件も残らなければ初期7種目に戻す */
 function sanitizeMuscleExercises(src) {
   if (!Array.isArray(src)) return DEFAULT_MUSCLE_EXERCISES.map(cloneMuscleExercise);
   var seen = {};
@@ -2417,152 +2403,6 @@ function parseDateStrForSanitize(s) {
   return { y: y, m: m, d: d };
 }
 
-/* 明日の持ち物リスト(項目の定義)を洗浄。id重複・空文字は捨てる。1件も残らなければ初期10種に戻す */
-function sanitizePackingDefs(src) {
-  if (!Array.isArray(src)) return DEFAULT_PACKING.map(clonePackingDef);
-  var seen = {};
-  var out = [];
-  src.forEach(function (d) {
-    if (!d || typeof d !== 'object') return;
-    if (typeof d.id !== 'string' || !d.id || seen[d.id]) return;
-    if (typeof d.name !== 'string' || !d.name.trim()) return;
-    seen[d.id] = true;
-    var scales = d.scales === true;
-    /* 2026-08-09: 日焼け止め(k9)・整髪剤(k10)は「回数連動」をやめて常に1個にする仕様変更。
-       前バージョンで scales:true として保存されていた既存データも、ここで強制的に揃える */
-    if (d.id === 'k9' || d.id === 'k10') scales = false;
-    /* 2026-09-06追加: baseExtra(1回分の基準数への上乗せ数)。数値以外・負の値は0に丸め、
-       上限3程度に収める(壊れたデータや異常値が入り続けるのを防ぐ) */
-    var baseExtra = d.baseExtra;
-    if (typeof baseExtra !== 'number' || !isFinite(baseExtra)) baseExtra = 0;
-    baseExtra = Math.max(0, Math.min(3, Math.round(baseExtra)));
-    out.push({
-      id: d.id,
-      name: d.name.trim().slice(0, 40),
-      unit: (typeof d.unit === 'string') ? d.unit.slice(0, 10) : '',
-      scales: scales,
-      baseExtra: baseExtra
-    });
-  });
-  /* 2026-09-06 追加: 持ち物リスト整理の移行処理(検証\2026-09-06-持ち物リスト整理-修正.md 参照)。
-     スパチュラ削除・クリームの位置移動・Tシャツ/短パンの追加・ブラジャー/パンツの個数ルール変更を
-     1回だけ(何度読み込んでも結果が変わらない形で)まとめて適用する */
-  out = migratePackingDefs(out);
-  if (out.length > 30) out = out.slice(0, 30);
-  return out.length ? out : DEFAULT_PACKING.map(clonePackingDef);
-}
-
-/* sanitizePackingDefs 専用の移行処理(2026-09-06 追加)。冪等(何度実行しても結果が同じ)であることが必須。
-   判定は基本的に name(項目名)で行う。ユーザーが「持ち物を追加」機能で作ったカスタム項目は
-   id に規則性が無い(id: 'pk'+タイムスタンプ)ため、name一致を主な判定手段にしている。
-   どのルールにも当てはまらない項目(将来ユーザーが追加する未知の項目)はここでは一切動かさない、
-   つまり削除・並び替えの対象は「名前が一致した項目」だけで、他は元の位置のまま残る */
-function migratePackingDefs(list) {
-  /* 1) スパチュラを削除。id:k3 が本来の目印だが、念のため name 一致でも拾う */
-  list = list.filter(function (d) { return d.id !== 'k3' && d.name !== 'スパチュラ'; });
-
-  /* 2) クリームを「化粧水美容液など」の直後に移動(既にその位置にあれば何もしない) */
-  var creamIdx = -1, moistIdx = -1;
-  for (var i = 0; i < list.length; i++) {
-    if (list[i].name === 'クリーム') creamIdx = i;
-    if (list[i].name === '化粧水美容液など') moistIdx = i;
-  }
-  if (creamIdx >= 0 && moistIdx >= 0 && creamIdx !== moistIdx + 1) {
-    var cream = list.splice(creamIdx, 1)[0];
-    if (creamIdx < moistIdx) moistIdx--; /* 抜いた分だけ後ろの項目の番号が1つずつ前にずれる */
-    list.splice(moistIdx + 1, 0, cream);
-  }
-
-  /* 3) Tシャツ・短パンを追加(名前が既にあれば重複追加しない)。
-     挿入位置は「ブラジャーの直前」。ブラジャーが無いユーザーは
-     「クリーム」または「化粧水美容液など」の直後をフォールバックにする */
-  var toAdd = [];
-  if (!list.some(function (d) { return d.name === 'Tシャツ'; })) {
-    toAdd.push({ id: 'k11', name: 'Tシャツ', unit: '枚', scales: true, baseExtra: 1 });
-  }
-  if (!list.some(function (d) { return d.name === '短パン'; })) {
-    toAdd.push({ id: 'k12', name: '短パン', unit: '枚', scales: true, baseExtra: 1 });
-  }
-  if (toAdd.length) {
-    var braIdx = -1, creamIdx2 = -1, moistIdx2 = -1;
-    for (var j = 0; j < list.length; j++) {
-      if (list[j].name === 'ブラジャー' && braIdx < 0) braIdx = j;
-      if (list[j].name === 'クリーム') creamIdx2 = j;
-      if (list[j].name === '化粧水美容液など') moistIdx2 = j;
-    }
-    var insertAt = (braIdx >= 0) ? braIdx
-      : (creamIdx2 >= 0) ? creamIdx2 + 1
-      : (moistIdx2 >= 0) ? moistIdx2 + 1
-      : list.length;
-    Array.prototype.splice.apply(list, [insertAt, 0].concat(toAdd));
-  }
-
-  /* 4) ブラジャー・パンツは「1回分の基準数+1」に統一。念のため毎回 scales:true を強制する
-     (既に scales:true・baseExtra:1 なら実質なにも変わらない = 冪等) */
-  list.forEach(function (d) {
-    if (d.name === 'ブラジャー' || d.name === 'パンツ') {
-      d.scales = true;
-      d.baseExtra = 1;
-    }
-  });
-
-  return list;
-}
-
-/* 明日の持ち物の記録(タブ・チェック・その日だけの数量上書き)を洗浄。月→日→{tab,checked,overrides} */
-function sanitizePackingData(src) {
-  var out = {};
-  if (!src || typeof src !== 'object' || Array.isArray(src)) return out;
-  Object.keys(src).forEach(function (ym) {
-    if (!/^\d{4}-\d{2}$/.test(ym)) return;
-    var mo = src[ym];
-    if (!mo || typeof mo !== 'object' || Array.isArray(mo)) return;
-    var y = parseInt(ym.slice(0, 4), 10);
-    var m = parseInt(ym.slice(5, 7), 10);
-    if (!(m >= 1 && m <= 12)) return;
-    var dim = daysInMonth(y, m);
-    var cleanMo = {};
-    Object.keys(mo).forEach(function (dk) {
-      if (!/^\d{1,2}$/.test(dk)) return;
-      var n = parseInt(dk, 10);
-      if (n < 1 || n > dim) return;
-      var rec = mo[dk];
-      if (!rec || typeof rec !== 'object' || Array.isArray(rec)) return;
-      var clean = {};
-      if (rec.tab === 1 || rec.tab === 2) clean.tab = rec.tab;
-      if (rec.checked && typeof rec.checked === 'object' && !Array.isArray(rec.checked)) {
-        var ch = {};
-        Object.keys(rec.checked).forEach(function (id) {
-          if (rec.checked[id] === true) ch[id] = true;
-        });
-        if (Object.keys(ch).length) clean.checked = ch;
-      }
-      if (rec.overrides && typeof rec.overrides === 'object' && !Array.isArray(rec.overrides)) {
-        var ov = {};
-        Object.keys(rec.overrides).forEach(function (id) {
-          var v = rec.overrides[id];
-          if (typeof v === 'number' && isFinite(v)) {
-            v = Math.floor(v);
-            if (v >= 1 && v <= 9) ov[id] = v;
-          }
-        });
-        if (Object.keys(ov).length) clean.overrides = ov;
-      }
-      /* needOverride = 「必要/不要」の自動判定を、その日だけ手動で上書きしたもの(2026-08-09 追加) */
-      if (rec.needOverride && typeof rec.needOverride === 'object' && !Array.isArray(rec.needOverride)) {
-        var nd = {};
-        Object.keys(rec.needOverride).forEach(function (id) {
-          if (rec.needOverride[id] === true || rec.needOverride[id] === false) nd[id] = rec.needOverride[id];
-        });
-        if (Object.keys(nd).length) clean.needOverride = nd;
-      }
-      if (clean.tab || clean.checked || clean.overrides || clean.needOverride) cleanMo[String(n)] = clean;
-    });
-    if (Object.keys(cleanMo).length) out[ym] = cleanMo;
-  });
-  return out;
-}
-
 /* ===== 実施の記録(済 / 休む)のヘルパー =====
    状態は "done"(済)/ "rest"(休む)/ null(未記録)の3つ。
    「休む」は自分で選んだ前向きな選択として扱い、責める表現は使わない */
@@ -2570,6 +2410,12 @@ function getDayRecord(ym, d) {
   var mo = state.exercise.records[ym];
   if (!mo) return null;
   return mo[String(d)] || null;
+}
+/* その日の記録が「空っぽ」かどうかの判定(2026-09-14 追加。計画.md 16章)。
+   ✓/🌙(feel)・💪(muscle)・🚴+(extra)・旧walk・💪+(muscleExtra)・予約(booked)のどれも無ければ空。
+   記録を消してよいかの判断は、必ずこの関数を通す(条件式のコピーを各所に置かない) */
+function isEmptyRecord(rec) {
+  return !rec.feel && !rec.muscle && !rec.extra && !rec.walk && !rec.muscleExtra && !rec.booked;
 }
 function getFeelState(ym, d, index) {
   var rec = getDayRecord(ym, d);
@@ -2596,7 +2442,7 @@ function setExtraCount(ym, d, n) {
   if (!mo[key]) mo[key] = {};
   var rec = mo[key];
   if (n > 0) rec.extra = n; else delete rec.extra;
-  if (!rec.feel && !rec.muscle && !rec.extra && !rec.walk && !rec.muscleExtra) delete mo[key];
+  if (isEmptyRecord(rec)) delete mo[key];
   if (!Object.keys(mo).length) delete state.exercise.records[ym];
   saveState();
 }
@@ -2617,7 +2463,7 @@ function setMuscleExtraCount(ym, d, n) {
   if (!mo[key]) mo[key] = {};
   var rec = mo[key];
   if (n > 0) rec.muscleExtra = n; else delete rec.muscleExtra;
-  if (!rec.feel && !rec.muscle && !rec.extra && !rec.walk && !rec.muscleExtra) delete mo[key];
+  if (isEmptyRecord(rec)) delete mo[key];
   if (!Object.keys(mo).length) delete state.exercise.records[ym];
   saveState();
 }
@@ -2642,7 +2488,7 @@ function setFeelState(ym, d, index, next) {
   rec.feel[index] = (next === null || rec.feel[index] === next) ? null : next;
   while (rec.feel.length && rec.feel[rec.feel.length - 1] === null) rec.feel.pop();
   if (!rec.feel.length) delete rec.feel;
-  if (!rec.feel && !rec.muscle && !rec.extra && !rec.walk && !rec.muscleExtra) delete mo[key];
+  if (isEmptyRecord(rec)) delete mo[key];
   if (!Object.keys(mo).length) delete state.exercise.records[ym];
   saveState();
 }
@@ -2654,9 +2500,70 @@ function setMuscleState(ym, d, next) {
   var rec = mo[key];
   if (next === null || rec.muscle === next) delete rec.muscle;  /* null = 未記録に戻す */
   else rec.muscle = next;
-  if (!rec.feel && !rec.muscle && !rec.extra && !rec.walk && !rec.muscleExtra) delete mo[key];
+  if (isEmptyRecord(rec)) delete mo[key];
   if (!Object.keys(mo).length) delete state.exercise.records[ym];
   saveState();
+}
+
+/* ===== フィールサイクルの予約時刻(2026-09-14 追加。計画.md 15章 ステップ21) =====
+   records[年月][日].booked = ["7:00", null, "19:15"] のように、feel と同じ添字(0=朝/1=晩/2=⤴3本目)で
+   予約した時刻 "H:MM" を持つ。null = 未予約。日記(state.diet.diary)には一切書かない */
+var BOOK_PRESETS = ['7:00', '7:30', '18:30'];   /* プルダウンの固定の選択肢(時刻の早い順)。「その他…」はこの外 */
+var BOOK_LIMIT = 3;                              /* 同時に持てる予約の本数(設定化は「あとで」#54) */
+var BOOK_WINDOW = 14;                            /* 予約状況の箱で、今日から何日先まで見るか(ステップ23。予約は最長7日先なので保有は必ずこの中) */
+var BOOK_AHEAD = 7;                              /* 何日先まで予約できるか(15-2 決定1。7日ちょうどを含む) */
+
+/* 時刻を "H:MM"(時は先頭の0なし・分は2桁)に揃える。揃えられなければ null。
+   保存(setBookedTime)も洗浄(sanitizeExercise)もこの関数を通す。例 "07:00" → "7:00" / "25:00" → null */
+function normalizeBookTime(v) {
+  if (typeof v !== 'string') return null;
+  var m = /^(\d{1,2}):(\d{2})$/.exec(v.trim());
+  if (!m) return null;
+  var h = parseInt(m[1], 10), mi = parseInt(m[2], 10);
+  if (!(h >= 0 && h <= 23 && mi >= 0 && mi <= 59)) return null;
+  return h + ':' + (mi < 10 ? '0' + mi : '' + mi);
+}
+/* "H:MM" を分に直す(選択肢を時刻の早い順に並べるときだけ使う) */
+function bookTimeMinutes(t) {
+  var p = t.split(':');
+  return parseInt(p[0], 10) * 60 + parseInt(p[1], 10);
+}
+function getBookedTime(ym, d, index) {
+  var rec = getDayRecord(ym, d);
+  if (!rec || !Array.isArray(rec.booked)) return null;
+  return normalizeBookTime(rec.booked[index]);
+}
+/* timeOrNull が null(または正規化できない値)なら印を外す。呼ぶのは saveState() まで */
+function setBookedTime(ym, d, index, timeOrNull) {
+  var t = normalizeBookTime(timeOrNull);
+  if (!state.exercise.records[ym]) state.exercise.records[ym] = {};
+  var mo = state.exercise.records[ym];
+  var key = String(d);
+  if (!mo[key]) mo[key] = {};
+  var rec = mo[key];
+  if (!Array.isArray(rec.booked)) rec.booked = [];
+  while (rec.booked.length <= index) rec.booked.push(null);
+  rec.booked[index] = t;
+  while (rec.booked.length && rec.booked[rec.booked.length - 1] === null) rec.booked.pop();
+  if (!rec.booked.length) delete rec.booked;
+  if (isEmptyRecord(rec)) delete mo[key];
+  if (!Object.keys(mo).length) delete state.exercise.records[ym];
+  saveState();
+}
+/* 枠の呼び名を1箇所で決める(日付タップ欄・箱・注意文・一覧行のプルダウンで共用)。
+   res.slots の中にある枠は「朝/晩/朝1/朝2」、その外(⤴で増えた枠)は「◯本目」(例 3本目)、
+   idx >= res.count なら「予定外」。(修正 2026-09-14-07 V5: ⤴の日も 朝/晩/3本目 にそろえる)
+   既存の buildRecordGroup(addPair)のラベル計算はこれとは別に従来どおり残す */
+function feelSlotName(res, idx) {
+  var count = (res && res.count) || 0;
+  if (idx >= count) return '予定外';
+  var slots = (res && res.slots) || [];
+  if (idx < slots.length && slots[idx]) {
+    var sameCount = 0, seq = 0;
+    slots.forEach(function (s, i) { if (s === slots[idx]) { sameCount++; if (i <= idx) seq++; } });
+    return slots[idx] + (sameCount > 1 ? seq : '');
+  }
+  return (idx + 1) + '本目';
 }
 
 /* そのラベルのスタンプが押されている日数を数える */
@@ -2857,6 +2764,23 @@ function buildStampCellText(names, maxW) {
   return { text: iconsOnly, lines: lines };
 }
 
+/* 15章 ステップ22(2026-09-14): マスの運動予定の行に出す「枠ごとの予約時刻」の文字(読むだけ)。
+   予約済みの枠 → 時刻、未予約の枠 → 従来の「朝/晩」、⤴の3本目で未予約 → 何も足さない(⤴の印だけ)。
+   予約が1本も無ければ null(呼び出し側は従来の feelSlotsLabel をそのまま使う)。
+   予定外の印(idx >= res.count)はマスには出さない。太字にはしない(measureCellText の幅計測とずれるため) */
+function bookedSlotsText(ym, d, res) {
+  var slots = (res && res.slots) || [];
+  var count = (res && res.count) || 0;
+  var parts = [], nBooked = 0;
+  for (var idx = 0; idx < count; idx++) {
+    var t = getBookedTime(ym, d, idx);
+    if (t !== null) { parts.push(t); nBooked++; }
+    else if (idx < slots.length) parts.push(slots[idx]);
+  }
+  if (nBooked === 0) return null;
+  return { text: parts.join('·'), n: nBooked };
+}
+
 function buildCellExerciseLine(ym, d, shEntry, maxW, stampNames) {
   var closure = state.exercise.closureDays[ym] || [];
   var ds = dateStrOf(cur.y, cur.m, d);
@@ -2897,30 +2821,41 @@ function buildCellExerciseLine(ym, d, shEntry, maxW, stampNames) {
   /* フィールサイクルは「朝晩」「朝2」「朝」のように、いつ行くかが分かる書き方にする。
      予定外に行った回数(extra)は「+n」で後ろに足す(予定0回の日でも出る) */
   var n = res.count + extraN, cands;
-  var slotTxt = feelSlotsLabel(res);
+  /* 15章 ステップ22: 予約した枠だけ「朝/晩」を時刻に置き換える(例 7:00·18:30 / 7:00·晩)。
+     予約が1本も無い日は bk = null で、従来の feelSlotsLabel そのまま(表示は1文字も変わらない) */
+  var bk = bookedSlotsText(ym, d, res);
+  var slotTxt = bk ? bk.text : feelSlotsLabel(res);
   if (extraN > 0) slotTxt = slotTxt ? slotTxt + '+' + extraN : '追加' + extraN;
   /* 14-7: ブーストされた日は目印(⤴)を1文字追加する。数字だけのフォールバック表示でも同様 */
   var boostMark = res.boosted ? '⤴' : '';
   slotTxt += boostMark;
   var nTxt = n + boostMark;
+  /* 15章: 幅が足りないときの短い形(🎫 = 予約、数字 = 予約の本数)。例 🎫2 / 🎫1⤴。予約が無い日は null */
+  var bkShort = bk ? ('🎫' + bk.n + boostMark) : null;
+  /* 修正 2026-09-14-07 V3・V8: 予約がある日は「🚴も🎫も付かない時刻だけの形」(例 7:00·18:30)を候補から外す
+     (勤務時間と読み違えないため)。筋トレ日は 🚴🎫2💪 を 🚴2✓💪 より先に試す。
+     予約が無い日(bk = null)は下の null が取り除かれ、従来と同じ候補・同じ順になる */
   if (hasFeel && hasMuscle) {
     cands = [
       '🚴' + slotTxt + feelMark + ' 💪筋トレ' + mMark,
       '🚴' + slotTxt + feelMark + ' 💪' + mMark,
-      slotTxt + feelMark + ' 筋' + mMark,
+      bk ? null : slotTxt + feelMark + ' 筋' + mMark,
       '🚴' + slotTxt + feelMark + '💪' + mMark,
       '🚴' + slotTxt + feelMarkShort + '💪' + mMark,
       '🚴' + slotTxt + '💪' + mMark,
+      bk ? '🚴' + bkShort + '💪' + mMark : null,   /* 15章: 予約があるときだけの短い形(V8: nTxt の形より先) */
       '🚴' + nTxt + feelMarkShort + '💪' + mMark,
       '🚴💪'                                  /* 最後の受け皿(必ず収まる短さ) */
     ];
   } else if (hasFeel) {
     cands = [
       '🚴' + slotTxt + feelMark,
-      slotTxt + feelMark,
+      bk ? null : slotTxt + feelMark,
       '🚴' + slotTxt + feelMarkShort,
       '🚴' + slotTxt,
-      slotTxt,
+      bk ? null : slotTxt,
+      bk ? '🚴' + bkShort + feelMarkShort : null,  /* 15章: 🚴🎫2✓(予約があるときだけ) */
+      bk ? '🚴' + bkShort : null,                  /* 15章: 🚴🎫2 */
       '🚴' + nTxt
     ];
   } else if (hasMuscle) {
@@ -2934,6 +2869,8 @@ function buildCellExerciseLine(ym, d, shEntry, maxW, stampNames) {
   } else {
     cands = [];
   }
+  /* 15章: 予約が無い日の null(候補なし)を取り除く。予約の無い日は従来と同じ候補配列になる */
+  cands = cands.filter(function (c) { return c !== null; });
 
   var exText = cands.length ? pickFitting(cands, maxW - 1) : '';  /* 1px の余裕を見て切れを防ぐ */
   if (!exText) return null;
@@ -2979,6 +2916,10 @@ function render() {
      ここで先に出し入れしておくのは、この下の grid.clientHeight を測る前に高さを確定させるため
      (あとから1行増えると、行の高さをそろえる 1px 調整がズレてしまう) */
   try { updateMuscleGapNote(); } catch (e) { /* 失敗してもカレンダー描画は続ける */ }
+  /* 15章 ステップ22: 日付タップ欄(#book-bar)も同じ理由で、カレンダーの高さを測る前に出し入れしておく
+     (出した分だけカレンダーが縮むので、1px 調整と fitStampLines をその高さで行うため)。
+     末尾の renderDayInfo() からも呼ばれる(計画 15-5)。同じ内容で描き直すだけなので高さは変わらない */
+  try { renderBookBar(); } catch (e) { /* 失敗してもカレンダー描画は続ける */ }
 
   var first = new Date(cur.y, cur.m - 1, 1);
   var offset = (first.getDay() + 6) % 7; /* 月曜始まり */
@@ -3184,7 +3125,77 @@ function renderDayInfo() {
     $('di-note-btn').textContent = myNote ? '📝 メモを編集' : '📝 メモ';
   }
   renderStampChipRow();
+  /* 15章 ステップ22: 日付タップ欄の予約プルダウン(#book-bar)。条件外なら高さゼロ */
+  try { renderBookBar(); } catch (e) { /* 失敗しても日付欄の描画は続ける */ }
 }
+
+/* 15章 ステップ22(2026-09-14): 日付タップ欄 #book-bar(#di-bar の直下の1行)。
+   選択中の日が「表示中の月にある・今日以降・フィール枠が1本以上(getFeelcycleCountBoosted の count > 0)」のときだけ、
+   「🎫予約 朝[▾] 晩[▾]」を出す。それ以外(未選択・過去日・金曜・希休・手動休館・シフト未確定)は display:none で高さゼロ。
+   選ぶと即保存され(setBookedTime。日記には書かない)、render() でマスとこの欄を描き直す。
+   文字はすべて textContent。#di-bar の中身・チップ列・メモの処理には触れない。
+   ステップ25(2026-09-14 B案): 条件を満たす日は #di-bar に「🎫予約▾」ボタンだけ出し、押したときだけ欄を開く。
+   開閉の状態は保存しない2変数(bookBarOpen / bookBarDay)で持ち、判定はこの関数の中だけで行う
+   (selectDay・月移動など cur / selected を変える既存関数には手を入れない)。
+     別の日に移った → 閉 / 同じ日の再タップ・予約の保存 → 開いたまま / 条件外(月移動で表示月外を含む) → 閉 */
+var bookBarOpen = false;   /* 欄を開いているか(保存しない) */
+var bookBarDay = null;     /* 最後にボタンを出した日 "YYYY-MM-DD"(保存しない) */
+function renderBookBar() {
+  var bar = $('book-bar');
+  var btn = $('di-book-btn');
+  if (!bar || !btn) return;
+  bar.textContent = '';
+  bar.className = '';            /* まず欄を隠す(高さゼロ) */
+  btn.style.display = 'none';    /* まずボタンを隠す */
+  var ym, d, ds, res;
+  if (selected && selected.y === cur.y && selected.m === cur.m) {
+    ym = ymKey(selected.y, selected.m);
+    d = selected.d;
+    ds = dateStrOf(selected.y, selected.m, d);
+    var t = getTodayDay();
+    if (ds >= dateStrOf(t.y, t.m, t.d)) {   /* 過去日は出さない(マスの表示で読める) */
+      var shEntry = normShift((state.shifts[ym] || {})[String(d)]);
+      var isManual = (state.exercise.closureDays[ym] || []).indexOf(String(d)) >= 0;
+      res = getFeelcycleCountBoosted(ds, shEntry, isManual, computeFeelcycleBoostPlan(ym));
+    }
+  }
+  if (!res || !res.count) {   /* 未選択・表示月外・過去日・回数0・シフト未確定・不明の日は出さない */
+    bookBarOpen = false;
+    bookBarDay = null;
+    btn.setAttribute('aria-expanded', 'false');
+    return;
+  }
+  if (ds !== bookBarDay) {    /* 別の日に移ったら閉じる */
+    bookBarOpen = false;
+    bookBarDay = ds;
+  }
+  var booked = 0;   /* 予定内の枠(idx < res.count)で時刻が入っている本数。予定外の印は数えない */
+  for (var i = 0; i < res.count; i++) {
+    if (getBookedTime(ym, d, i) !== null) booked++;
+  }
+  btn.textContent = '🎫予約' + (booked > 0 ? String(booked) : '') + (bookBarOpen ? '▴' : '▾');
+  btn.setAttribute('aria-expanded', bookBarOpen ? 'true' : 'false');
+  btn.style.display = '';
+  if (!bookBarOpen) return;   /* 閉じているときは欄は高さゼロのまま */
+
+  for (var idx = 0; idx < res.count; idx++) {
+    var item = document.createElement('span');
+    item.className = 'book-item';
+    var slot = document.createElement('span');
+    slot.className = 'book-slot';
+    slot.textContent = feelSlotName(res, idx);
+    item.appendChild(slot);
+    item.appendChild(buildBookingSelect(ym, d, idx, { res: res, compact: true, onSaved: render }));
+    bar.appendChild(item);
+  }
+  bar.className = 'show';
+}
+
+/* 15章 ステップ25: 予約欄の開閉ボタン。開閉を切り替えて描き直すだけ */
+$('di-book-btn').addEventListener('click', function () {
+  bookBarOpen = !bookBarOpen;
+  render();
+});
 
 /* 詳細欄をタップすると、その日の全文(シフト表の補足と自分のメモ)を表示する。
    表示は alert なので、どんな文字を入れても文字としてしか出ない(XSS の心配がない) */
@@ -3387,8 +3398,14 @@ function scrollExerciseToToday() {
     $('ex-list').scrollTop = 0;
     return;
   }
-  var row = $('ex-list').querySelector('.ex-row-today');
-  if (row) $('ex-list').scrollTop = Math.max(0, row.offsetTop - 8);
+  var list = $('ex-list');
+  var row = list.querySelector('.ex-row-today');
+  if (!row) return;
+  /* row.offsetTop の基準(offsetParent)は position:fixed のシート(#sheet-exercise)であって
+     #ex-list ではないため、そのまま scrollTop に使うと見出し・回数の箱ぶんが上乗せされて
+     今日の行が一覧の上に隠れる(2026-09-14 手直し)。画面上の位置の差から一覧内の位置を出す */
+  var delta = row.getBoundingClientRect().top - list.getBoundingClientRect().top;
+  list.scrollTop = Math.max(0, list.scrollTop + delta - 8);
 }
 
 /* ================= 運動予定(2026-07-27 追加。計画.md 10章) ================= */
@@ -3918,9 +3935,114 @@ function buildExerciseRow(row, ym) {
     ym: ym, d: row.d,
     count: row.res.count > 0 ? row.res.count : 0,
     slots: row.res.slots || [],
-    withMuscle: row.isMuscleDay
+    withMuscle: row.isMuscleDay,
+    res: row.res   /* 15章: 予約プルダウンの呼び名(feelSlotName)用 */
   }));
   return el;
+}
+
+/* ===== 15章(2026-09-14): 予約時刻のプルダウン(共通部品。計画.md 15-4-2) =====
+   選択肢は常に「予約なし / 7:00 / 7:30 / 18:30 /(保存済みの任意の時刻をその位置に)/ その他…」。
+   固定の時刻か「予約なし」を選んだ瞬間に保存。「その他…」は時刻入力+決定/やめる。
+   opts.res       : getFeelcycleCountBoosted の結果(呼び名 feelSlotName 用)
+   opts.removeOnly: 予定外の枠用。「その値 / 予約なし」の2択だけにする
+   opts.compact   : 日付タップ欄用(ステップ22で使う予定。いまは見た目を変えない)
+   opts.onSaved   : 保存した後に呼ぶ再描画(呼び出し側で決める)
+   文字はすべて textContent で入れる。日記には書かない */
+function buildBookingSelect(ym, d, idx, opts) {
+  opts = opts || {};
+  var mNum = parseInt(ym.slice(5, 7), 10);
+  var slotName = feelSlotName(opts.res, idx);
+  var labelBase = mNum + '/' + d + ' ' + slotName + ' の予約時刻';
+
+  var wrap = document.createElement('span');
+  wrap.className = 'book-wrap';
+  var sel = document.createElement('select');
+  sel.setAttribute('aria-label', labelBase);
+
+  var other = document.createElement('span');
+  other.className = 'book-other';
+  var input = document.createElement('input');
+  input.type = 'time';
+  input.step = '300';   /* 5分刻み(効かない端末もある。洗浄は刻みを強制しないので、どの分でも保存できる) */
+  input.setAttribute('aria-label', labelBase + '(その他)');
+  var okBtn = document.createElement('button');
+  okBtn.type = 'button';
+  okBtn.textContent = '決定';
+  var cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button';
+  cancelBtn.textContent = 'やめる';
+  other.appendChild(input);
+  other.appendChild(okBtn);
+  other.appendChild(cancelBtn);
+
+  function addOpt(value, text) {
+    var o = document.createElement('option');
+    o.value = value;
+    o.textContent = text;
+    sel.appendChild(o);
+  }
+  /* 保存済みの値から選択肢と見た目を作り直す(保存のたび・やめるのたびに呼ぶ) */
+  function paint() {
+    var current = getBookedTime(ym, d, idx);
+    sel.textContent = '';
+    addOpt('', '予約なし');
+    if (opts.removeOnly) {
+      if (current !== null) addOpt(current, current);
+    } else {
+      var times = BOOK_PRESETS.slice();
+      if (current !== null && times.indexOf(current) < 0) {
+        /* <select> は選択肢に無い値を表示できないので、任意の時刻はこの枠の選択肢に早い順の位置で加える */
+        var pos = times.length;
+        for (var k = 0; k < times.length; k++) {
+          if (bookTimeMinutes(current) < bookTimeMinutes(times[k])) { pos = k; break; }
+        }
+        times.splice(pos, 0, current);
+      }
+      times.forEach(function (t) { addOpt(t, t); });
+      addOpt('other', 'その他…');
+    }
+    sel.value = current !== null ? current : '';
+    sel.className = 'book-sel' + (current !== null ? ' is-booked' : '');
+  }
+  function hideOther() { other.classList.remove('show'); }
+
+  sel.addEventListener('change', function () {
+    if (sel.value === 'other') {
+      /* 時刻入力を出すだけ。保存はまだしない */
+      var current = getBookedTime(ym, d, idx);
+      var iv = '';
+      if (current !== null) {
+        var hp = current.split(':');
+        iv = (hp[0].length < 2 ? '0' + hp[0] : hp[0]) + ':' + hp[1];   /* <input type="time"> は "07:00" の形 */
+      }
+      input.value = iv;
+      other.classList.add('show');
+      try { input.focus(); } catch (e) { /* フォーカスできない端末でも何もしない */ }
+      return;
+    }
+    hideOther();
+    setBookedTime(ym, d, idx, sel.value || null);   /* '' → null = 印を外す */
+    paint();
+    if (opts.onSaved) opts.onSaved();
+  });
+  okBtn.addEventListener('click', function () {
+    var t = normalizeBookTime(input.value);
+    if (t === null) { toast('時刻を入れてください'); return; }
+    setBookedTime(ym, d, idx, t);
+    hideOther();
+    paint();
+    if (opts.onSaved) opts.onSaved();
+  });
+  cancelBtn.addEventListener('click', function () {
+    hideOther();
+    paint();   /* 元の値に戻す。何も保存しない */
+  });
+
+  paint();
+  wrap.appendChild(sel);
+  wrap.appendChild(other);
+  return wrap;
 }
 
 /* 記録ボタンのまとまりを作る。
@@ -3930,6 +4052,12 @@ function buildExerciseRow(row, ym) {
 function buildRecordGroup(opt) {
   var wrap = document.createElement('div');
   wrap.className = 'rec-group';
+  /* 15章(2026-09-14): 予約時刻のプルダウンを出してよい行か(今日以降の日だけ。過去日には出さない)。
+     res(getFeelcycleCountBoosted の結果)を受け取った呼び出しだけが対象 */
+  var bookTodayDay = getTodayDay();
+  var bookingOpenRow = !!opt.res &&
+    dateStrOf(parseInt(opt.ym.slice(0, 4), 10), parseInt(opt.ym.slice(5, 7), 10), opt.d) >=
+    dateStrOf(bookTodayDay.y, bookTodayDay.m, bookTodayDay.d);
 
   /* 項目ごとに「済」ボタンと、その横に控えめな「🌙」ボタンを並べる(2026-07-28 問題39)。
      済を押せば済、🌙を押せば休み。どちらを記録するにも、もう一方の状態を経由しない。
@@ -3987,10 +4115,41 @@ function buildRecordGroup(opt) {
       } else {
         label = opt.count > 1 ? String(idx + 1) : '🚴';
       }
+      var pairStart = wrap.childNodes.length;
       addPair(label,
         function () { return getFeelState(opt.ym, opt.d, idx); },
         function (next) { setFeelState(opt.ym, opt.d, idx, next); });
+      /* 15章(2026-09-14): 今日以降のフィール枠だけ、済/🌙 の右隣に予約時刻のプルダウンを置く。
+         保存後はプルダウン自身の見た目を更新してから afterRecordChange()(一覧は作り直さない)。
+         手直し(2026-09-14-03b): スマホ幅でプルダウンだけが次の行に落ちて 💪 の予約に見えないよう、
+         「ラベル・済・🌙・プルダウン」を1つの箱(.rec-slot)にまとめ、折り返すときは枠ごと折り返す。
+         addPair 自体は書き換えず、addPair が足した部品を後から箱へ移すだけ */
+      if (bookingOpenRow) {
+        var slotBox = document.createElement('span');
+        slotBox.className = 'rec-slot';
+        while (wrap.childNodes.length > pairStart) slotBox.appendChild(wrap.childNodes[pairStart]);
+        slotBox.appendChild(buildBookingSelect(opt.ym, opt.d, idx, { res: opt.res, onSaved: afterRecordChange }));
+        wrap.appendChild(slotBox);
+      }
     })(i);
+  }
+  /* 15章: 予定の本数より外に残った予約の印(⤴が外れた・シフトが変わった等)。
+     新規のプルダウンは出さず、「その値 / 予約なし」の2択だけ(外すことだけできる)。今日以降の日だけ */
+  if (bookingOpenRow) {
+    var bookRec = getDayRecord(opt.ym, opt.d);
+    var bookLen = (bookRec && Array.isArray(bookRec.booked)) ? bookRec.booked.length : 0;
+    for (var bj = opt.count; bj < bookLen; bj++) {
+      if (getBookedTime(opt.ym, opt.d, bj) === null) continue;
+      var orphanBox = document.createElement('span');
+      orphanBox.className = 'rec-slot';   /* ラベルとプルダウンを離さない(手直し 03b) */
+      var orphanLab = document.createElement('span');
+      orphanLab.className = 'rec-label';
+      orphanLab.textContent = '予定外';
+      orphanBox.appendChild(orphanLab);
+      orphanBox.appendChild(buildBookingSelect(opt.ym, opt.d, bj,
+        { res: opt.res, removeOnly: true, onSaved: afterRecordChange }));
+      wrap.appendChild(orphanBox);
+    }
   }
   if (opt.withMuscle) {
     addPair('💪',
@@ -4064,6 +4223,33 @@ function buildRecordGroup(opt) {
     }, 700);
   });
   wrap.appendChild(muscleExtraBtn);
+
+  /* 15章 ステップ24(2026-09-14): 🌙+予約の注意文(計画.md 15-1 #51 / 15-5 / 15-8 数値パターン7)。
+     今日以降の日で、フィール枠が🌙(rest)なのに予約時刻が残っていれば、行の直下に1枠1行で出す。
+     両方が揃っている間ずっと出し、「予約なし」にする・🌙を取り消す・済にすると消える。
+     一覧は作り直さない流儀(afterRecordChange)なので、行の中のクリック・変更のたびに描き直す
+     (addPair・済/🌙の処理・プルダウンの処理は書き換えず、行のまとまりでイベントを受けるだけ)。
+     読むだけ。state は書き換えない。文字は textContent */
+  if (bookingOpenRow && opt.count > 0) {
+    var restNote = document.createElement('div');
+    restNote.className = 'book-rest-note';
+    var paintRestNote = function () {
+      restNote.textContent = '';
+      for (var ri = 0; ri < opt.count; ri++) {
+        if (getFeelState(opt.ym, opt.d, ri) !== 'rest') continue;
+        var restBooked = getBookedTime(opt.ym, opt.d, ri);
+        if (restBooked === null) continue;
+        var restLine = document.createElement('div');
+        restLine.textContent = '予約(' + restBooked + ')が残っています。フィール側でキャンセル(開始120分前まで)したら「予約なし」にしてください';
+        restNote.appendChild(restLine);
+      }
+      restNote.className = 'book-rest-note' + (restNote.childNodes.length ? ' show' : '');
+    };
+    paintRestNote();
+    wrap.addEventListener('click', paintRestNote);    /* 済・🌙・「その他…」の決定/やめる のあと(バブリングで後から呼ばれる) */
+    wrap.addEventListener('change', paintRestNote);   /* プルダウンで時刻・予約なしを選んだあと */
+    wrap.appendChild(restNote);
+  }
   return wrap;
 }
 
@@ -4102,8 +4288,15 @@ function trimOrphanRecords(ym) {
       while (rec.feel.length && rec.feel[rec.feel.length - 1] === null) rec.feel.pop();
       if (!rec.feel.length) delete rec.feel;
     }
+    /* 15章(2026-09-14): 予約の印も feel と同じく予定の本数で切り詰める(予定外の添字だけ消える) */
+    if (Array.isArray(rec.booked)) {
+      rec.booked = rec.booked.slice(0, res.count);
+      while (rec.booked.length && rec.booked[rec.booked.length - 1] === null) rec.booked.pop();
+      if (!rec.booked.length) delete rec.booked;
+    }
     if (rec.muscle && muscleDays.indexOf(String(d)) < 0) delete rec.muscle;
-    if (!rec.feel && !rec.muscle) delete mo[String(d)];
+    /* 16章: 🚴+ / 💪+ / 旧walk だけの日を「空」と誤判定して消さないよう、共通の判定に統一 */
+    if (isEmptyRecord(rec)) delete mo[String(d)];
   }
   if (!Object.keys(mo).length) delete state.exercise.records[ym];
   saveState();
@@ -4361,7 +4554,7 @@ function renderExercise() {
   }
 
   updateExerciseCounts();
-  renderPacking();
+  renderScheduleTodayTomorrow(); /* 昨日・今日・明日の予定行(2026-09-14: 計画.md 17章の欄廃止に伴い、ここから直接呼ぶ) */
 }
 
 /* 月間カウント(予定と済)の表示だけを更新する。
@@ -4376,6 +4569,7 @@ function updateExerciseCounts() {
   var total = plan.total; /* 14-4: 分母は plan.total をそのまま使う。ループ内で積み上げ直さない(二重計算防止) */
   var feelDone = 0, feelRest = 0, feelExtra = 0, walkTotal = 0;
   var orphanDays = [];   /* 予定より多く記録が残っている日(問題40) */
+  var orphanHasBooked = false;   /* 15章 ステップ24: 予定外の記録に予約の時刻が含まれるか(通知の追記用) */
   for (var d = 1; d <= dim; d++) {
     var ds = dateStrOf(cur.y, cur.m, d);
     var shEntry = normShift(monthShifts[String(d)]);
@@ -4392,6 +4586,17 @@ function updateExerciseCounts() {
     if (rec && Array.isArray(rec.feel)) {
       for (var j = res.count; j < rec.feel.length; j++) {
         if (rec.feel[j] === 'done' || rec.feel[j] === 'rest') { orphanDays.push(d); break; }
+      }
+    }
+    /* 15章(2026-09-14): 予定の本数より外に残った予約の印も検出する(⤴が外れた・シフトが変わった等)。
+       ステップ24: 通知に「予約の時刻も含みます」を足すため、feel 側で既に検出済みの日でも印の有無を控える */
+    if (rec && Array.isArray(rec.booked)) {
+      for (var bj = res.count; bj < rec.booked.length; bj++) {
+        if (rec.booked[bj] != null) {
+          orphanHasBooked = true;
+          if (orphanDays.indexOf(d) < 0) orphanDays.push(d);
+          break;
+        }
       }
     }
     if (rec && rec.muscle && (state.exercise.muscle[ym] || []).indexOf(String(d)) < 0) {
@@ -4444,14 +4649,16 @@ function updateExerciseCounts() {
   if (orphanDays.length) {
     noteEl.className = 'ex-orphan-note show';
     var msg = document.createElement('span');
-    msg.textContent = orphanDays.join('日・') + '日 の記録の一部が、今の予定の回数に収まらなくなっています(数には入っていません)。';
+    /* 15章 ステップ24(2026-09-14): 予定外の予約の印が含まれるときだけ、文言と確認ダイアログに1文を足す(15-5) */
+    var bookedAddTxt = orphanHasBooked ? '(予約の時刻も含みます。フィール側の予約も確認してください)' : '';
+    msg.textContent = orphanDays.join('日・') + '日 の記録の一部が、今の予定の回数に収まらなくなっています(数には入っていません)。' + bookedAddTxt;
     noteEl.appendChild(msg);
     var btn = document.createElement('button');
     btn.className = 'btn sub small';
     btn.style.marginTop = '6px';
     btn.textContent = '収まらない記録を整理する';
     btn.addEventListener('click', function () {
-      if (!confirm('予定の回数に収まらない記録を消して、表示と数を合わせます。\n(' + orphanDays.join('日・') + '日)\n\nよろしいですか?')) return;
+      if (!confirm('予定の回数に収まらない記録を消して、表示と数を合わせます。\n(' + orphanDays.join('日・') + '日)\n' + (bookedAddTxt ? bookedAddTxt + '\n' : '') + '\nよろしいですか?')) return;
       trimOrphanRecords(ym);
       renderExercise();
       toast('記録を整理しました');
@@ -4509,162 +4716,143 @@ function updateExerciseCounts() {
     void tuanBox.offsetWidth; /* reflow でアニメーションを最初から再生させる(フィールサイクル30回と同じ仕組み) */
     tuanBox.classList.add('flash');
   }
+
+  /* 15章 ステップ23: 予約状況の箱。月ループ(cur 基準)には足さず、実際の今日を基準に別計算する */
+  try { updateBookingStatus(); } catch (e) { /* 失敗しても回数の表示は壊さない */ }
 }
 
-/* ================= 明日の持ち物(2026-08-08 追加) =================
-   「明日」は実際の今日から見た翌日(new Date() 基準)。表示中のカレンダーの月とは無関係 */
+/* ===== 15章 ステップ23(2026-09-14): フィールサイクルの予約状況(計画.md 15-4-1 / 15-5) =====
+   読むだけ。state を書き換えず saveState() も呼ばない。
+   getFeelcycleCount / computeFeelcycleBoostPlan / getFeelcycleCountBoosted は呼ぶだけで中身に触れない。
+   分子(doneAll)・分母(plan.total)・お祝い演出の計算には一切関与しない。日記には書かない */
+
+/* そのレッスン日が予約できるか。ここだけ差し替えれば公開モデルを変えられる(#56)。
+   「今日から7日以内」= 7日ちょうどの日を含む(15-2 決定1・4a)。時刻は見ない(日単位) */
+function isBookingOpen(ds, todayDs) {
+  return ds <= addDaysToDateStr(todayDs, BOOK_AHEAD);
+}
+/* そのレッスンが予約できるようになる日(表示用) */
+function bookingOpenDate(ds) {
+  return addDaysToDateStr(ds, -BOOK_AHEAD);
+}
+/* 修正 2026-09-14-07 V5: 箱の枠の呼び名も feelSlotName に一本化(旧 bookingBoxSlotName は削除)。
+   朝が2本の日は箱でも「朝1/朝2」と出る */
+function computeBookingStatus() {
+  var today = getTodayDay();   /* 実際の今日。cur(表示中の月)は使わない */
+  var todayDs = dateStrOf(today.y, today.m, today.d);
+  var plans = {};              /* 年月 → computeFeelcycleBoostPlan(ym)。月ごとに1回だけ計算する */
+  var held = [];
+  var next = null;
+  var firstUnimported = null;
+  for (var offset = 0; offset < BOOK_WINDOW; offset++) {
+    var day = new Date(today.y, today.m - 1, today.d + offset);   /* 月またぎ・年またぎは Date に任せる */
+    var y = day.getFullYear(), m = day.getMonth() + 1, d = day.getDate();
+    var ym = ymKey(y, m);
+    var ds = dateStrOf(y, m, d);
+    if (!plans.hasOwnProperty(ym)) plans[ym] = computeFeelcycleBoostPlan(ym);
+    var shEntry = normShift((state.shifts[ym] || {})[String(d)]);
+    var isManual = (state.exercise.closureDays[ym] || []).indexOf(String(d)) >= 0;
+    var res = getFeelcycleCountBoosted(ds, shEntry, isManual, plans[ym]);   /* 既存関数そのまま */
+    if (!shEntry && firstUnimported === null) firstUnimported = ds;
+    var rec = getDayRecord(ym, d);
+    var bookedLen = rec && Array.isArray(rec.booked) ? rec.booked.length : 0;
+    var nSlots = Math.max(res.count, bookedLen);   /* 予定外に残った印も見る */
+    for (var idx = 0; idx < nSlots; idx++) {
+      var time = getBookedTime(ym, d, idx);
+      var label = feelSlotName(res, idx);
+      if (time !== null) {
+        /* 今日の分も保有に数える(15-2 決定2: 枠が空くのは日付が変わったとき) */
+        held.push({ ds: ds, idx: idx, label: label, time: time, orphan: idx >= res.count,
+                    extraSlot: idx >= res.count || idx >= (res.slots || []).length });
+      } else if (idx < res.count && next === null) {
+        /* 今日の枠で✓か🌙を押してあれば、もう予約対象ではない(終わった/休むと決めた)。
+           修正 2026-09-14-07 V6: 未来の枠も🌙(休む)なら勧めない(✓が付いていても外す)。保有の数え方は変えない */
+        var st = getFeelState(ym, d, idx);
+        if (!(st === 'done' || st === 'rest')) {
+          next = { ds: ds, idx: idx, label: label };
+        }
+      }
+    }
+  }
+  /* 表示は日付順・時刻順(同じ日は時刻の早い順) */
+  held.sort(function (a, b) {
+    if (a.ds !== b.ds) return a.ds < b.ds ? -1 : 1;
+    var ta = bookTimeMinutes(a.time), tb = bookTimeMinutes(b.time);
+    if (ta !== tb) return ta - tb;
+    return a.idx - b.idx;
+  });
+  if (held.length >= BOOK_LIMIT) {
+    return { kind: 'full', todayDs: todayDs, held: held, next: next, freeAt: held[0], firstUnimported: firstUnimported };
+  }
+  if (next === null) return { kind: 'none', todayDs: todayDs, held: held, firstUnimported: firstUnimported };
+  if (!isBookingOpen(next.ds, todayDs)) {
+    return { kind: 'wait', todayDs: todayDs, held: held, next: next, openOn: bookingOpenDate(next.ds), firstUnimported: firstUnimported };
+  }
+  return { kind: 'now', todayDs: todayDs, held: held, next: next, firstUnimported: firstUnimported };
+}
+
+/* "2026-09-10" → "9/10" / "9/10(木)" */
+function bookingMD(ds) {
+  var p = parseDateStr(ds);
+  return p.m + '/' + p.d;
+}
+function bookingMDW(ds) {
+  return bookingMD(ds) + '(' + WEEK_JA[dowOfDateStr(ds)] + ')';
+}
+
+/* 箱 #ex-book-box の表示を更新する(15-5 の文言表どおり)。文字はすべて textContent */
+function updateBookingStatus() {
+  var heldEl = $('ex-book-held'), nextEl = $('ex-book-next'), noteEl = $('ex-book-note');
+  if (!heldEl || !nextEl || !noteEl) return;
+  var s = computeBookingStatus();
+
+  /* 1行目: 🎫 予約 ◯ / 3本: 9/10 7:00・9/10 18:30(⤴の3本目は「3本目」、予定外の印は「予定外」を時刻の前に) */
+  var list = s.held.map(function (h) {
+    return bookingMD(h.ds) + ' ' + (h.extraSlot ? h.label + ' ' : '') + h.time;
+  });
+  heldEl.textContent = '🎫 予約 ' + s.held.length + ' / ' + BOOK_LIMIT + '本: ' + (list.length ? list.join('・') : 'なし');
+
+  /* 2行目(太字): 状態は ◎ / ⏳ / 📅 の記号と文字で区別する(色は使わない) */
+  var line;
+  var nextTxt = s.next ? bookingMDW(s.next.ds) + s.next.label : null;
+  if (s.kind === 'now') {
+    line = '次に予約: ' + nextTxt + ' ◎ 今すぐ予約できます';
+  } else if (s.kind === 'full') {
+    var free = s.freeAt.ds === s.todayDs
+      ? '⏳ 今日(' + bookingMD(s.todayDs) + ')が過ぎると1本空きます(日付が変わると反映)'
+      : '⏳ ' + bookingMDW(s.freeAt.ds) + 'が過ぎると1本空きます';
+    line = '次に予約: ' + (nextTxt ? nextTxt + ' ' : 'なし ') + free;
+  } else if (s.kind === 'wait') {
+    line = '次に予約: ' + nextTxt + ' 📅 ' + bookingMDW(s.openOn) + 'から予約できます';
+  } else {
+    line = '次に予約: なし(2週間先まで予約済み・または予定なし)';
+  }
+  if (s.firstUnimported) line += '／' + bookingMD(s.firstUnimported) + '以降はシフト未取り込み';
+  nextEl.textContent = line;
+
+  /* wait のときだけ注記を添える。それ以外は空(:empty で高さゼロ) */
+  noteEl.textContent = s.kind === 'wait'
+    ? '※ 7日先まで予約できる前提で計算(公式FAQでは金曜20時ごろ公開。食い違ったらこの計算を直す)'
+    : '';
+}
+
+/* ================= 明日の日付(昨日・今日・明日の予定行で使う) =================
+   「明日」は実際の今日から見た翌日(new Date() 基準)。表示中のカレンダーの月とは無関係。
+   2026-09-14: 旧「明日の準備」欄は計画.md 17章で廃止。この関数名は 13章・14章が言及しているので変えない */
 function getPackingDay() {
   var t = new Date();
   t.setDate(t.getDate() + 1);
   return { y: t.getFullYear(), m: t.getMonth() + 1, d: t.getDate() };
 }
 
-/* 既存の getFeelcycleCount と getMuscleSessionsOf をそのまま使い、
-   フィールサイクル回数+筋トレセッション数の合計から既定タブを決める(2026-08-19 変更)。
-   合計が2以上なら「2回分」、1以下は「1回分」(上限2、持ち物タブが2種類しかないため頭打ち) */
-function packingAutoTab(day) {
-  var ds = dateStrOf(day.y, day.m, day.d);
-  var ym = ymKey(day.y, day.m);
-  var shEntry = normShift((state.shifts[ym] || {})[String(day.d)]);
-  var closure = state.exercise.closureDays[ym] || [];
-  var res = getFeelcycleCount(ds, shEntry, closure.indexOf(String(day.d)) >= 0);
-  var muscleCount = getMuscleSessionsOf(ds).length;
-  var total = res.count + muscleCount;
-  return (total >= 2) ? 2 : 1;
-}
-
-function getPackingRecord(day, createIfMissing) {
-  var ym = ymKey(day.y, day.m);
-  var key = String(day.d);
-  if (!state.exercise.packing[ym]) {
-    if (!createIfMissing) return null;
-    state.exercise.packing[ym] = {};
-  }
-  var mo = state.exercise.packing[ym];
-  if (!mo[key]) {
-    if (!createIfMissing) return null;
-    mo[key] = {};
-  }
-  return mo[key];
-}
-
-/* 記録が空になったら月・日のキーごと消して、保存データを肥大化させない */
-function cleanupPackingRecord(day) {
-  var ym = ymKey(day.y, day.m);
-  var mo = state.exercise.packing[ym];
-  if (!mo) return;
-  var key = String(day.d);
-  var rec = mo[key];
-  if (rec && !rec.tab && !rec.checked && !rec.overrides && !rec.needOverride) delete mo[key];
-  if (mo && !Object.keys(mo).length) delete state.exercise.packing[ym];
-}
-
-function getPackingTab(day) {
-  var rec = getPackingRecord(day, false);
-  if (rec && (rec.tab === 1 || rec.tab === 2)) return rec.tab;
-  return packingAutoTab(day);
-}
-function setPackingTab(day, tab) {
-  var rec = getPackingRecord(day, true);
-  rec.tab = tab;
-  saveState();
-}
-function getPackingOverride(day, itemId) {
-  var rec = getPackingRecord(day, false);
-  if (rec && rec.overrides && typeof rec.overrides[itemId] === 'number') return rec.overrides[itemId];
-  return null;
-}
-/* その日・その項目だけの数量上書き。既定値と同じ数に戻したら上書きを消す(データを増やさない) */
-function setPackingOverride(day, itemId, qty, defaultQty) {
-  var rec = getPackingRecord(day, true);
-  if (!rec.overrides) rec.overrides = {};
-  if (qty === defaultQty) delete rec.overrides[itemId];
-  else rec.overrides[itemId] = qty;
-  if (!Object.keys(rec.overrides).length) delete rec.overrides;
-  cleanupPackingRecord(day);
-  saveState();
-}
-function getPackingChecked(day, itemId) {
-  var rec = getPackingRecord(day, false);
-  return !!(rec && rec.checked && rec.checked[itemId]);
-}
-function togglePackingChecked(day, itemId) {
-  var rec = getPackingRecord(day, true);
-  if (!rec.checked) rec.checked = {};
-  if (rec.checked[itemId]) delete rec.checked[itemId];
-  else rec.checked[itemId] = true;
-  if (!Object.keys(rec.checked).length) delete rec.checked;
-  cleanupPackingRecord(day);
-  saveState();
-}
-
-/* ===== 持ち物の要否の自動判定(2026-08-09 追加) =====
-   対象は id で見分ける組み込み3項目だけ(k1=シャンプー・ボディソープ / k9=日焼け止め / k10=整髪剤)。
-   それ以外の項目(固定・回数連動とも)は今までどおり常に「必要」として扱う */
+/* ===== 明日に筋トレの予定があるか(2026-08-09 追加) =====
+   scheduleSummaryFor の「💪筋トレ予定」表示が使う。関数名は変えない(2026-09-14: 旧欄の要否判定は計画.md 17章で廃止) */
 function packingMuscleTomorrow(day) {
   var ym = ymKey(day.y, day.m);
   var ds = dateStrOf(day.y, day.m, day.d);
   if (getMuscleSessionsOf(ds).length > 0) return true; /* 金曜(am/pm)も exercise.muscle の予定日もここに含まれる */
   return getMuscleExtraCount(ym, day.d) > 0;
 }
-function packingMorningFeelTomorrow(day) {
-  var ds = dateStrOf(day.y, day.m, day.d);
-  var ym = ymKey(day.y, day.m);
-  var shEntry = normShift((state.shifts[ym] || {})[String(day.d)]);
-  var closure = state.exercise.closureDays[ym] || [];
-  var res = getFeelcycleCount(ds, shEntry, closure.indexOf(String(day.d)) >= 0);
-  return !!(res.slots && res.slots.indexOf('朝') >= 0);
-}
-/* この項目が自動判定の対象かどうか(対象外の項目は常に必要=トグルも出さない) */
-function packingItemHasAutoRule(def) {
-  return def.id === 'k1' || def.id === 'k9' || def.id === 'k10';
-}
-/* 明日の予定だけから見た「必要/不要」(その日だけの手動上書きを含まない) */
-function packingItemAutoNeeded(def, day) {
-  if (def.id === 'k1') return packingMuscleTomorrow(day);          /* シャンプー・ボディソープ: 筋トレの予定がある日だけ */
-  if (def.id === 'k9' || def.id === 'k10') return packingMorningFeelTomorrow(day); /* 日焼け止め・整髪剤: 朝のフィールサイクルがある日だけ */
-  return true;   /* その他は今までどおり常に必要 */
-}
-function getPackingNeedOverride(day, itemId) {
-  var rec = getPackingRecord(day, false);
-  if (rec && rec.needOverride && typeof rec.needOverride[itemId] === 'boolean') return rec.needOverride[itemId];
-  return null;
-}
-/* 実際に一覧へ出す「必要/不要」(自動判定 → その日だけの手動上書きがあれば優先) */
-function packingItemNeeded(def, day) {
-  var override = getPackingNeedOverride(day, def.id);
-  if (override !== null) return override;
-  return packingItemAutoNeeded(def, day);
-}
-/* タップで必要/不要をその日だけ切り替える。自動判定と同じ値に戻したら上書きを消す(データを増やさない) */
-function togglePackingNeed(day, itemId, autoNeeded) {
-  var rec = getPackingRecord(day, true);
-  var current = (rec.needOverride && typeof rec.needOverride[itemId] === 'boolean')
-    ? rec.needOverride[itemId] : autoNeeded;
-  var next = !current;
-  if (!rec.needOverride) rec.needOverride = {};
-  if (next === autoNeeded) delete rec.needOverride[itemId];
-  else rec.needOverride[itemId] = next;
-  if (!Object.keys(rec.needOverride).length) delete rec.needOverride;
-  cleanupPackingRecord(day);
-  saveState();
-}
-
-/* 明日の予定を1行にまとめる(2026-08-09 追加。持ち物の見出しのすぐ下に出して、
-   なぜシャンプー・日焼け止めなどが必要/不要と判定されたのかを、下までスクロールしたまま確認できるようにする) */
-function packingTomorrowSummary(day) {
-  var ym = ymKey(day.y, day.m);
-  var shEntry = normShift((state.shifts[ym] || {})[String(day.d)]);
-  var parts = [];
-  parts.push(shEntry ? (shEntry.label === UNKNOWN_LABEL ? '不明' : shEntry.label) : 'シフト未確定');
-  var ds = dateStrOf(day.y, day.m, day.d);
-  var closure = state.exercise.closureDays[ym] || [];
-  var res = getFeelcycleCount(ds, shEntry, closure.indexOf(String(day.d)) >= 0);
-  if (res.count > 0) parts.push('🚴' + feelSlotsLabel(res));
-  if (packingMuscleTomorrow(day)) parts.push('💪筋トレ予定');
-  return parts.join(' ');
-}
-
 /* 「今日」の実際の日付(new Date() 基準)。getPackingDay と対になる */
 function getTodayDay() {
   var t = new Date();
@@ -4680,7 +4868,7 @@ function getYesterdayDay() {
 }
 
 /* シフト・運動予定・繰り返し予定をまとめた1行の予定要約(2026-08-12 追加)。
-   packingTomorrowSummary(明日専用)と中身は同じだが、今日・明日どちらの日付にも使えるよう共通化した */
+   昨日・今日・明日のどの日付にも使える共通の要約(2026-09-14: 明日専用だった旧欄の要約は計画.md 17章で廃止) */
 function scheduleSummaryFor(day) {
   var ym = ymKey(day.y, day.m);
   var shEntry = normShift((state.shifts[ym] || {})[String(day.d)]);
@@ -4696,12 +4884,13 @@ function scheduleSummaryFor(day) {
   return parts.join(' ');
 }
 
-/* 持ち物欄の下に昨日・今日・明日の予定を3行で出す(2026-08-12 追加、2026-08-13 昨日・今日に変更。
-   持ち物を見るのにカレンダーまでスクロールし直さなくて済むように、というユーザー要望。
-   持ち物リストの下から下方向にスクロールしても月末の日付一覧まで進んでしまい、今日の欄に
-   戻りにくいとの声を受けて、明日ではなく昨日を表示するようにした(明日の持ち物欄は対象外)。
+/* 運動予定一覧の上に昨日・今日・明日の予定を3行で出す(2026-08-12 追加、2026-08-13 昨日・今日に変更。
+   予定を見るのにカレンダーまでスクロールし直さなくて済むように、というユーザー要望。
+   下方向にスクロールしても月末の日付一覧まで進んでしまい、今日の欄に
+   戻りにくいとの声を受けて、明日ではなく昨日を表示するようにした。
    2026-08-14 追加: 明日の予定も見たいとの要望で「明日」行を追加。明日の日付は
-   getPackingDay()(持ち物欄の対象日=翌日)をそのまま流用する。関数名は変更しない) */
+   getPackingDay()(翌日)をそのまま流用する。関数名は変更しない。
+   2026-09-14: 旧「明日の準備」欄の廃止(計画.md 17章)に伴い、renderExercise() の末尾から直接呼ぶようにした) */
 function renderScheduleTodayTomorrow() {
   var box = $('schedule-today-tomorrow');
   if (!box) return;
@@ -4714,171 +4903,6 @@ function renderScheduleTodayTomorrow() {
     box.appendChild(line);
   });
 }
-
-function renderPacking() {
-  var day = getPackingDay();
-  var w = WEEK_JA[new Date(day.y, day.m - 1, day.d).getDay()];
-  /* 2026-08-09: 「明日の予定」を日付と同じ行にまとめて出す(下にスクロールしたまま
-     シャンプー・日焼け止めなどの要否の理由が分かるように。要望元は追加のコーディネーター指示) */
-  $('packing-date').textContent = day.m + '月' + day.d + '日(' + w + ') ' + packingTomorrowSummary(day);
-  renderScheduleTodayTomorrow();
-
-  var tab = getPackingTab(day);
-  Array.prototype.forEach.call(document.querySelectorAll('#packing-tabs .diet-tab'), function (btn) {
-    btn.classList.toggle('on', parseInt(btn.getAttribute('data-ptab'), 10) === tab);
-  });
-
-  var list = $('packing-list');
-  list.textContent = '';
-
-  /* 2026-08-09: 明日の予定から見て「必要」な項目を上、「不要」な項目を下に並べる(自動ソート)。
-     並び替えは安定ソート(グループ内は元の並び順を保つ)にする */
-  var rows = state.exercise.packingDefs.map(function (def) {
-    var hasRule = packingItemHasAutoRule(def);
-    var autoNeeded = packingItemAutoNeeded(def, day);
-    var needed = packingItemNeeded(def, day);
-    return { def: def, hasRule: hasRule, autoNeeded: autoNeeded, needed: needed };
-  });
-  var ordered = rows.filter(function (r) { return r.needed; })
-    .concat(rows.filter(function (r) { return !r.needed; }));
-
-  ordered.forEach(function (item) {
-    var def = item.def;
-    /* 2026-09-06: 「1回分の基準数+回数ごとに+1」ルール(baseExtra)を追加。
-       通常の項目は baseExtra が無い(0)ので、今までどおり「1回分→1・2回分→2」のまま変わらない */
-    var defaultQty = def.scales ? (tab + (def.baseExtra || 0)) : 1;
-    var override = def.scales ? getPackingOverride(day, def.id) : null;
-    var qty = (override !== null) ? override : defaultQty;
-    var checked = getPackingChecked(day, def.id);
-
-    var row = document.createElement('div');
-    row.className = 'pk-row' + (item.needed ? '' : ' pk-row-unneeded');
-    var name = document.createElement('span');
-    name.className = 'pk-name';
-    name.textContent = def.name;
-    row.appendChild(name);
-
-    /* 自動判定の対象項目だけ、必要/不要をその日だけ手動で切り替えられるボタンを出す */
-    if (item.hasRule) {
-      var needBtn = document.createElement('button');
-      needBtn.type = 'button';
-      needBtn.className = 'pk-need-btn' + (item.needed ? '' : ' off');
-      needBtn.textContent = item.needed ? '必要' : '不要';
-      needBtn.setAttribute('aria-label', def.name + 'は今のところ' + (item.needed ? '必要' : '不要') +
-        'と判定されています。タップで切り替えられます');
-      needBtn.addEventListener('click', function () {
-        togglePackingNeed(day, def.id, item.autoNeeded);
-        renderPacking();
-      });
-      row.appendChild(needBtn);
-    }
-
-    var qtyWrap = document.createElement('div');
-    qtyWrap.className = 'pk-qty';
-    if (def.scales) {
-      var minus = document.createElement('button');
-      minus.type = 'button';
-      minus.textContent = '−';
-      minus.setAttribute('aria-label', def.name + 'を減らす');
-      minus.disabled = qty <= 1;
-      minus.addEventListener('click', function () {
-        setPackingOverride(day, def.id, Math.max(1, qty - 1), defaultQty);
-        renderPacking();
-      });
-      var num = document.createElement('span');
-      num.className = 'pk-qty-num';
-      num.textContent = String(qty);
-      var plus = document.createElement('button');
-      plus.type = 'button';
-      plus.textContent = '+';
-      plus.setAttribute('aria-label', def.name + 'を増やす');
-      plus.disabled = qty >= 5;
-      plus.addEventListener('click', function () {
-        setPackingOverride(day, def.id, Math.min(5, qty + 1), defaultQty);
-        renderPacking();
-      });
-      qtyWrap.appendChild(minus);
-      qtyWrap.appendChild(num);
-      qtyWrap.appendChild(plus);
-    } else {
-      qtyWrap.textContent = '1' + (def.unit || '');
-    }
-    row.appendChild(qtyWrap);
-
-    var chk = document.createElement('button');
-    chk.type = 'button';
-    chk.className = 'pk-check' + (checked ? ' on' : '');
-    chk.textContent = checked ? '✓ 持った' : 'まだ';
-    chk.addEventListener('click', function () {
-      togglePackingChecked(day, def.id);
-      renderPacking();
-    });
-    row.appendChild(chk);
-
-    list.appendChild(row);
-  });
-  if (!state.exercise.packingDefs.length) {
-    var hint = document.createElement('div');
-    hint.className = 'hint';
-    hint.textContent = '持ち物がありません。「持ち物リストを編集」から追加できます。';
-    list.appendChild(hint);
-  }
-}
-
-Array.prototype.forEach.call(document.querySelectorAll('#packing-tabs .diet-tab'), function (btn) {
-  btn.addEventListener('click', function () {
-    setPackingTab(getPackingDay(), parseInt(btn.getAttribute('data-ptab'), 10));
-    renderPacking();
-  });
-});
-
-/* 項目の名前変更・追加・削除(スタンプ・習慣の編集と同じ考え方。既存の記録は残す) */
-function renderPackingDefList() {
-  var list = $('packing-def-list');
-  list.textContent = '';
-  state.exercise.packingDefs.forEach(function (def, idx) {
-    var row = dietRow((def.scales ? '🔁 ' : '📌 ') + def.name, null, [
-      { text: '名前変更', onClick: function () {
-        var v = prompt('持ち物の名前を入力', def.name);
-        if (v === null) return;
-        var t = String(v).trim();
-        if (!t) { toast('名前を入れてください'); return; }
-        def.name = t.slice(0, 40);
-        saveState(); renderPackingDefList(); renderPacking();
-      } },
-      { text: '削除', cls: 'dr-del', onClick: function () {
-        if (!confirm('持ち物「' + def.name + '」を削除しますか?')) return;
-        state.exercise.packingDefs.splice(idx, 1);
-        saveState(); renderPackingDefList(); renderPacking();
-        toast('持ち物「' + def.name + '」を削除しました');
-      } }
-    ]);
-    list.appendChild(row);
-  });
-  if (!state.exercise.packingDefs.length) {
-    var hint = document.createElement('div');
-    hint.className = 'hint';
-    hint.textContent = '持ち物がありません。「+ 持ち物を追加」で作れます。';
-    list.appendChild(hint);
-  }
-}
-$('packing-edit-toggle').addEventListener('click', function () {
-  var area = $('packing-edit-area');
-  var show = (area.style.display === 'none');
-  area.style.display = show ? '' : 'none';
-  if (show) renderPackingDefList();
-});
-$('packing-add-item').addEventListener('click', function () {
-  if (state.exercise.packingDefs.length >= 30) { toast('持ち物は30件までです'); return; }
-  var v = prompt('新しい持ち物の名前を入力');
-  if (v === null) return;
-  var t = String(v).trim();
-  if (!t) { toast('名前を入れてください'); return; }
-  var scales = confirm('「' + t + '」は回数(1回・2回)に応じて個数が変わりますか?\n\n「OK」= 回数連動(1〜2個)\n「キャンセル」= 固定(常に1個)');
-  state.exercise.packingDefs.push({ id: 'pk' + Date.now(), name: t.slice(0, 40), unit: '', scales: scales });
-  saveState(); renderPackingDefList(); renderPacking();
-  toast('持ち物「' + t.slice(0, 40) + '」を追加しました');
-});
 
 /* ================= スタンプ(下部のチップ横並び) ================= */
 function renderStampChipRow() {
@@ -6650,6 +6674,8 @@ $('reset-all').addEventListener('click', function () {
 document.addEventListener('visibilitychange', function () {
   if (document.visibilityState !== 'visible') return;
   try { updateMuscleGapNote(); } catch (e) { /* 失敗しても何もしない */ }
+  /* 15章 ステップ23: 予約状況の箱も、日付が変わっていれば計算し直す(枠が空くのは日付が変わったとき) */
+  try { updateBookingStatus(); } catch (e) { /* 失敗しても何もしない */ }
 });
 
 /* ================= 起動 ================= */
