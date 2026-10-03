@@ -1,5 +1,7 @@
 <!DOCTYPE html>
-<!-- shift-calendar build 2026-09-14-08 -->
+<!-- shift-calendar build 2026-10-04-01 -->
+<!-- 版番号の「正」は JavaScript の APP_BUILD。設定画面の表示はそこから出しているので、
+     番号を上げるときは APP_BUILD と上の行の2つをそろえる(表示は増やさない) -->
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
@@ -283,7 +285,7 @@
   }
   /* メモを書くボタン(日付を選んでいないときは隠す)。
      15章 ステップ25(2026-09-14): 予約欄の開閉ボタン #di-book-btn も同じ見た目(値は変えていない) */
-  #di-note-btn, #di-book-btn {
+  #di-note-btn, #di-book-btn, #di-kikai-btn {
     flex: 0 0 auto;
     background: #fff;
     color: var(--navy);
@@ -296,10 +298,12 @@
     cursor: pointer;
   }
   #di-book-btn { white-space: nowrap; }   /* 15章 ステップ25: 「🎫予約2▾」が2行に折れないように */
+  /* 20章(2026-10-03): 機械チェックの「🔧済 / 🔧✓」ボタンも折れないように(値は既存と同じ) */
+  #di-kikai-btn { white-space: nowrap; }
   #di-bar .di-info { cursor: pointer; }   /* タップで全文を表示する */
   @media (max-width: 360px) {
     #di-bar { padding: 4px 12px; }
-    #di-note-btn, #di-book-btn { min-height: 28px; }
+    #di-note-btn, #di-book-btn, #di-kikai-btn { min-height: 28px; }
   }
   #chip-area {
     display: flex;
@@ -622,13 +626,8 @@
   .ex-count-line { font-size: 14px; margin: 3px 0; }
   .ex-count-box.achieved #ex-feel-count { color: #b8860b; font-weight: bold; }
   .ex-feel-msg { font-size: 13px; color: #b8860b; font-weight: bold; margin-top: 2px; min-height: 1.2em; }
-  .ex-count-box.achieved #ex-tuan-count { color: #b8860b; font-weight: bold; }
   /* 休んだ記録は控えめに(責める見た目にしない)。ただし読める濃さは確保する */
   .ex-rest-note { font-size: 11px; color: #6f6a5c; font-weight: normal; }
-  /* 15章 ステップ23: 予約状況の箱(#ex-book-box)。2行目は太字、状態は ◎ ⏳ 📅 の記号と文字で区別(色は使わない) */
-  .ex-book-next { font-weight: bold; }
-  .ex-book-note { font-size: 11px; color: #6f6a5c; font-weight: normal; line-height: 1.5; margin-top: 2px; }
-  .ex-book-note:empty { display: none; }
   /* 予定の回数に収まらない記録のお知らせ(事実だけを穏やかに伝える) */
   .ex-orphan-note { display: none; }
   .ex-orphan-note.show {
@@ -1148,6 +1147,44 @@
     max-width: 86%;
     text-align: center;
   }
+
+  /* 消えないお知らせ(2026-10-03 小問題2)。
+     「保存できなかった」は見逃すと困るので、2.6秒で消えるトーストとは別の帯にして、
+     本人が「閉じる」を押すまで出しっぱなしにする。
+     白黒表示でも分かるように、色ではなく ⚠ と文字と太い枠で伝える */
+  #save-warn {
+    position: fixed;
+    bottom: 140px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fff;
+    color: #000;
+    border: 2px solid #000;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.6;
+    z-index: 40;
+    display: none;
+    /* left:50% の位置から広がるので、幅を決めないとスマホで細長くなる。
+       幅を指定して画面中央に置く */
+    width: 86%;
+    max-width: 420px;
+    box-sizing: border-box;
+    text-align: left;
+    box-shadow: 0 2px 8px rgba(0,0,0,.35);
+  }
+  #save-warn button {
+    display: block;
+    margin: 8px 0 0 auto;
+    font-size: 12px;
+    padding: 4px 14px;
+    background: #fff;
+    color: #000;
+    border: 1px solid #000;
+    border-radius: 6px;
+    cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -1174,6 +1211,8 @@
   <span class="di-info" id="di-info"></span>
   <!-- 15章 ステップ25(2026-09-14 B案): 予約欄の開閉ボタン。条件外の日は display:none -->
   <button id="di-book-btn" aria-expanded="false" aria-controls="book-bar" style="display:none">🎫予約▾</button>
+  <!-- 20章(2026-10-03): 機械チェックの「終わった」ボタン。対象日だけ出す(それ以外は display:none) -->
+  <button id="di-kikai-btn" aria-label="機械チェックを終わったことにする" style="display:none">🔧済</button>
   <button id="di-note-btn" aria-label="この日のメモを書く">📝 メモ</button>
 </div>
 <!-- 15章(2026-09-14): 選択中の日の予約時刻。🎫予約▾ を押したときだけ .show(それ以外は高さゼロ) -->
@@ -1222,19 +1261,8 @@
     <div class="ex-feel-msg" id="ex-feel-msg"></div>
     <div class="ex-rest-note" id="ex-feel-rest"></div>
   </div>
-  <!-- 15章 ステップ23(2026-09-14): フィールサイクルの予約状況。表示中の月に関係なく、常に実際の今日が基準 -->
-  <div class="ex-count-box" id="ex-book-box">
-    <div class="ex-count-line" id="ex-book-held">🎫 予約 0 / 3本: なし</div>
-    <div class="ex-count-line ex-book-next" id="ex-book-next"></div>
-    <div class="ex-book-note" id="ex-book-note"></div>
-  </div>
-  <div class="ex-count-line ex-muscle-line">筋トレ: <span id="ex-muscle-count">予定 0回 / 済 0回</span> <span class="ex-rest-note" id="ex-muscle-rest"></span></div>
+  <div class="ex-count-line ex-muscle-line">筋トレ: <span id="ex-muscle-count">まだ記録がありません</span> <span class="ex-rest-note" id="ex-muscle-rest"></span></div>
   <div class="ex-orphan-note" id="ex-orphan-note"></div>
-
-  <div class="ex-count-box" id="ex-tuan-box">
-    <div class="ex-count-line">🏆 <span id="ex-tuan-count">チュアンドタンまで あと 50回</span></div>
-    <div class="ex-feel-msg" id="ex-tuan-msg"></div>
-  </div>
 
   <!-- ===== 昨日・今日の予定(2026-08-12 追加、2026-08-13 昨日・今日に変更。運動予定一覧の上に出して、
        予定を見るためにカレンダーまで戻らなくて済むように。2026-09-14: この上にあった旧「明日の準備」欄は計画.md 17章で廃止) ===== -->
@@ -1370,6 +1398,10 @@
   <div class="step" style="margin-top:14px;">全データを消す</div>
   <div class="hint">シフト・スタンプ・名前・運動予定・メモ・食事や体重の記録をすべて消して最初の状態に戻します。消す前にバックアップの書き出しをおすすめします。</div>
   <button class="btn small danger" id="reset-all">全データ消去(リセット)</button>
+
+  <!-- 2026-10-03(前回の問題7): スマホ単体で「どの版が入っているか」を確かめられるようにする。
+       中身は JavaScript の APP_BUILD から入れる(番号を2か所に書かない) -->
+  <div class="hint" id="build-note" style="margin-top:14px;"></div>
 </div>
 
 <!-- ===== 筋トレ記録シート(2026-08-13 追加。運動予定シートの上に重なるモーダル) ===== -->
@@ -1399,10 +1431,21 @@
 
 <div id="toast"></div>
 
+<!-- 消えないお知らせの帯(2026-10-03 小問題2)。トーストと場所を分けているので、
+     他のお知らせ(名前の案内など)に上書きされて読めなくなることがない -->
+<div id="save-warn" role="alert">
+  <span id="save-warn-text"></span>
+  <button type="button" id="save-warn-close">閉じる</button>
+</div>
+
 <script>
 'use strict';
 
 /* ================= データ ================= */
+/* 版番号(2026-10-03 追加。前回の問題7)。設定画面の一番下にこの文字を出すので、
+   スマホだけで「今入っているのがどの版か」を確かめられる。
+   番号を上げるときは、ここと 2行目の HTML コメントの2つをそろえる */
+var APP_BUILD = '2026-10-04-01';
 var STORE_KEY = 'shift-calendar-v1';
 
 /* 筋トレ種目マスタ7種(2026-08-13 追加。計画.md 10-7・10-8)。
@@ -1458,16 +1501,68 @@ var DEFAULT_STAMPS = [
    自動で出る予定なので state.stamps(手で押したスタンプ)には書き込まない */
 var DEFAULT_RECURRING = [
   { label: '在庫〆日',        icon: '🗓', type: 'monthly', days: [15, 'last'], enabled: true },
-  { label: 'BML締め',         icon: '🅱', type: 'monthly', days: [20],        enabled: true },
-  { label: 'フィフティ締め',  icon: '🅵', type: 'monthly', days: [25],        enabled: true },
-  { label: 'フィフティ発注',  icon: '📋', type: 'weekly',  weekdays: [3],     enabled: true },
-  { label: 'フィフティ在庫確認', icon: '🔍', type: 'weekly', weekdays: [1],   enabled: true },
-  { label: 'BML発注',         icon: '🧾', type: 'weekly',  weekdays: [1, 4],  enabled: true },
+  /* 2026-10-02 ユーザー指示: 取引先が BML・フィフティ → 東邦 に替わったため、
+     BML締め(20日)・フィフティ締め(25日)・フィフティ発注(水)・フィフティ在庫確認(月)・
+     BML発注(月・木)の5件を削除し、東邦発注(日・木)に入れ替えた。
+     在庫〆日(15日・月末)とシムタの餌・水補充は取引先に関係ないのでそのまま残す。 */
+  /* 2026-10-03 絵文字を 🧾 → 📦 → 🚚 に変更。🧾 は消えた BML発注 と同じ絵文字で
+     記憶が混ざり、📦 はスタンプ「在庫締め日」と同じで予定が3つ以上重なった日に
+     見分けが付かないため(検証 問題5)。保存済みの端末の分は migrateToToho が直す */
+  { label: '東邦発注',        icon: '🚚', type: 'weekly',  weekdays: [0, 4],  enabled: true },
+  /* 2026-10-03 ユーザー指示: 機械チェックは毎月10日までにやる。
+     期限までの残り日数が分かるよう、1日〜10日の毎日カレンダーに出す */
+  { label: '機械チェック',    icon: '🔧', type: 'monthly',
+    days: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],                                  enabled: true },
   /* 毎日表示の繰り返し予定(2026-08-09 追加。type: 'daily' は days/weekdays を持たず、毎日ヒットする) */
   { label: 'シムタの餌・水補充', icon: '🐹', type: 'daily', enabled: true }
 ];
 
 var UNKNOWN_LABEL = '不明';
+
+/* ※ この かたまり(var の定数)は、必ず下の `var state = loadState();` より【上】に置くこと。
+   下に置くと、読み込みのときに MONTHLY_DONE_LABELS がまだ空(undefined)で
+   sanitizeMonthlyDone が止まり、保存データが丸ごと読めなくなる(2026-10-03 自己検証で発見)。 */
+/* ================= 20章(2026-10-03) 機械チェックの「終わった」記録 =================
+   計画.md 20章。🔧 機械チェックは毎月1〜10日の毎日出るが、終わった日を記録すると
+   その日は 🔧✓ で残し、同じ月のほかの日(前の日・後の日の両方)からは消す(20-9 決定1)。 */
+var KIKAI_LABEL = '機械チェック';        /* 繰り返し予定の名前(state.recurring の label) */
+var KIKAI_DONE_LABEL = '機械チェック済';  /* 終わった日だけに使う表示用の名前 */
+/* この仕組みを付ける予定の名前(ここに無い名前は洗浄で捨てる)。
+   🗓 在庫〆日・🚚 東邦発注・🐹 シムタの餌には付けない(20-1 のユーザー決定1) */
+var MONTHLY_DONE_LABELS = [KIKAI_LABEL];
+/* マスの絵文字は findStampDef → findRecurringDef で名前から探しているが、
+   '機械チェック済' はどちらにも無い名前なので、ここで絵文字を教える(20-3)。
+   ✓ は絵文字ではなく文字の ✓(U+2713)= 白黒でも形で読める。
+   22章(2026-10-03)の '明日は東邦発注(休み)' も同じ理由でここに並べる(表は1つだけ作る)。
+   ※ ここは TOHO_TOMORROW_WARN の定義より前なので、文字をそのまま書く(定数はまだ空のため) */
+var EXTRA_LABEL_ICONS = {
+  '機械チェック済': '🔧✓',               /* 20章 */
+  '明日は東邦発注(休み)': '⚠'          /* 22章。色ではなく三角の形で読める(白黒対応) */
+};
+
+/* 「その月は何日に終えたか」の洗浄(2026-10-03 追加。計画.md 20-2)。
+   知らない名前のキーは捨て、月は YYYY-MM の形だけ、値は 1〜31 の整数だけ通す。
+   この箱を持たない古い保存データ・古いバックアップは {} になる
+   = 「まだ終わっていない」= 今までどおり 1〜10日に 🔧 が出る(スキーマは壊れない) */
+function sanitizeMonthlyDone(src) {
+  var out = {};
+  if (!src || typeof src !== 'object' || Array.isArray(src)) return out;
+  MONTHLY_DONE_LABELS.forEach(function (label) {
+    var mo = src[label];
+    if (!mo || typeof mo !== 'object' || Array.isArray(mo)) return;
+    var keep = {};
+    Object.keys(mo).forEach(function (ym) {
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(ym)) return;   /* 月のキーの形 */
+      var v = mo[ym];
+      /* 文字・小数・0・32以上・NaN は捨てる */
+      if (typeof v !== 'number' || !isFinite(v) || Math.floor(v) !== v) return;
+      if (v < 1 || v > 31) return;
+      keep[ym] = v;
+    });
+    if (Object.keys(keep).length) out[label] = keep;   /* 空になった月・名前はキーごと残さない */
+  });
+  return out;
+}
 var UNKNOWN_COLOR = '#9e9e9e';
 
 /* ===== ダイエット・食事管理(2026-07-28 追加。計画.md 11章) =====
@@ -1569,9 +1664,19 @@ function defaultState() {
       muscleExercises: DEFAULT_MUSCLE_EXERCISES.map(cloneMuscleExercise),
       log: {} },
     /* diet = ダイエット・食事管理(2026-07-28 追加)。既存キーには触らない */
-    diet: defaultDiet()
+    diet: defaultDiet(),
+    /* monthlyDone = 「毎月やる用事を、その月は何日に終えたか」(2026-10-03 追加。計画.md 20-2)。
+       形は { 予定の名前: { "YYYY-MM": 日(1〜31) } }。いまは '機械チェック' の1つだけ。
+       月ごとに別で持つので、翌月1日になれば自動でまた 🔧 が出る(月替わりのリセット処理は作らない)。
+       recurring(予定の定義)・stamps(手押し)・notes(手書きメモ)・exercise(運動の記録)には
+       いっさい書かない = 既存のどの処理にも影響しない */
+    monthlyDone: {}
   };
 }
+
+/* 保存データが壊れていて初期状態で開いたときは true。
+   この場合は自動入れ替え(migrateToToho)を走らせない = 壊れたデータを上書きしない */
+var stateLoadFailed = false;
 
 var state = loadState();
 
@@ -1596,20 +1701,344 @@ function loadState() {
     s.notes = sanitizeNotes(d.notes);
     s.recurring = sanitizeRecurring(d.recurring);
     s.diet = sanitizeDiet(d.diet);
+    /* 2026-10-03: 済み印(どの入れ替えを済ませたか)を引き継ぐ。
+       ここを忘れると毎回「まだやっていない」判定になり、起動ごとに入れ替えが走る */
+    s.migrations = sanitizeMigrations(d.migrations);
+    /* 20章(2026-10-03): 機械チェックを何日に終えたかの記録を引き継ぐ */
+    s.monthlyDone = sanitizeMonthlyDone(d.monthlyDone);
     if (d.settings && typeof d.settings === 'object' && typeof d.settings.userName === 'string') {
       s.settings.userName = d.settings.userName;
     }
-  } catch (e) { /* 壊れた保存データは初期状態で開く(上書きは操作があるまでしない) */ }
+  } catch (e) {
+    /* 壊れた保存データは初期状態で開く(上書きは操作があるまでしない) */
+    stateLoadFailed = true;
+  }
   return s;
 }
 
-function saveState() {
+/* 済み印の洗浄(2026-10-03 追加)。知らない名札は捨て、true 以外は「まだやっていない」と読む。
+   印を持たない古い保存データ・古いバックアップは {}(= 未移行)になる。
+   戻り値を defaultState() には入れない = 新規インストール・全データ消去のあとは入れ替えが走る */
+function sanitizeMigrations(src) {
+  var out = {};
+  if (!src || typeof src !== 'object' || Array.isArray(src)) return out;
+  if (src.toho202610 === true) out.toho202610 = true;
+  /* 2026-10-03(小問題3): 東邦発注の絵文字を 🚚 に直したかどうかの印。
+     1度立ったら以降は絵文字を触らない = 本人があとで付け直した絵文字が残る */
+  if (src.tohoIcon202610 === true) out.tohoIcon202610 = true;
+  /* 23章(2026-10-03): 筋トレ予定日を「3日おき」から「毎週金曜」に切り替え済みかどうかの印 */
+  if (src.muscleFriday202610 === true) out.muscleFriday202610 = true;
+  return out;
+}
+
+
+/* 保存して成否を返す(画面への知らせはしない)。2026-10-03 追加(検証 問題1)。
+   「本当に保存できたか」を確かめたい場所からだけ呼ぶ。
+   例外の名前はブラウザごとに違うので、例外が出たら失敗とだけ扱う */
+/* 保存する形を作る(2026-10-04 追加。検証2 問題5)。
+   exercise.muscle(筋トレ予定日)は「その月の金曜」から毎回計算し直す控えなので、端末に保存しない。
+   こうしないと、月を開くたびに muscle["年-月"] が1件ずつ貯まって保存データが増え続ける。
+   ・箱(muscle というキー)は空の {} で必ず書くので、保存データの形(スキーマ)は変わらない。
+     古い保存データ・古いバックアップは今までどおり sanitizeExercise() が muscle を読んで通る。
+   ・やっているのは浅いコピーで muscle だけを空に差し替えること。
+     records(✓・🌙・💪臨時・予約)・log(重量・回数)・notes・shifts・diet などは
+     参照をそのまま渡すので、1件も落ちない・1バイトも変わらない。 */
+function stateForSave() {
+  if (!state || typeof state !== 'object'
+      || !state.exercise || typeof state.exercise !== 'object'
+      || Array.isArray(state.exercise)) return state;   /* 形が違うときは何も触らない */
+  var ex = {};
+  Object.keys(state.exercise).forEach(function (k) { ex[k] = state.exercise[k]; });
+  ex.muscle = {};
+  var out = {};
+  Object.keys(state).forEach(function (k) { out[k] = state[k]; });
+  out.exercise = ex;
+  return out;
+}
+
+function saveStateChecked() {
   try {
-    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    localStorage.setItem(STORE_KEY, JSON.stringify(stateForSave()));
+    return true;
   } catch (e) {
+    return false;
+  }
+}
+
+function saveState() {
+  if (!saveStateChecked()) {
     toast('保存に失敗しました。空き容量を確認してください');
   }
 }
+
+/* ================= 2026-10-02 取引先の入れ替え(東邦)=================
+   取引先が BML・フィフティ → 東邦 に替わった(2026-10-02 ユーザー指示)。
+   繰り返し予定は端末の中(localStorage)に保存されているので、上の DEFAULT_RECURRING を
+   直すだけでは今使っている端末には反映されない。そこで「開いたとき1回だけ」の
+   入れ替えをここで行う。
+   2026-10-03 改修(検証 問題1・2・4): 済み印は本体データの中(state.migrations.toho202610)に
+   置く。本体と同じ1回の setItem で書かれるので「印だけ残って入れ替えが永久にやり直されない」
+   が原理的に起きない。印を持たない古いデータ・古いバックアップは「まだやっていない」と読む。
+     ・消す : 名前に「BML」か「フィフティ」が入っている繰り返し予定
+     ・足す : 東邦発注(毎週 日曜・木曜)、機械チェック(毎月1日〜10日)
+     ・残す : 在庫〆日(15日・月末)、シムタの餌・水補充(毎日)
+     ・2026年10月の個別メモ4件(既にあるメモは消さず後ろに足す)
+     ・2026年10/1〜10/4 をフィールサイクルの休館(手動)にする
+   壊れた保存データで開いたとき(stateLoadFailed)は何もしない = 上書きしない。 */
+/* 2026-10-02〜10-03 の間だけ使っていた「別キーの済み印」。
+   すでにこのキーが立っている端末があり得るので、読んで state 側の印に引き継ぐためだけに残す */
+var MIGR_TOHO_KEY = 'shift-calendar-migrated-toho-2026-10';
+var TOHO_RECURRING = { label: '東邦発注', icon: '🚚', type: 'weekly', weekdays: [0, 4] };
+/* これまで東邦発注に使っていた古い絵文字。保存済みの端末ではこれを 🚚 に書き換える。
+   🧾 = 2026-10-02 の入れ替え時 / 📦 = 2026-10-03 の途中の版(公開前なので実害は無い想定だが、
+   途中の版を触った端末があっても確実に 🚚 に揃うように両方を見る) */
+var TOHO_OLD_ICONS = ['🧾', '📦'];
+/* 2026-10-03 ユーザー指示。10日までが期限なので 1〜10日の毎日出す */
+var KIKAI_RECURRING = { label: '機械チェック', icon: '🔧', type: 'monthly',
+  days: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] };
+var TOHO_OCT_NOTES = {
+  '4':  '河野さんと発注',
+  '8':  '船田さんと発注。連休前なので多めに頼む',
+  '25': '船田さんと発注',
+  '29': '河野さんと発注'
+};
+
+/* useLegacyKey = true のときだけ、古い別キーの済み印を読んで state 側に引き継ぐ。
+   起動時の1回だけ true にする。復元・全データ消去のあとは false
+   (false にしないと、古いバックアップを復元しても別キーの印のせいで入れ替えがスキップされる)
+
+   quiet = true のときは、保存に失敗してもこの中ではお知らせを出さない(2026-10-03 小問題4)。
+   復元・全データ消去のように「結果の文」を別に出す場所から呼ぶとき用。
+   戻り値: 保存できた / 保存の必要がなかった = true、保存しようとして失敗した = false */
+function migrateToToho(useLegacyKey, quiet) {
+  if (stateLoadFailed) return true;
+  if (!state.migrations || typeof state.migrations !== 'object'
+      || Array.isArray(state.migrations)) state.migrations = {};
+
+  /* 古い別キーの済み印を state 側へ引き継ぐ(2026-10-03) */
+  var tookOverLegacy = false;
+  if (useLegacyKey === true && state.migrations.toho202610 !== true) {
+    var legacy = null;
+    try { legacy = localStorage.getItem(MIGR_TOHO_KEY); } catch (e) { legacy = null; }
+    if (legacy === '1') {
+      state.migrations.toho202610 = true;
+      tookOverLegacy = true;
+    }
+  }
+
+  var changed = false;
+
+  /* 0) 東邦発注の絵文字を古いもの(🧾・📦)から 🚚 に直す(2026-10-03 検証 問題5)。
+        名前が「東邦発注」で絵文字が TOHO_OLD_ICONS のどれかのものだけを直す。
+        2026-10-03 改修(小問題3): この直しは「1回だけ」。印(tohoIcon202610)を立てたら
+        以降はいっさい絵文字を見ない。
+        こうしないと、本人が「東邦発注」を作り直して 📦 や 🧾 を付けたとき、
+        次に開くたびに 🚚 に戻されてしまう。
+        「本人が消した・変えたものを勝手に戻さない」という他の場所と同じ考え方にそろえた。 */
+  var iconMarked = false;
+  if (state.migrations.tohoIcon202610 !== true) {
+    if (Array.isArray(state.recurring)) {
+      for (var n = 0; n < state.recurring.length; n++) {
+        var rec = state.recurring[n];
+        if (rec && rec.label === TOHO_RECURRING.label
+            && TOHO_OLD_ICONS.indexOf(rec.icon) !== -1) {
+          rec.icon = TOHO_RECURRING.icon;
+        }
+      }
+    }
+    /* 絵文字が元から 🚚 だった端末でも印は立てる(次からここを通らないようにする)。
+       このとき保存が1回だけ走る */
+    state.migrations.tohoIcon202610 = true;
+    iconMarked = true;
+    changed = true;
+  }
+
+  /* すでに入れ替え済みなら、ここまでの直し(絵文字・引き継いだ印)だけ保存して終わる */
+  if (state.migrations.toho202610 === true) {
+    if (changed || tookOverLegacy) {
+      if (saveStateChecked()) {
+        /* 印が本体の中に無事入ったので、古い別キーはもう使わない。
+           残しておくと「古いバックアップを復元したのに入れ替えが走らない」原因になる */
+        if (tookOverLegacy) { try { localStorage.removeItem(MIGR_TOHO_KEY); } catch (e) {} }
+      } else {
+        if (tookOverLegacy) state.migrations.toho202610 = false;
+        if (iconMarked) state.migrations.tohoIcon202610 = false;
+        if (quiet !== true) {
+          showSaveWarning('この端末に保存できませんでした。空き容量やプライベートモードを確認してください(次に開いたとき入れ直します)');
+        }
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /* 1) BML・フィフティの繰り返し予定を消す */
+  if (!Array.isArray(state.recurring)) state.recurring = [];
+  var before = state.recurring.length;
+  state.recurring = state.recurring.filter(function (r) {
+    if (!r || typeof r.label !== 'string') return false;
+    return r.label.indexOf('BML') < 0 && r.label.indexOf('フィフティ') < 0;
+  });
+  if (state.recurring.length !== before) changed = true;
+
+  /* 2) 東邦発注を足す(同じ名前がすでにあれば足さない) */
+  var hasToho = false;
+  for (var i = 0; i < state.recurring.length; i++) {
+    if (state.recurring[i].label === TOHO_RECURRING.label) { hasToho = true; break; }
+  }
+  if (!hasToho) {
+    state.recurring.push({
+      label: TOHO_RECURRING.label, icon: TOHO_RECURRING.icon,
+      type: TOHO_RECURRING.type, weekdays: TOHO_RECURRING.weekdays.slice(),
+      enabled: true
+    });
+    changed = true;
+  }
+
+  /* 2-2) 機械チェック(毎月1日〜10日)を足す(同じ名前がすでにあれば足さない) */
+  var hasKikai = false;
+  for (var j = 0; j < state.recurring.length; j++) {
+    if (state.recurring[j].label === KIKAI_RECURRING.label) { hasKikai = true; break; }
+  }
+  if (!hasKikai) {
+    state.recurring.push({
+      label: KIKAI_RECURRING.label, icon: KIKAI_RECURRING.icon,
+      type: KIKAI_RECURRING.type, days: KIKAI_RECURRING.days.slice(),
+      enabled: true
+    });
+    changed = true;
+  }
+
+  /* 3) 2026年10月の個別メモ。すでに書いてあるメモは消さず、改行して後ろに足す */
+  if (!state.notes || typeof state.notes !== 'object' || Array.isArray(state.notes)) state.notes = {};
+  if (!state.notes['2026-10'] || typeof state.notes['2026-10'] !== 'object'
+      || Array.isArray(state.notes['2026-10'])) state.notes['2026-10'] = {};
+  var oct = state.notes['2026-10'];
+  Object.keys(TOHO_OCT_NOTES).forEach(function (d) {
+    var add = TOHO_OCT_NOTES[d];
+    var cur = (typeof oct[d] === 'string') ? oct[d].trim() : '';
+    if (cur.indexOf(add) >= 0) return;   /* 同じ文を二重に書かない */
+    oct[d] = cur ? (cur + '\n' + add) : add;
+    changed = true;
+  });
+
+  /* 4) 2026-10-02 ユーザー指示: 10/1〜10/4 はフィールサイクルに行かないので休館(手動)にする。
+        休館にすると getFeelcycleCount が 0 回を返す。月30回のブーストは今までどおり働かせる
+        (他の休みの日に自動で足される)= ユーザー了承済み(2026-10-02) */
+  if (!state.exercise.closureDays || typeof state.exercise.closureDays !== 'object'
+      || Array.isArray(state.exercise.closureDays)) state.exercise.closureDays = {};
+  var closeArr = Array.isArray(state.exercise.closureDays['2026-10'])
+    ? state.exercise.closureDays['2026-10'] : [];
+  ['1', '2', '3', '4'].forEach(function (d) {
+    if (closeArr.indexOf(d) < 0) { closeArr.push(d); changed = true; }
+  });
+  state.exercise.closureDays['2026-10'] = closeArr;
+
+  /* 済み印を state に立ててから、本体と一緒に1回で保存する(2026-10-03 検証 問題1)。
+     保存が失敗したら印も保存されない = 次に開いたときもう一度やり直す。
+     画面は入れ替え後の正しい内容で描かれるので、その場では困らない */
+  state.migrations.toho202610 = true;
+  if (saveStateChecked()) {
+    try { localStorage.removeItem(MIGR_TOHO_KEY); } catch (e) {}
+    return true;
+  }
+  state.migrations.toho202610 = false;
+  if (iconMarked) state.migrations.tohoIcon202610 = false;
+  if (quiet !== true) {
+    showSaveWarning('この端末に保存できませんでした。空き容量やプライベートモードを確認してください(次に開いたとき入れ直します)');
+  }
+  return false;
+}
+
+/* ================= 23章(2026-10-03)筋トレ予定日を「毎週金曜」に切り替える =================
+   端末の中(localStorage)には「3日おき」で決まった古い予定日が残っている。
+   DEFAULT の書き換えだけでは今使っている端末に反映されないので、東邦の入れ替え(19章)と
+   同じやり方で「開いたとき1回だけ」の片付けをここで行う。
+
+   やること
+     ① 金曜以外の日に残った筋トレの記録の居場所を移す
+          ✓(muscle='done')→ 「💪臨時」(muscleExtra)に +1 して ✓ を外す
+            = 見え方(💪✓)・消費カロリー(+150)・13章の「やった日」判定は移行前と同じ。
+              移さないと「予定に収まらない記録」と判定され、本人が「整理する」を押した瞬間に消える
+          🌙(muscle='rest')→ 外すだけ。🌙 は「予定日だったが休んだ」の印で、
+            予定日でなくなれば意味を持たない(やった記録ではないので失うものがない)
+     ② 予定日の箱・確定済み月・基準日をまっさらにする(次に開いたとき金曜で入れ直される)
+   触らないもの
+     exercise.records の重量以外の記録全部(✓以外)・exercise.log(種目・重量・回数)は1バイトも触らない。
+     log は日付をキーにしていて予定日とは無関係なので、予定日を空にしても影響がない。
+
+   済み印(state.migrations.muscleFriday202610)は本体とまったく同じ1回の保存で書く(19-5 の設計)。
+   途中で setMuscleState() などの「中で保存する」関数を使うと、
+   記録の移し替えだけが保存されて印が保存されない事故が起き、次に開いたとき
+   もう一度移し替えが走って「💪臨時」が二重に増える。だから保存しない書き換えを下に用意した。
+   壊れた保存データで開いたとき(stateLoadFailed)は何もしない = 上書きしない。
+   戻り値: 保存できた / 必要がなかった = true、保存しようとして失敗した = false */
+
+/* 1日ぶんの記録から ✓/🌙 を片付ける(保存はしない)。
+   片付け方は setMuscleState() / setMuscleExtraCount() とそろえてある */
+function migrateMuscleRecordOfDay(ym, key) {
+  var mo = state.exercise.records[ym];
+  if (!mo) return;
+  var rec = mo[key];
+  if (!rec || !rec.muscle) return;
+  if (rec.muscle === 'done') {
+    var n = (typeof rec.muscleExtra === 'number' && rec.muscleExtra > 0) ? rec.muscleExtra : 0;
+    n = n + 1;
+    if (n > 20) n = 20;                 /* 上限は setMuscleExtraCount と同じ20回 */
+    rec.muscleExtra = n;
+  }
+  delete rec.muscle;                    /* 'rest' と、読めない値はここで消えるだけ */
+  if (isEmptyRecord(rec)) delete mo[key];
+  if (!Object.keys(mo).length) delete state.exercise.records[ym];
+}
+
+function migrateMuscleToFriday(quiet) {
+  if (stateLoadFailed) return true;
+  if (!state.migrations || typeof state.migrations !== 'object'
+      || Array.isArray(state.migrations)) state.migrations = {};
+  if (state.migrations.muscleFriday202610 === true) return true;   /* もう済んでいる */
+
+  /* ① 金曜以外の ✓/🌙 を片付ける。
+        古い予定日の配列ではなく「記録そのもの」を見て回る。配列を見るだけだと、
+        シフトが変わって予定日から外れたあとに残った ✓ を取りこぼし、
+        それが「整理する」で消えてしまうため(記録は1件も失わない方を選ぶ) */
+  if (state.exercise.records && typeof state.exercise.records === 'object') {
+    Object.keys(state.exercise.records).forEach(function (ym) {
+      var mo = state.exercise.records[ym];
+      if (!mo || typeof mo !== 'object' || Array.isArray(mo)) return;
+      var p = ym.split('-');
+      var y = parseInt(p[0], 10), m = parseInt(p[1], 10);
+      if (!(y >= 1970) || !(m >= 1 && m <= 12)) return;
+      Object.keys(mo).forEach(function (key) {
+        var d = parseInt(key, 10);
+        if (!(d >= 1 && d <= 31)) return;
+        if (dowOfDateStr(dateStrOf(y, m, d)) === 5) return;   /* 金曜は今も予定日。そのまま */
+        migrateMuscleRecordOfDay(ym, key);
+      });
+    });
+  }
+
+  /* ② 予定日の箱・確定済み月・基準日をまっさらにする。records / log は触らない。
+        muscleAnchor の箱自体は残す(sanitizeExercise が読んでいるので、
+        消すと古いバックアップの読み込みで形が変わってしまう) */
+  state.exercise.muscle = {};
+  state.exercise.confirmedMonths = [];
+  state.exercise.muscleAnchor = null;
+
+  /* 印を立ててから、本体と一緒に1回で保存する。
+     保存が失敗したら印も保存されない = 次に開いたときもう一度やり直す */
+  state.migrations.muscleFriday202610 = true;
+  if (saveStateChecked()) return true;
+  state.migrations.muscleFriday202610 = false;
+  if (quiet !== true) {
+    showSaveWarning('この端末に保存できませんでした。空き容量やプライベートモードを確認してください(次に開いたとき入れ直します)');
+  }
+  return false;
+}
+
+migrateToToho(true);
+/* 23章: 東邦の入れ替えの「あと」に置く(上書きの順番を変えないため) */
+migrateMuscleToFriday();
 
 /* ================= 便利関数 ================= */
 function $(id) { return document.getElementById(id); }
@@ -2168,6 +2597,53 @@ function inventoryDeadlineEffectiveDay(y, m, triggerDay) {
   return d;
 }
 
+/* ================= 22章(2026-10-03) 勤務しない日は出さない + 木曜のぶんは前日に注意 =========
+   計画.md 22章。保存するデータは1つも増えない(すでにある state.shifts を読むだけ)。 */
+
+/* 22章: 「出勤しない日」のシフト名。ここを直せば判定が全部変わる(1か所にまとめる)。
+   ユーザー決定 2026-10-03: 希休・休み・有休 の3つ。
+   ※ 12章の在庫〆日のずらし処理(inventoryDeadlineEffectiveDay)は
+      今までどおり「休み・希休」の2つだけを見る。ユーザー決定でそこは変えない */
+var OFF_SHIFT_LABELS = ['希休', '休み', '有休'];
+
+/* シフト名が「出勤しない日」か。これだけを見る(他の場所に同じ判定を書かない) */
+function isOffShiftLabel(label) {
+  return OFF_SHIFT_LABELS.indexOf(label) >= 0;
+}
+
+/* その日が「出勤しない日」か。未入力・不明は false(= 今までどおり予定を出す)。
+   取り方は 12章 inventoryDeadlineEffectiveDay と同じ(normShift を通す)。state は読むだけ */
+function isOffShiftDay(y, m, d) {
+  var sh = normShift((state.shifts[ymKey(y, m)] || {})[String(d)]);
+  if (!sh) return false;                    /* 未入力 → 出す(ユーザー決定) */
+  return isOffShiftLabel(sh.label);
+}
+
+/* 22章: この条件を付ける繰り返し予定の名前(ちょうど一致するものだけ)。
+   🗓 在庫〆日・🐹 シムタの餌・自分で足した予定には付けない。
+   '機械チェック済'(20章)はここに入れない = 終わった日の記録は休みでも残る(22-10 の表) */
+var TOHO_LABEL = '東邦発注';              /* TOHO_RECURRING.label と同じ名前 */
+var SKIP_WHEN_OFF_LABELS = [TOHO_LABEL, KIKAI_LABEL];
+
+/* 22章 ルール2: 「翌日が木曜の東邦発注なのに、その木曜が休みで消える」日に出す注意の名前。
+   出さないときは null。日曜のぶんには出さない(木曜だけ。ユーザー決定 2026-10-03)。
+   翌日が翌月・翌年になるケースは new Date の繰り上がりに任せる(自分で日数計算しない) */
+var TOHO_TOMORROW_WARN = '明日は東邦発注(休み)';
+
+function tohoTomorrowWarnLabel(y, m, d) {
+  var def = findRecurringDef(TOHO_LABEL);
+  if (!def || def.enabled === false) return null;          /* 消した・OFF にした人には出さない */
+  if (def.type !== 'weekly' || !Array.isArray(def.weekdays)) return null;
+  if (def.weekdays.indexOf(4) < 0) return null;            /* 木曜に出る設定でなければ出さない */
+
+  var t = new Date(y, m - 1, d + 1);                       /* 翌日。月末・年末は自動で繰り上がる */
+  if (t.getDay() !== 4) return null;                       /* 翌日が木曜でなければ出さない */
+
+  var ty = t.getFullYear(), tm = t.getMonth() + 1, td = t.getDate();
+  if (!isOffShiftDay(ty, tm, td)) return null;             /* その木曜が出勤 → 🚚 は出るので注意は不要 */
+  return TOHO_TOMORROW_WARN;
+}
+
 /* その日に出る繰り返し予定の名前を並び順で返す(ONのものだけ) */
 function recurringLabelsFor(y, m, d) {
   var out = [];
@@ -2195,6 +2671,28 @@ function recurringLabelsFor(y, m, d) {
     }
     if (hit && out.indexOf(r.label) < 0) out.push(r.label);
   });
+  /* 20章(2026-10-03): 機械チェックが終わった月は、終わった日だけ「機械チェック済」(🔧✓)にして、
+     同じ月のほかの日(終わった日より前・後の両方)からは消す(計画.md 20-3 の表・20-9 決定1)。
+     記録が無い月は今までどおり 1〜10日の毎日 🔧 が出る */
+  var ki = out.indexOf(KIKAI_LABEL);
+  if (ki >= 0) {
+    var kiDone = getMonthlyDone(KIKAI_LABEL, y, m);
+    if (kiDone !== null) {
+      if (d === kiDone) out[ki] = KIKAI_DONE_LABEL;   /* 終わった日そのもの = 🔧✓ で残す */
+      else out.splice(ki, 1);                          /* それ以外の日は出さない */
+    }
+  }
+  /* 22章 ルール1(2026-10-03): 東邦発注・機械チェックは、その日が希休・休み・有休なら出さない。
+     在庫〆日・シムタ・自分で足した予定には付けない(名前がちょうど一致するものだけ)。
+     20章の「終わった日の印」(機械チェック済)より【あと】に置くのが大事(計画.md 22-10 の表)。
+     '機械チェック済' は SKIP_WHEN_OFF_LABELS に入っていないので、休みの日でも記録として残る */
+  if (out.length && isOffShiftDay(y, m, d)) {
+    out = out.filter(function (name) { return SKIP_WHEN_OFF_LABELS.indexOf(name) < 0; });
+  }
+  /* 22章 ルール2(2026-10-03): 翌日が木曜で、その木曜の 🚚 が休みで消えるときだけ注意を足す。
+     「🚚 が出る」と「注意が出る」は必ず片方だけになる(二重に出ない) */
+  var warn = tohoTomorrowWarnLabel(y, m, d);
+  if (warn && out.indexOf(warn) < 0) out.push(warn);
   return out;
 }
 
@@ -2205,6 +2703,27 @@ function findRecurringDef(label) {
     if (state.recurring[i].label === label) return state.recurring[i];
   }
   return null;
+}
+
+/* 20章(2026-10-03): 「その月は何日に終えたか」の読み書き3つ(計画.md 20-8 ステップ②)。
+   保存は既存の saveState()(📝メモ の setNote と同じ作り) */
+function getMonthlyDone(label, y, m) {
+  var mo = (state.monthlyDone && typeof state.monthlyDone === 'object') ? state.monthlyDone[label] : null;
+  var v = (mo && typeof mo === 'object') ? mo[ymKey(y, m)] : null;
+  return (typeof v === 'number' && v >= 1 && v <= 31) ? v : null;   /* 記録が無ければ null */
+}
+function setMonthlyDone(label, y, m, d) {
+  if (!state.monthlyDone || typeof state.monthlyDone !== 'object') state.monthlyDone = {};
+  if (!state.monthlyDone[label] || typeof state.monthlyDone[label] !== 'object') state.monthlyDone[label] = {};
+  state.monthlyDone[label][ymKey(y, m)] = d;   /* 1か月に1つだけ(上書き) */
+  saveState();
+}
+function clearMonthlyDone(label, y, m) {
+  var mo = (state.monthlyDone && typeof state.monthlyDone === 'object') ? state.monthlyDone[label] : null;
+  if (!mo || typeof mo !== 'object') return;
+  delete mo[ymKey(y, m)];
+  if (!Object.keys(mo).length) delete state.monthlyDone[label];   /* 空になったらキーごと消す */
+  saveState();
 }
 
 /* メモの読み書き。空文字を渡すと削除 */
@@ -2509,9 +3028,6 @@ function setMuscleState(ym, d, next) {
    records[年月][日].booked = ["7:00", null, "19:15"] のように、feel と同じ添字(0=朝/1=晩/2=⤴3本目)で
    予約した時刻 "H:MM" を持つ。null = 未予約。日記(state.diet.diary)には一切書かない */
 var BOOK_PRESETS = ['7:00', '7:30', '18:30'];   /* プルダウンの固定の選択肢(時刻の早い順)。「その他…」はこの外 */
-var BOOK_LIMIT = 3;                              /* 同時に持てる予約の本数(設定化は「あとで」#54) */
-var BOOK_WINDOW = 14;                            /* 予約状況の箱で、今日から何日先まで見るか(ステップ23。予約は最長7日先なので保有は必ずこの中) */
-var BOOK_AHEAD = 7;                              /* 何日先まで予約できるか(15-2 決定1。7日ちょうどを含む) */
 
 /* 時刻を "H:MM"(時は先頭の0なし・分は2桁)に揃える。揃えられなければ null。
    保存(setBookedTime)も洗浄(sanitizeExercise)もこの関数を通す。例 "07:00" → "7:00" / "25:00" → null */
@@ -2663,6 +3179,23 @@ function typeColor(label) {
   return t ? t.color : '#333';
 }
 
+/* 消えないお知らせを出す(2026-10-03 小問題2)。
+   保存できなかったことは必ず伝わってほしいので、2.6秒で消える toast ではなく
+   専用の帯に出し、本人が「閉じる」を押すまで消さない。
+   色だけに頼らず ⚠ と文字で分かるようにしている */
+function showSaveWarning(msg) {
+  var el = $('save-warn');
+  if (!el) return;
+  $('save-warn-text').textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+(function () {
+  var btn = $('save-warn-close');
+  if (btn) {
+    btn.addEventListener('click', function () { $('save-warn').style.display = 'none'; });
+  }
+})();
+
 function toast(msg) {
   var el = $('toast');
   el.textContent = msg;
@@ -2734,6 +3267,8 @@ function buildStampCellText(names, maxW) {
   var budget = maxW - 1;   /* 1px の余裕を見て切れを防ぐ */
 
   function icon(name) {
+    /* 20章(2026-10-03): '機械チェック済' のように定義に無い表示用の名前はここで絵文字を引く */
+    if (EXTRA_LABEL_ICONS[name]) return EXTRA_LABEL_ICONS[name];
     var def = findStampDef(name);
     if (def && def.icon) return def.icon;
     var rec = findRecurringDef(name);   /* 繰り返し予定の絵文字も使う */
@@ -2932,12 +3467,12 @@ function render() {
   /* マス1個の内側の幅(運動予定の言葉が収まるかの判定に使う) */
   var cellInnerW = Math.max(20, Math.floor(grid.clientWidth / 7) - 6);
   var ym = ymKey(cur.y, cur.m);
-  /* 運動予定タブを開いていなくてもカレンダーに筋トレ予定を出せるよう、ここでも計算しておく
-     (基準日が未設定のときは何もしない。確定済みの月は再計算されない) */
+  /* 運動予定タブを開いていなくてもカレンダーに筋トレ予定を出せるよう、ここでも計算しておく。
+     23章(2026-10-03): 毎週金曜なので基準日も既存の予定日も要らない = 条件なしで呼ぶ。
+     以前あった「基準日か予定日があるときだけ」の if は、23章の片付けで両方とも空になるため
+     残すと二度と 💪 が出なくなる。だから外した */
   try {
-    if (state.exercise.muscleAnchor || Object.keys(state.exercise.muscle).length) {
-      ensureMuscleScheduleUpTo(ym);
-    }
+    ensureMuscleScheduleUpTo(ym);
   } catch (e) { /* 失敗してもカレンダー描画は続ける */ }
   var monthShifts = state.shifts[ym] || {};
   var monthStamps = state.stamps[ym] || {};
@@ -3127,6 +3662,8 @@ function renderDayInfo() {
   renderStampChipRow();
   /* 15章 ステップ22: 日付タップ欄の予約プルダウン(#book-bar)。条件外なら高さゼロ */
   try { renderBookBar(); } catch (e) { /* 失敗しても日付欄の描画は続ける */ }
+  /* 20章(2026-10-03): 機械チェックの「🔧済 / 🔧✓」ボタン。条件外なら display:none */
+  try { renderMachineDoneBtn(); } catch (e) { /* 失敗しても日付欄の描画は続ける */ }
 }
 
 /* 15章 ステップ22(2026-09-14): 日付タップ欄 #book-bar(#di-bar の直下の1行)。
@@ -3195,6 +3732,55 @@ function renderBookBar() {
 $('di-book-btn').addEventListener('click', function () {
   bookBarOpen = !bookBarOpen;
   render();
+});
+
+/* 20章(2026-10-03): 機械チェックの「終わった」ボタン #di-kikai-btn(計画.md 20-4・20-5)。
+   renderBookBar とまったく同じ型で、renderDayInfo の最後から呼ぶだけ。
+   selectDay・月移動など既存の関数には手を入れない。行も増やさない(#di-bar に横並び)。
+
+   出す/出さないの判定は recurringLabelsFor の結果をそのまま使う。こうすると
+   「🔧 が出る日だけボタンも出る」が自動でそろう:
+     ・1〜10日でまだ記録が無い        → 一覧に '機械チェック'   が入る → 🔧済 を出す(今日まで)
+     ・記録した日そのもの              → 一覧に '機械チェック済' が入る → 🔧✓ を出す(取り消し用)
+     ・記録がある月の、記録した日以外  → 一覧に入らない              → 出さない(決定4。日が勝手に動かない)
+     ・11日以降 / 予定を消した・OFF    → 一覧に入らない              → 出さない(決定2・20-3 の最後)
+   未来の日だけは別に見る(決定3。やっていない日を済みにできるとやり忘れにつながるため) */
+function renderMachineDoneBtn() {
+  var btn = $('di-kikai-btn');
+  if (!btn) return;
+  btn.style.display = 'none';   /* まず隠す */
+  /* 日付を選んでいない・見ている月の外(月移動した直後など)は出さない */
+  if (!selected || selected.y !== cur.y || selected.m !== cur.m) return;
+  var labels = recurringLabelsFor(selected.y, selected.m, selected.d);
+  if (labels.indexOf(KIKAI_DONE_LABEL) >= 0) {   /* この日が「終わった日」 = 取り消し用 */
+    btn.textContent = '🔧✓';
+    btn.setAttribute('aria-label', '機械チェックの済みを取り消す');
+    btn.style.display = '';
+    return;
+  }
+  if (labels.indexOf(KIKAI_LABEL) < 0) return;   /* 🔧 が出ない日にはボタンも出さない */
+  var t = getTodayDay();
+  /* 今日より後(未来)の日には出さない(決定3)。過去の月は全部「今日より前」なので出る */
+  if (dateStrOf(selected.y, selected.m, selected.d) > dateStrOf(t.y, t.m, t.d)) return;
+  btn.textContent = '🔧済';
+  btn.setAttribute('aria-label', '機械チェックを終わったことにする');
+  btn.style.display = '';
+}
+
+/* 20章: 押したときの動き。確認ダイアログは出さない(1タップで元に戻せるため。20-4) */
+$('di-kikai-btn').addEventListener('click', function () {
+  if (!selected || selected.y !== cur.y || selected.m !== cur.m) return;
+  var done = getMonthlyDone(KIKAI_LABEL, selected.y, selected.m);
+  if (done === selected.d) {            /* 取り消し: 1〜10日に 🔧 が戻る */
+    clearMonthlyDone(KIKAI_LABEL, selected.y, selected.m);
+    render();
+    toast('機械チェックの済みを取り消しました');
+    return;
+  }
+  if (done !== null) return;            /* 記録がある月の別の日では押せない(ボタンも出ていない) */
+  setMonthlyDone(KIKAI_LABEL, selected.y, selected.m, selected.d);
+  render();
+  toast(selected.m + '/' + selected.d + ' に機械チェックが終わったことにしました。もう一度押すと取り消せます');
 });
 
 /* 詳細欄をタップすると、その日の全文(シフト表の補足と自分のメモ)を表示する。
@@ -3366,7 +3952,8 @@ $('nav-settings').addEventListener('click', function () {
   openSheet('settings');
 });
 $('nav-exercise').addEventListener('click', function () {
-  ensureMuscleAnchorIfNeeded();
+  /* 23章(2026-10-03): ここにあった ensureMuscleAnchorIfNeeded()(「直近に筋トレをした日を
+     教えてください」の質問)を削除した。毎週金曜なので基準日が存在しない = 聞く意味がない */
   renderExercise();
   openSheet('exercise');
   /* 筋トレ予定がここで確定することがあるので、カレンダー側の表示も合わせて更新する(問題43) */
@@ -3554,92 +4141,122 @@ function feelSlotsLabel(res) {
   return evening > 1 ? '晩' + evening : '晩';
 }
 
-/* 10-4-2: 筋トレ予定日の計算(月またぎ継続・繰り越し)。一度確定した月は再計算しない */
-function findLatestMuscleDate() {
-  var months = Object.keys(state.exercise.muscle)
-    .filter(function (k) { return state.exercise.muscle[k] && state.exercise.muscle[k].length; })
-    .sort();
-  if (!months.length) return null;
-  var lastMonth = months[months.length - 1];
-  var days = state.exercise.muscle[lastMonth].map(function (d) { return parseInt(d, 10); });
-  var maxDay = Math.max.apply(null, days);
-  return lastMonth + '-' + pad2(maxDay);
+/* ===== 23章(2026-10-03): 筋トレ予定日は「毎週金曜」だけ =====
+   旧ルール(10-4-2「2日休んで3日目」+ 希休・半9 を避けて翌日にずらす・基準日から繰り越し)は廃止。
+   金曜はフィールサイクルが休館(自転車に乗らない日)なので筋トレに行ける、という理由。
+   ユーザー決定(2026-10-03): 金曜が「休み」「希休」でも**ずらさない**。だからシフトは一切見ない。
+   旧 findLatestMuscleDate() / ensureMuscleAnchorIfNeeded()(基準日さがしと初回の質問)は
+   「どこから数えるか」が存在しなくなったので削除した。
+   保存データの形(muscle[年月] = 日の文字列の配列)は変えない = 古いバックアップもそのまま読める */
+
+/* その月の金曜の日(文字列)を全部返す。state は読まない・書かない純粋な計算 */
+function fridaysOfMonth(ym) {
+  var p = ym.split('-');
+  var y = parseInt(p[0], 10), m = parseInt(p[1], 10);
+  var out = [];
+  if (!(y >= 1970) || !(m >= 1 && m <= 12)) return out;
+  var dim = daysInMonth(y, m);
+  for (var d = 1; d <= dim; d++) {
+    if (dowOfDateStr(dateStrOf(y, m, d)) === 5) out.push(String(d));   /* 5 = 金曜 */
+  }
+  return out;
 }
 
+/* ===== 2026-10-04(検証2 問題4): 予定を作ってよい月の下限 =====
+   アプリを使っていなかった月(2024年など)を開いたときに、金曜に 💪 が並ばないようにする。
+   下限 = 「保存データが1件でもある一番古い月」と「今月」の早いほう。
+     ・今月と、今月より先の月にはいつでも作る(先の予定を見たいため)
+     ・保存データが1件も無い端末(新規インストール直後)でも今月より前には作らない
+   数に入れるもの: シフト・手押しスタンプ・手書きメモ・運動の記録(records)・種目ログ(log)・
+     フィールの休館日・機械チェックの済み・ダイエットの記録・基準日(muscleAnchor)
+   数に入れないもの: exercise.muscle と confirmedMonths。
+     この2つは「アプリが自分で作った控え」なので、自分が書いたものを根拠にすると
+     下限がじわじわ過去へずれていってしまう。
+   state を読むだけ。書かない・保存しない。 */
+
+/* 中身が空の箱(空配列・空オブジェクト・null)は「使っていない」と見なす */
+function isEmptyDataBox(v) {
+  if (v === null || v === undefined) return true;
+  if (Array.isArray(v)) return v.length === 0;
+  if (typeof v === 'object') return Object.keys(v).length === 0;
+  return false;
+}
+
+/* obj のキー("YYYY-MM" か "YYYY-MM-DD")のうち、中身がある一番古い月を返す。
+   best より古いものが無ければ best をそのまま返す(best は null でもよい)。
+   引数名を cur にしないこと。cur は「いま表示している年月」の別の変数で、紛らわしいため */
+function oldestYMOfKeys(obj, best) {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return best;
+  var keys = Object.keys(obj);
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i], ym = null;
+    if (/^\d{4}-\d{2}$/.test(k)) ym = k;
+    else if (/^\d{4}-\d{2}-\d{2}$/.test(k)) ym = k.slice(0, 7);
+    if (ym === null) continue;
+    if (isEmptyDataBox(obj[k])) continue;
+    if (best === null || ym < best) best = ym;       /* "YYYY-MM" は文字の大小＝日付の前後 */
+  }
+  return best;
+}
+
+function muscleScheduleFloorYM() {
+  var floor = null;
+  var ex = (state.exercise && typeof state.exercise === 'object') ? state.exercise : {};
+  floor = oldestYMOfKeys(state.shifts, floor);
+  floor = oldestYMOfKeys(state.stamps, floor);
+  floor = oldestYMOfKeys(state.notes, floor);
+  floor = oldestYMOfKeys(ex.closureDays, floor);
+  floor = oldestYMOfKeys(ex.records, floor);
+  floor = oldestYMOfKeys(ex.log, floor);
+  if (typeof ex.muscleAnchor === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(ex.muscleAnchor)) {
+    var anchorYM = ex.muscleAnchor.slice(0, 7);
+    if (floor === null || anchorYM < floor) floor = anchorYM;
+  }
+  var md = state.monthlyDone;
+  if (md && typeof md === 'object' && !Array.isArray(md)) {
+    Object.keys(md).forEach(function (name) { floor = oldestYMOfKeys(md[name], floor); });
+  }
+  var dt = state.diet;
+  if (dt && typeof dt === 'object' && !Array.isArray(dt)) {
+    ['weights', 'meals', 'mealsGrams', 'diary', 'habits', 'prep', 'achieved'].forEach(function (k) {
+      floor = oldestYMOfKeys(dt[k], floor);
+    });
+  }
+  var now = new Date();
+  var nowYM = ymKey(now.getFullYear(), now.getMonth() + 1);
+  if (floor === null || nowYM < floor) floor = nowYM;
+  return floor;
+}
+
+/* その月に筋トレ予定(毎週金曜)を作ってよいか */
+function isMuscleScheduleYM(ym) {
+  if (typeof ym !== 'string' || !/^\d{4}-\d{2}$/.test(ym)) return false;
+  return ym >= muscleScheduleFloorYM();
+}
+
+/* 関数名・引数・戻り値の形は今までどおり(呼び出し側7か所は1文字も変えていない)。
+   中身だけ「その月の金曜を詰める」に入れ替えた。
+
+   2026-10-04(検証2 問題1・問題5)で、ここでの localStorage への保存をやめた。
+     ・問題1: 壊れた保存データの端末でアプリを開いたとき、ユーザーが画面に触る前に
+       saveState() が走って壊れたデータを初期データで上書きしてしまっていた。
+       入れ替え処理(migrateToToho / migrateMuscleToFriday)が stateLoadFailed を見て
+       何も書かないのと同じ流儀にそろえ、この道も「操作があるまで書かない」にした。
+     ・問題5: 月を1つ開くごとに保存データが1件ずつ増え続けていた。
+   予定日は「その月の金曜」= カレンダーだけで決まる控えなので、毎回その場で作り直せばよく、
+   端末に保存しておく必要がない(保存の形は変えないので古いバックアップはそのまま読める。
+   保存時に muscle を空で書くのは stateForSave() を参照)。
+   confirmedMonths への書き足しもやめた。23章で判定に使わなくなった死んだデータで、
+   月を開くたびに増えるだけだったため。箱(キー)は残すのでスキーマは変わらない。 */
 function ensureMuscleScheduleUpTo(targetYM) {
-  /* 「確定済み」は confirmedMonths リストだけで判定する(2026-07-27 修正)。
-     以前は「muscle[targetYM] にキーがあるか」だけで見ていたため、繰り越しで翌月に
-     1件だけこぼれた場合に、その月がまだ計算し終わっていないのに「確定済み」と
-     誤判定してしまうバグがあった(7月→8月と順番に呼ぶと8月が1件で止まる) */
-  if (state.exercise.confirmedMonths.indexOf(targetYM) >= 0) {
-    return state.exercise.muscle[targetYM] || [];
-  }
-
-  var anchor = findLatestMuscleDate();
-  if (!anchor) {
-    if (!state.exercise.muscleAnchor) return null; /* 呼び出し側が先に基準日を確認する */
-    anchor = state.exercise.muscleAnchor;
-  }
-
-  var current = anchor;
-  var lastMonthTouched = ymOfDateStr(current);
-  var guard = 0;
-  while (ymOfDateStr(current) <= targetYM && guard < 3000) {
-    guard++;
-    var candidate = addDaysToDateStr(current, 3); /* 2日休んで3日目 */
-    var loopGuard = 0;
-    while (loopGuard < 60) {
-      var lab = shiftLabelOfDate(candidate);
-      if (lab === '希休' || lab === '半9') { candidate = addDaysToDateStr(candidate, 1); loopGuard++; }
-      else break;
-    }
-    var month = ymOfDateStr(candidate);
-    if (!state.exercise.muscle[month]) state.exercise.muscle[month] = [];
-    var dayStr = dayOfDateStr(candidate);
-    if (state.exercise.muscle[month].indexOf(dayStr) < 0) state.exercise.muscle[month].push(dayStr);
-
-    /* 月をまたいだ瞬間、直前まで作業していた月はもう二度と戻って来ないので確定させてよい */
-    if (month !== lastMonthTouched && state.exercise.confirmedMonths.indexOf(lastMonthTouched) < 0) {
-      state.exercise.confirmedMonths.push(lastMonthTouched);
-    }
-    lastMonthTouched = month;
-    current = candidate;
-  }
-
-  /* ループが(guard上限ではなく)条件どおり自然に終わっていれば、
-     current は targetYM より後ろの月に進んでいる=targetYM は最後まで計算し終えている */
-  if (ymOfDateStr(current) > targetYM && state.exercise.confirmedMonths.indexOf(targetYM) < 0) {
-    state.exercise.confirmedMonths.push(targetYM);
-  }
-  saveState();
-  return state.exercise.muscle[targetYM] || [];
-}
-
-/* 筋トレ記録が1件も無く、基準日も未設定なら、初回だけ質問する */
-function ensureMuscleAnchorIfNeeded() {
-  var hasAny = Object.keys(state.exercise.muscle).some(function (k) {
-    return state.exercise.muscle[k] && state.exercise.muscle[k].length;
-  });
-  if (hasAny || state.exercise.muscleAnchor) return;
-
-  var useToday = !confirm('筋トレの記録がまだありません。直近に筋トレをした日を教えてください。\n\n「OK」= 日付を入力する\n「キャンセル」= 今日から数える');
-  var anchorDate;
-  if (useToday) {
-    var t = new Date();
-    anchorDate = dateStrOf(t.getFullYear(), t.getMonth() + 1, t.getDate());
-  } else {
-    var input = prompt('直近に筋トレをした日を入力してください(例: 2026-07-30)');
-    if (input && /^\d{4}-\d{1,2}-\d{1,2}$/.test(input.trim())) {
-      var p = input.trim().split('-');
-      anchorDate = dateStrOf(parseInt(p[0], 10), parseInt(p[1], 10), parseInt(p[2], 10));
-    } else {
-      var t2 = new Date();
-      anchorDate = dateStrOf(t2.getFullYear(), t2.getMonth() + 1, t2.getDate());
-      if (input !== null) toast('日付の形式が正しくなかったため、今日を基準にしました');
-    }
-  }
-  state.exercise.muscleAnchor = anchorDate;
-  saveState();
+  /* 2026-10-04(問題4): 使い始める前の月には予定を作らない */
+  if (!isMuscleScheduleYM(targetYM)) return [];
+  var want = fridaysOfMonth(targetYM);
+  var have = state.exercise.muscle[targetYM];
+  var same = Array.isArray(have) && have.length === want.length
+    && want.every(function (d) { return have.indexOf(d) >= 0; });
+  if (!same) state.exercise.muscle[targetYM] = want;
+  return state.exercise.muscle[targetYM];
 }
 
 function toggleClosureDay(ym, d) {
@@ -3675,6 +4292,23 @@ function getMuscleSessionsOf(dateStr) {
   return [];
 }
 
+/* その日に「すでに入っている種目ログ(重量・回数)」のセッションだけを返す(2026-10-04 追加。検証2 問題3)。
+   23章で予定日が金曜だけになったため、昔 金曜以外の日に入れた重量・回数に入口が無くなり、
+   見ることも直すことも消すこともできなくなっていた。その入口を出すためだけの判定。
+   ・予定かどうかは見ない。記録が1件も無い日は空配列を返す = 記録が無い日にボタンを増やさない
+   ・getMuscleSessionsOf()(予定の判定)は1文字も変えていないので、
+     月の内訳の件数・13章の警告・「明日の筋トレ予定」の判定はこれまでと同じ
+   state を読むだけ。書かない・保存しない */
+function loggedMuscleSessionsOf(dateStr) {
+  var out = [];
+  var mo = state.exercise.log[dateStr];
+  if (!mo || typeof mo !== 'object' || Array.isArray(mo)) return out;
+  ['am', 'pm', 'normal'].forEach(function (sn) {     /* 並びは getMuscleBreakdownOf とそろえる */
+    if (Array.isArray(mo[sn]) && mo[sn].length > 0) out.push(sn);
+  });
+  return out;
+}
+
 function findMuscleExerciseDef(exerciseId) {
   var list = state.exercise.muscleExercises;
   for (var i = 0; i < list.length; i++) {
@@ -3689,31 +4323,15 @@ function getExerciseLog(dateStr, session) {
   return mo[session];
 }
 
-/* チュアンドタン集計(11-7-2)用: その月の筋トレ予定セッション(金曜am/pmを含む)のうち、
-   記録済み(旧✓トグル または 新しい記録機能でのログ)のセッション数を数える(2026-08-13 方針A)。
-   非金曜日は旧✓トグルもOR判定に含めるので、旧✓トグルだけで記録していた過去月の集計は変わらない */
-function getMuscleDoneSessionCountOf(ym) {
-  var p = ym.split('-'), y = parseInt(p[0], 10), m = parseInt(p[1], 10);
-  var dim = daysInMonth(y, m);
-  var count = 0;
-  for (var d = 1; d <= dim; d++) {
-    var ds = dateStrOf(y, m, d);
-    var sessions = getMuscleSessionsOf(ds); /* 金曜=['am','pm']、通常の予定日=['normal']、予定外=[] */
-    sessions.forEach(function (s) {
-      var logged = getExerciseLog(ds, s).length > 0;
-      var oldDone = (s === 'normal') && getMuscleState(ym, d) === 'done';
-      if (logged || oldDone) count++;
-    });
-  }
-  return count;
-}
-
 /* ===== 13章: 筋トレの間隔があいたら警告(2026-08-24 追加。計画.md 13章) =====
-   既存の判定・集計(ensureMuscleScheduleUpTo / getMuscleSessionsOf / getMuscleDoneSessionCountOf)は
+   既存の判定・集計(ensureMuscleScheduleUpTo / getMuscleSessionsOf)は
+   (getMuscleDoneSessionCountOf はチュアンドタン集計専用だったため 21章で削除した)
    1文字も変更せず、「予定かどうかに関係なく、その日に記録があるか」だけを見る関数を新しく足す。
    ここは state を読むだけ。書き換えないので saveState() は呼ばない(新しい保存データも増やさない) */
 
-var MUSCLE_GAP_WARN_DAYS = 3;    /* 何日空いたら知らせるか(13-9 の確認でユーザーが選んだ (A)3日) */
+var MUSCLE_GAP_WARN_DAYS = 8;    /* 何日空いたら知らせるか(13-9 の確認でユーザーが選んだ (A)3日)
+                                    2026-10-04: 23章で筋トレを毎週金曜にしたため 3日 → 8日 に変えた
+                                    (3日のままだと毎週 月〜木 ずっと出てしまう。8日なら金曜を1回飛ばした翌日から出る) */
 var MUSCLE_GAP_LIMIT_DAYS = 400; /* さかのぼる上限。記録が1件も無いときに無限に探さないため */
 
 /* その日に筋トレを「実際にやった」と数えられるか。
@@ -3856,7 +4474,6 @@ function getMuscleBreakdownOf(ym) {
 /* 月ごとの「前回描画時の合計」を覚えておく一時変数(保存はしない)。
    達成の瞬間だけフラッシュを再生し、ページ再読み込み直後は再生しないための仕組み */
 var exercisePrevTotal = {};
-var exercisePrevTuan = {};   /* チュアンドタン(11-7-2)の前回カウント。月ごとに達成の瞬間だけ演出を出すため */
 
 function buildExerciseRow(row, ym) {
   var el = document.createElement('div');
@@ -3914,10 +4531,16 @@ function buildExerciseRow(row, ym) {
     badge.className = 'ex-muscle-badge';
     badge.textContent = muscleSessions.length === 2 ? '💪 筋トレ(朝・夜)' : '💪 筋トレ';
     el.appendChild(badge);
-
+  }
+  /* 2026-10-04(検証2 問題3): 予定日ではないが、過去に入れた重量・回数がある日。
+     予定の「💪 筋トレ」バッジは出さず(予定日は金曜だけ、という 23章の見え方を崩さない)、
+     中身を見る・直す・消すための「記録する」ボタンだけを出す。
+     記録が1件も無い日には何も増やさない */
+  var logBtnSessions = muscleSessions.length ? muscleSessions : loggedMuscleSessionsOf(ds);
+  if (logBtnSessions.length) {
     var logBtnRow = document.createElement('div');
     logBtnRow.className = 'ex-log-btn-row';
-    muscleSessions.forEach(function (session) {
+    logBtnSessions.forEach(function (session) {
       var hasLog = getExerciseLog(ds, session).length > 0;
       var btn = document.createElement('button');
       btn.className = 'btn sub small ex-log-btn';
@@ -4269,6 +4892,10 @@ function playMoon(el) {
 
 /* 予定の回数に収まらなくなった記録を消して、表示と数を合わせる(問題40の整理ボタン用) */
 function trimOrphanRecords(ym) {
+  /* 23章(2026-10-03): 下で state.exercise.muscle[ym] を直接読むので、自分で先に計算しておく。
+     計算していない月のまま読むと「予定が1日も無い」と見えて rec.muscle を消してしまう。
+     中身が今までと同じなら保存しないので重くならない */
+  try { ensureMuscleScheduleUpTo(ym); } catch (e) { /* 失敗しても下の整理は続ける */ }
   var mo = state.exercise.records[ym];
   if (!mo) return;
   var p = ym.split('-');
@@ -4535,7 +5162,7 @@ function renderExercise() {
   var monthShifts = state.shifts[ym] || {};
   var closure = state.exercise.closureDays[ym] || [];
   var muscleDays = ensureMuscleScheduleUpTo(ym);
-  if (muscleDays === null) muscleDays = []; /* 基準日未設定(通常はここに来る前に ensureMuscleAnchorIfNeeded で確定済み) */
+  if (!Array.isArray(muscleDays)) muscleDays = []; /* 23章: 今は必ず配列が返るが、万一のときの受け皿として残す */
 
   var plan = computeFeelcycleBoostPlan(ym); /* 14章: 先頭で1回だけ計算する(日ごとに呼び直さない) */
   var list = $('ex-list');
@@ -4561,6 +5188,10 @@ function renderExercise() {
    一覧を作り直さないので、押したボタンのアニメーションが途中で消えない */
 function updateExerciseCounts() {
   var ym = ymKey(cur.y, cur.m);
+  /* 23章(2026-10-03): 下で state.exercise.muscle[ym] を直接読むため、自分で先に計算しておく。
+     renderExercise() 経由なら計算済みだが、afterRecordChange() から単独で呼ばれる道もあるので
+     「呼んでから読む」形にしておく(中身が同じなら保存しない) */
+  try { ensureMuscleScheduleUpTo(ym); } catch (e) { /* 失敗しても集計は続ける */ }
   var dim = daysInMonth(cur.y, cur.m);
   var monthShifts = state.shifts[ym] || {};
   var closure = state.exercise.closureDays[ym] || [];
@@ -4666,23 +5297,6 @@ function updateExerciseCounts() {
     noteEl.appendChild(btn);
   }
 
-  /* 筋トレ: 予定と済(2026-08-09: 臨時の筋トレ「💪+」も済に加える) */
-  var muscleDays = state.exercise.muscle[ym] || [];
-  var mRest = 0, muscleExtraTotal = 0;
-  muscleDays.forEach(function (dk) {
-    var st = getMuscleState(ym, parseInt(dk, 10));
-    if (st === 'rest') mRest++;
-  });
-  /* チュアンドタン集計(11-7-2)専用: セッション単位(金曜am/pmも含む)で
-     「旧✓トグル or 新しい記録機能でのログ」をOR判定して数える(2026-08-13 方針A)。
-     過去の月(旧✓トグルのみで記録)の集計結果は変わらないよう、非金曜日は旧✓判定も引き続き有効にする */
-  var muscleSessionDone = getMuscleDoneSessionCountOf(ym);
-  for (var md = 1; md <= dim; md++) {
-    muscleExtraTotal += getMuscleExtraCount(ym, md);
-  }
-  /* 筋トレの🌙も同じ考え方で「予定」から差し引く(2026-07-28 ユーザー承認・フィールサイクルと揃える) */
-  var muscleTotalShown = Math.max(0, muscleDays.length - mRest);
-  void muscleTotalShown; /* 2026-08-13: 表示は下の種目別内訳に置き換え。値自体はチュアンドタン集計に引き続き使う */
   /* 月間筋トレ内訳(2026-08-13 追加。計画.md 10-8-2)。
      予定日数ではなく「実際に記録したログの件数」を種目別に数える。金曜(朝・夜)も含める */
   var breakdownInfo = getMuscleBreakdownOf(ym);
@@ -4695,145 +5309,6 @@ function updateExerciseCounts() {
     $('ex-muscle-count').textContent = 'まだ記録がありません';
   }
   $('ex-muscle-rest').textContent = ''; /* 2026-08-13: 表示廃止(裏側の集計・差し引きロジックは変更しない) */
-
-  /* チュアンドタン目標(11-7-2)。フィールサイクル済+予定外ジム+筋トレ済(臨時ぶんを含む)+旧ウォーキングデータの合計で判定する。
-     「🌙 休む」はどちらの内訳にも入っていないので自然にカウント対象外になる */
-  var tuanGoal = state.diet.profile.tuanGoal;
-  var tuanTotal = feelDone + feelExtra + muscleSessionDone + muscleExtraTotal + walkTotal;
-  var tuanAchieved = tuanTotal >= tuanGoal;
-  var tuanPrev = exercisePrevTuan.hasOwnProperty(ym) ? exercisePrevTuan[ym] : null;
-  var tuanJustAchieved = tuanAchieved && tuanPrev !== null && tuanPrev < tuanGoal;
-  exercisePrevTuan[ym] = tuanTotal;
-
-  var tuanBox = $('ex-tuan-box');
-  tuanBox.classList.toggle('achieved', tuanAchieved);
-  $('ex-tuan-count').textContent = tuanAchieved
-    ? 'チュアンドタン級!(' + tuanTotal + '回)'
-    : 'チュアンドタンまで あと ' + (tuanGoal - tuanTotal) + '回';
-  $('ex-tuan-msg').textContent = tuanAchieved ? '🏆 チュアンドタン級!' : '';
-  if (tuanJustAchieved) {
-    tuanBox.classList.remove('flash');
-    void tuanBox.offsetWidth; /* reflow でアニメーションを最初から再生させる(フィールサイクル30回と同じ仕組み) */
-    tuanBox.classList.add('flash');
-  }
-
-  /* 15章 ステップ23: 予約状況の箱。月ループ(cur 基準)には足さず、実際の今日を基準に別計算する */
-  try { updateBookingStatus(); } catch (e) { /* 失敗しても回数の表示は壊さない */ }
-}
-
-/* ===== 15章 ステップ23(2026-09-14): フィールサイクルの予約状況(計画.md 15-4-1 / 15-5) =====
-   読むだけ。state を書き換えず saveState() も呼ばない。
-   getFeelcycleCount / computeFeelcycleBoostPlan / getFeelcycleCountBoosted は呼ぶだけで中身に触れない。
-   分子(doneAll)・分母(plan.total)・お祝い演出の計算には一切関与しない。日記には書かない */
-
-/* そのレッスン日が予約できるか。ここだけ差し替えれば公開モデルを変えられる(#56)。
-   「今日から7日以内」= 7日ちょうどの日を含む(15-2 決定1・4a)。時刻は見ない(日単位) */
-function isBookingOpen(ds, todayDs) {
-  return ds <= addDaysToDateStr(todayDs, BOOK_AHEAD);
-}
-/* そのレッスンが予約できるようになる日(表示用) */
-function bookingOpenDate(ds) {
-  return addDaysToDateStr(ds, -BOOK_AHEAD);
-}
-/* 修正 2026-09-14-07 V5: 箱の枠の呼び名も feelSlotName に一本化(旧 bookingBoxSlotName は削除)。
-   朝が2本の日は箱でも「朝1/朝2」と出る */
-function computeBookingStatus() {
-  var today = getTodayDay();   /* 実際の今日。cur(表示中の月)は使わない */
-  var todayDs = dateStrOf(today.y, today.m, today.d);
-  var plans = {};              /* 年月 → computeFeelcycleBoostPlan(ym)。月ごとに1回だけ計算する */
-  var held = [];
-  var next = null;
-  var firstUnimported = null;
-  for (var offset = 0; offset < BOOK_WINDOW; offset++) {
-    var day = new Date(today.y, today.m - 1, today.d + offset);   /* 月またぎ・年またぎは Date に任せる */
-    var y = day.getFullYear(), m = day.getMonth() + 1, d = day.getDate();
-    var ym = ymKey(y, m);
-    var ds = dateStrOf(y, m, d);
-    if (!plans.hasOwnProperty(ym)) plans[ym] = computeFeelcycleBoostPlan(ym);
-    var shEntry = normShift((state.shifts[ym] || {})[String(d)]);
-    var isManual = (state.exercise.closureDays[ym] || []).indexOf(String(d)) >= 0;
-    var res = getFeelcycleCountBoosted(ds, shEntry, isManual, plans[ym]);   /* 既存関数そのまま */
-    if (!shEntry && firstUnimported === null) firstUnimported = ds;
-    var rec = getDayRecord(ym, d);
-    var bookedLen = rec && Array.isArray(rec.booked) ? rec.booked.length : 0;
-    var nSlots = Math.max(res.count, bookedLen);   /* 予定外に残った印も見る */
-    for (var idx = 0; idx < nSlots; idx++) {
-      var time = getBookedTime(ym, d, idx);
-      var label = feelSlotName(res, idx);
-      if (time !== null) {
-        /* 今日の分も保有に数える(15-2 決定2: 枠が空くのは日付が変わったとき) */
-        held.push({ ds: ds, idx: idx, label: label, time: time, orphan: idx >= res.count,
-                    extraSlot: idx >= res.count || idx >= (res.slots || []).length });
-      } else if (idx < res.count && next === null) {
-        /* 今日の枠で✓か🌙を押してあれば、もう予約対象ではない(終わった/休むと決めた)。
-           修正 2026-09-14-07 V6: 未来の枠も🌙(休む)なら勧めない(✓が付いていても外す)。保有の数え方は変えない */
-        var st = getFeelState(ym, d, idx);
-        if (!(st === 'done' || st === 'rest')) {
-          next = { ds: ds, idx: idx, label: label };
-        }
-      }
-    }
-  }
-  /* 表示は日付順・時刻順(同じ日は時刻の早い順) */
-  held.sort(function (a, b) {
-    if (a.ds !== b.ds) return a.ds < b.ds ? -1 : 1;
-    var ta = bookTimeMinutes(a.time), tb = bookTimeMinutes(b.time);
-    if (ta !== tb) return ta - tb;
-    return a.idx - b.idx;
-  });
-  if (held.length >= BOOK_LIMIT) {
-    return { kind: 'full', todayDs: todayDs, held: held, next: next, freeAt: held[0], firstUnimported: firstUnimported };
-  }
-  if (next === null) return { kind: 'none', todayDs: todayDs, held: held, firstUnimported: firstUnimported };
-  if (!isBookingOpen(next.ds, todayDs)) {
-    return { kind: 'wait', todayDs: todayDs, held: held, next: next, openOn: bookingOpenDate(next.ds), firstUnimported: firstUnimported };
-  }
-  return { kind: 'now', todayDs: todayDs, held: held, next: next, firstUnimported: firstUnimported };
-}
-
-/* "2026-09-10" → "9/10" / "9/10(木)" */
-function bookingMD(ds) {
-  var p = parseDateStr(ds);
-  return p.m + '/' + p.d;
-}
-function bookingMDW(ds) {
-  return bookingMD(ds) + '(' + WEEK_JA[dowOfDateStr(ds)] + ')';
-}
-
-/* 箱 #ex-book-box の表示を更新する(15-5 の文言表どおり)。文字はすべて textContent */
-function updateBookingStatus() {
-  var heldEl = $('ex-book-held'), nextEl = $('ex-book-next'), noteEl = $('ex-book-note');
-  if (!heldEl || !nextEl || !noteEl) return;
-  var s = computeBookingStatus();
-
-  /* 1行目: 🎫 予約 ◯ / 3本: 9/10 7:00・9/10 18:30(⤴の3本目は「3本目」、予定外の印は「予定外」を時刻の前に) */
-  var list = s.held.map(function (h) {
-    return bookingMD(h.ds) + ' ' + (h.extraSlot ? h.label + ' ' : '') + h.time;
-  });
-  heldEl.textContent = '🎫 予約 ' + s.held.length + ' / ' + BOOK_LIMIT + '本: ' + (list.length ? list.join('・') : 'なし');
-
-  /* 2行目(太字): 状態は ◎ / ⏳ / 📅 の記号と文字で区別する(色は使わない) */
-  var line;
-  var nextTxt = s.next ? bookingMDW(s.next.ds) + s.next.label : null;
-  if (s.kind === 'now') {
-    line = '次に予約: ' + nextTxt + ' ◎ 今すぐ予約できます';
-  } else if (s.kind === 'full') {
-    var free = s.freeAt.ds === s.todayDs
-      ? '⏳ 今日(' + bookingMD(s.todayDs) + ')が過ぎると1本空きます(日付が変わると反映)'
-      : '⏳ ' + bookingMDW(s.freeAt.ds) + 'が過ぎると1本空きます';
-    line = '次に予約: ' + (nextTxt ? nextTxt + ' ' : 'なし ') + free;
-  } else if (s.kind === 'wait') {
-    line = '次に予約: ' + nextTxt + ' 📅 ' + bookingMDW(s.openOn) + 'から予約できます';
-  } else {
-    line = '次に予約: なし(2週間先まで予約済み・または予定なし)';
-  }
-  if (s.firstUnimported) line += '／' + bookingMD(s.firstUnimported) + '以降はシフト未取り込み';
-  nextEl.textContent = line;
-
-  /* wait のときだけ注記を添える。それ以外は空(:empty で高さゼロ) */
-  noteEl.textContent = s.kind === 'wait'
-    ? '※ 7日先まで予約できる前提で計算(公式FAQでは金曜20時ごろ公開。食い違ったらこの計算を直す)'
-    : '';
 }
 
 /* ================= 明日の日付(昨日・今日・明日の予定行で使う) =================
@@ -6272,15 +6747,6 @@ function renderDietSettings() {
   g.appendChild(dietRow('運動したぶんを目標に足す', p.useExerciseKcal ? 'する' : 'しない', [{ text: '切り替え', onClick: function () {
     p.useExerciseKcal = !p.useExerciseKcal; saveState(); renderDietSettings(); renderDiet();
   } }]));
-  g.appendChild(dietRow('チュアンドタン目標(月の運動回数)', p.tuanGoal + ' 回', [{ text: '変更', onClick: function () {
-    var v = prompt('チュアンドタン目標(月の運動回数)を入力', String(p.tuanGoal));
-    if (v === null) return;
-    var n = parseInt(v, 10);
-    if (!isFinite(n) || n < 10 || n > 99) { toast('10〜99 の数字で入れてください'); return; }
-    p.tuanGoal = n; saveState(); renderDietSettings();
-    /* 運動予定シートが開いていれば、その場でカウント表示にも反映する */
-    if ($('sheet-exercise').classList.contains('open')) updateExerciseCounts();
-  } }]));
 
   /* --- 今日の習慣(項目) --- */
   renderDietHabitSettings();
@@ -6630,24 +7096,49 @@ $('backup-restore').addEventListener('click', function () {
   s.notes = sanitizeNotes(d.notes);
   s.recurring = sanitizeRecurring(d.recurring);
   s.diet = sanitizeDiet(d.diet);
+  /* 2026-10-03(検証 問題2): 貼られたバックアップが持っている済み印を引き継ぐ。
+     印を持たない 10/02 以前の古いバックアップは「まだやっていない」になるので、
+     このあとの migrateToToho() で東邦への入れ替えがもう一度走る。
+     印を持つ新しいバックアップでは走らない = 自分で消したメモ・解除した休館が復活しない */
+  s.migrations = sanitizeMigrations(d.migrations);
+  /* 20章(2026-10-03): 機械チェックを何日に終えたかの記録も復元する。
+     この1行を忘れると、復元したときだけ 🔧✓ の記録が消える(計画.md 20-2・20-7)。
+     この箱を持たない 10/02 以前の古いバックアップは {} = 1〜10日に 🔧 が出る状態に戻る */
+  s.monthlyDone = sanitizeMonthlyDone(d.monthlyDone);
   if (d.settings && typeof d.settings === 'object' && typeof d.settings.userName === 'string') {
     s.settings.userName = d.settings.userName;
   }
   state = s;
+  /* 復元は正常な操作。起動時の読み込み失敗の印が残っていると入れ替えがスキップされるので戻す */
+  stateLoadFailed = false;
   /* 2026-08-26: 復元直後は「前回の記録数」を覚えている入れ物をリセットする(問題6の修正)。
      こうしないと復元前の少ない回数と復元後の多い回数を比べてしまい、
      何もしていないのに「たった今達成した」お祝いの光る演出が誤って出てしまう。
      全データ消去(reset-all)側は前から同じ考え方でリセットしている。 */
   exercisePrevTotal = {};
-  exercisePrevTuan = {};
-  saveState();
+  /* 2026-10-03(小問題4): 保存できたかどうかを自分で受け取る。
+     saveState() を使うと「保存に失敗しました」のお知らせが別に出てしまい、
+     下の「✅ 復元しました。」と食い違って見えるため */
+  var restoreSaved = saveStateChecked();
+  /* 古いバックアップだったときだけ、ここで東邦への入れ替えが走って保存される。
+     別キーの古い印は見ない(見ると古いバックアップでも入れ替えがスキップされる)。
+     quiet = true にして、結果は下の1つの文にまとめる */
+  if (migrateToToho(false, true) === false) restoreSaved = false;
+  /* 23章(2026-10-03): 古いバックアップ(3日おきの筋トレ予定日)を読んでも金曜に直す。
+     印を持つ新しいバックアップでは走らない = 「💪臨時」が二重に増えない */
+  if (migrateMuscleToFriday(true) === false) restoreSaved = false;
   $('backup-in').value = '';
   $('user-name').value = state.settings.userName;
   renderTypeList();
   renderMuscleExerciseList();
   renderStampDefList();
   renderRecurringList();
-  showBackupResult('✅ 復元しました。', false);
+  /* 成否を1つの文にまとめて出す(2026-10-03 小問題4) */
+  if (restoreSaved) {
+    showBackupResult('✅ 復元しました。', false);
+  } else {
+    showBackupResult('⚠ 復元した内容は画面に出ていますが、この端末には保存できませんでした。アプリを閉じると消えます。空き容量やプライベートモード(シークレットモード)を確認してから、もう一度読み込んでください。', true);
+  }
   render();
 });
 
@@ -6657,15 +7148,29 @@ $('reset-all').addEventListener('click', function () {
   if (!confirm('バックアップは取りましたか?\n「OK」を押すと元に戻せません。')) return;
   try { localStorage.removeItem(STORE_KEY); } catch (e) {}
   state = defaultState();
+  /* まっさらな初期状態にしたので「壊れた保存データ」の印は外す(外さないと下の入れ替えが止まる) */
+  stateLoadFailed = false;
+  /* 2026-10-03(検証 問題4): defaultState() は済み印を持たないので、ここで入れ替えを
+     走らせると新しいスマホに入れたのとまったく同じ状態(10月のメモ4件・10/1〜10/4 休館も入る)
+     にそろう。別キーの古い印は見ない。
+     quiet = true にして、成否は下の1つの文にまとめる(2026-10-03 小問題4) */
+  var resetSaved = (migrateToToho(false, true) !== false);
+  /* 23章(2026-10-03): defaultState() は印を持たないので、ここでも走らせて印を立てる。
+     記録が1件も無いので①は空振りし、②と印だけが残る = 新しいスマホに入れたのと同じ状態 */
+  if (migrateMuscleToFriday(true) === false) resetSaved = false;
   selected = null;
   exercisePrevTotal = {};
-  exercisePrevTuan = {}; /* 2026-08-26: チュアンドタン用の入れ物も同様に初期化(問題6の修正) */
   $('user-name').value = '';
   $('backup-in').value = '';
   renderTypeList();
   renderStampDefList();
   renderRecurringList();
-  showBackupResult('全データを消去しました。最初の状態に戻っています。', false);
+  /* 成否を1つの文にまとめて出す(2026-10-03 小問題4) */
+  if (resetSaved) {
+    showBackupResult('全データを消去しました。最初の状態に戻っています。', false);
+  } else {
+    showBackupResult('⚠ 全データを消去しました。ただし最初の状態をこの端末に保存できませんでした。画面には出ていますが端末には残っていません。空き容量やプライベートモード(シークレットモード)を確認してください。', true);
+  }
   render();
 });
 
@@ -6674,12 +7179,14 @@ $('reset-all').addEventListener('click', function () {
 document.addEventListener('visibilitychange', function () {
   if (document.visibilityState !== 'visible') return;
   try { updateMuscleGapNote(); } catch (e) { /* 失敗しても何もしない */ }
-  /* 15章 ステップ23: 予約状況の箱も、日付が変わっていれば計算し直す(枠が空くのは日付が変わったとき) */
-  try { updateBookingStatus(); } catch (e) { /* 失敗しても何もしない */ }
 });
 
 /* ================= 起動 ================= */
 (function init() {
+  /* 2026-10-03(前回の問題7): 設定画面の一番下に版番号を文字で出す。
+     スマホだけで「古い版のままか」を確かめられるようにするため */
+  var bn = $('build-note');
+  if (bn) bn.textContent = '版: ' + APP_BUILD;
   /* 起動時は今日を選択した状態にする(下のシフト入力バーがすぐ使える) */
   var t = new Date();
   selected = { y: cur.y, m: cur.m, d: t.getDate() };
