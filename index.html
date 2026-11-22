@@ -1728,6 +1728,8 @@ function sanitizeMigrations(src) {
   if (src.tohoIcon202610 === true) out.tohoIcon202610 = true;
   /* 23章(2026-10-03): 筋トレ予定日を「3日おき」から「毎週金曜」に切り替え済みかどうかの印 */
   if (src.muscleFriday202610 === true) out.muscleFriday202610 = true;
+  /* 24章(2026-11-23): フィールの記録を U34(1日1回)用に1枠へまとめ済みかどうかの印 */
+  if (src.u34Feel202611 === true) out.u34Feel202611 = true;
   return out;
 }
 
@@ -2036,9 +2038,48 @@ function migrateMuscleToFriday(quiet) {
   return false;
 }
 
+/* 24章(2026-11-23): U34の月(2026-11以降)のフィール記録を1枠(添字0)にまとめる。
+   ✓ がどこかの枠にあれば ✓、無くて 🌙 があれば 🌙。予約時刻は最初の1本を残す。
+   1回だけ実行し、済み印は本体と同じ1回の保存で書く(23章と同じ作り) */
+function migrateFeelToU34(quiet) {
+  if (stateLoadFailed) return true;
+  if (!state.migrations || typeof state.migrations !== 'object'
+      || Array.isArray(state.migrations)) state.migrations = {};
+  if (state.migrations.u34Feel202611 === true) return true;
+  var recs = state.exercise && state.exercise.records;
+  if (recs && typeof recs === 'object') {
+    Object.keys(recs).forEach(function (ym) {
+      if (!isU34YM(ym)) return;
+      var mo = recs[ym];
+      if (!mo || typeof mo !== 'object' || Array.isArray(mo)) return;
+      Object.keys(mo).forEach(function (key) {
+        var rec = mo[key];
+        if (!rec || typeof rec !== 'object') return;
+        if (Array.isArray(rec.feel) && rec.feel.length > 1) {
+          var v = rec.feel.indexOf('done') >= 0 ? 'done' : (rec.feel.indexOf('rest') >= 0 ? 'rest' : null);
+          if (v) rec.feel = [v]; else delete rec.feel;
+        }
+        if (Array.isArray(rec.booked) && rec.booked.length > 1) {
+          var b = null;
+          rec.booked.forEach(function (x) { if (b === null && x != null) b = x; });
+          if (b !== null) rec.booked = [b]; else delete rec.booked;
+        }
+      });
+    });
+  }
+  state.migrations.u34Feel202611 = true;
+  if (saveStateChecked()) return true;
+  state.migrations.u34Feel202611 = false;
+  if (quiet !== true) {
+    showSaveWarning('この端末に保存できませんでした。空き容量やプライベートモードを確認してください(次に開いたとき入れ直します)');
+  }
+  return false;
+}
+
 migrateToToho(true);
 /* 23章: 東邦の入れ替えの「あと」に置く(上書きの順番を変えないため) */
 migrateMuscleToFriday();
+migrateFeelToU34();
 
 /* ================= 便利関数 ================= */
 function $(id) { return document.getElementById(id); }
@@ -3334,6 +3375,10 @@ function buildCellExerciseLine(ym, d, shEntry, maxW, stampNames) {
     doneN += extraN;   /* 予定外に行った回数も「済」として数える */
     if (doneN > 0) { feelMark += '✓' + doneN; feelMarkShort += '✓'; }
     if (restN > 0) { feelMark += '🌙'; feelMarkShort += '🌙'; }
+    /* 24章: U34で行かなかった過去の日は「消」(チケットが消えた)。🌙を付けた日も同じく消える */
+    if (doneN === 0 && isFeelTicketLost(ym, d, res)) {
+      feelMark = feelMark.replace('🌙', '') + '消'; feelMarkShort = feelMarkShort.replace('🌙', '') + '消';
+    }
   }
   var muscleDays = state.exercise.muscle[ym] || [];
   var isMuscleScheduled = muscleDays.indexOf(String(d)) >= 0;
@@ -4024,8 +4069,24 @@ function shiftLabelOfDate(s) {
   return sh ? sh.label : null;
 }
 
-/* 10-4-1: フィールサイクル回数判定(優先順位厳守) */
+/* ===== 24章(2026-11-23): フィールサイクルを U34プラン(1日1回・行かなかった日のチケットは消える)に変更 =====
+   2026-11-01 以降は1日の予定を最大1回にする。それより前の月は今までどおり(M30: 月30回・1日2回まで)。
+   朝晩2回だった日(日勤・休みなど)は「朝/晩」= その日に決める、として1回だけ数える */
+/* var にしない: 起動直後の migrateFeelToU34() が、この行より上で実行されるため */
+function u34Start() { return '2026-11-01'; }
+function isU34Date(dateStr) { return dateStr >= u34Start(); }
+function isU34YM(ym) { return ym + '-01' >= u34Start(); }
+
 function getFeelcycleCount(dateStr, shiftEntry, isManualClosure) {
+  var r = getFeelcycleCountM30(dateStr, shiftEntry, isManualClosure);
+  if (!isU34Date(dateStr) || !(r.count > 0)) return r;
+  var slots = r.slots || [];
+  var hasEvening = slots.indexOf('晩') >= 0;
+  return { count: 1, reason: r.reason + '(U34)', slots: [hasEvening ? '朝/晩' : '朝'] };
+}
+
+/* 10-4-1: フィールサイクル回数判定(優先順位厳守)。24章から M30 時代の判定として残す */
+function getFeelcycleCountM30(dateStr, shiftEntry, isManualClosure) {
   var dow = dowOfDateStr(dateStr);
 
   if (dow === 5) return { count: 0, reason: '金曜休館' };
@@ -4071,6 +4132,7 @@ function getFeelcycleCount(dateStr, shiftEntry, isManualClosure) {
    +1ずつ割り振る。読むだけで state を書き換えない・saveState() も呼ばない。
    getFeelcycleCount()(10-4-1)自体は1文字も変更しない */
 function computeFeelcycleBoostPlan(ym) {
+  if (isU34YM(ym)) return computeFeelcycleU34Plan(ym);
   var t = new Date();
   var todayDs = dateStrOf(t.getFullYear(), t.getMonth() + 1, t.getDate()); /* 実際の今日。cur.y/cur.m は使わない */
   var p = ym.split('-');
@@ -4119,6 +4181,39 @@ function computeFeelcycleBoostPlan(ym) {
   return { boostedDays: boostedDays, total: total, baseTotal: baseTotal };
 }
 
+/* 24章: U34の月の集計。ブースト(⤴)は無し。
+   total = その月に行ける日数(シフト未確定・不明の日は数えない)
+   lost  = チケットが消えた日数(今日より前で ✓ が無い日 + 今日以降で 🌙 にした日) */
+function computeFeelcycleU34Plan(ym) {
+  var t = new Date();
+  var todayDs = dateStrOf(t.getFullYear(), t.getMonth() + 1, t.getDate());
+  var p = ym.split('-');
+  var y = parseInt(p[0], 10), m = parseInt(p[1], 10);
+  var dim = daysInMonth(y, m);
+  var monthShifts = state.shifts[ym] || {};
+  var closure = state.exercise.closureDays[ym] || [];
+  var total = 0, lost = 0;
+  for (var d = 1; d <= dim; d++) {
+    var ds = dateStrOf(y, m, d);
+    var base = getFeelcycleCount(ds, normShift(monthShifts[String(d)]), closure.indexOf(String(d)) >= 0);
+    if (base.excludedFromTotal || !(base.count > 0)) continue;
+    total++;
+    var st = getFeelState(ym, d, 0);
+    if (ds < todayDs ? st !== 'done' : st === 'rest') lost++;
+  }
+  return { boostedDays: [], total: total, baseTotal: total, lost: lost, u34: true };
+}
+
+/* 24章: U34の日で、チケットが消えた(今日より前で ✓ が無い)か */
+function isFeelTicketLost(ym, d, res) {
+  if (!isU34YM(ym) || !res || !(res.count > 0)) return false;
+  var t = new Date();
+  var todayDs = dateStrOf(t.getFullYear(), t.getMonth() + 1, t.getDate());
+  var ds = ym + '-' + pad2(d);
+  if (ds >= todayDs) return false;
+  return getFeelState(ym, d, 0) !== 'done' && !(getExtraCount(ym, d) > 0);
+}
+
 /* 14章: 既存 getFeelcycleCount() の結果を、上のプランで包むだけの薄いラッパー。既存関数は書き換えない */
 function getFeelcycleCountBoosted(dateStr, shiftEntry, isManualClosure, plan) {
   var base = getFeelcycleCount(dateStr, shiftEntry, isManualClosure); /* 既存そのまま */
@@ -4135,6 +4230,7 @@ function feelSlotsLabel(res) {
   var slots = res.slots || [];
   if (!slots.length) return String(res.count);
   var morning = 0, evening = 0;
+  if (slots.length === 1 && slots[0] === '朝/晩') return '朝/晩';   /* 24章: U34でその日に決める日 */
   slots.forEach(function (s) { if (s === '晩') evening++; else morning++; });
   if (morning && evening) return '朝晩';
   if (morning) return morning > 1 ? '朝' + morning : '朝';
@@ -4798,7 +4894,10 @@ function buildRecordGroup(opt) {
       wrap.appendChild(chip);
     })(e + 1);
   }
+  /* 24章: U34は1日1回まで。予定がある日・もう追加した日は 🚴+ を出さない */
+  var u34NoAdd = isU34YM(opt.ym) && ((opt.res && opt.res.count > 0) || extra >= 1);
   var addBtn = document.createElement('button');
+  if (u34NoAdd) addBtn.style.display = 'none';
   addBtn.className = 'rec-btn rec-btn-add';
   addBtn.textContent = '🚴+';
   addBtn.setAttribute('aria-label', cur.m + '/' + opt.d + ' に予定外で行った1回を記録する');
@@ -5237,7 +5336,8 @@ function updateExerciseCounts() {
 
   /* 達成の判定は「実際に行った数(予定ぶんの済 + 予定外の追加 + 30分歩き)」で見る */
   var doneAll = feelDone + feelExtra + walkTotal;
-  var achieved = doneAll >= 30;
+  /* 24章: U34の月は「行ける日をぜんぶ行けたか」で達成を見る(月30回は1日1回では届かないため) */
+  var achieved = plan.u34 ? (plan.total > 0 && doneAll >= plan.total) : doneAll >= 30;
   var prev = exercisePrevTotal.hasOwnProperty(ym) ? exercisePrevTotal[ym] : null;
   var justAchieved = achieved && prev !== null && prev < 30;
   exercisePrevTotal[ym] = doneAll;
@@ -5260,7 +5360,9 @@ function updateExerciseCounts() {
      (もともと予定に入っていた分をこなすだけのため)。詳しい数値例は計画.md 14-15-3参照。
      お祝い演出(achieved / justAchieved)は今までどおり実際に30回行ったときのままで、分母には連動させない */
   void feelRest; /* 2026-08-24: 🌙の集計は残すが、この表示では使わない(上のコメント参照) */
-  $('ex-feel-count').textContent = doneAll + ' / ' + total + '回' + (achieved ? ' 🎉' : '');
+  $('ex-feel-count').textContent = plan.u34
+    ? doneAll + ' / ' + total + '日' + (plan.lost > 0 ? '(消えた ' + plan.lost + '日)' : '') + (achieved ? ' 🎉' : '')
+    : doneAll + ' / ' + total + '回' + (achieved ? ' 🎉' : '');
   $('ex-feel-msg').textContent = achieved ? '🎉 今月の目標達成!' : '';
   if (justAchieved) {
     box.classList.remove('flash');
@@ -7127,6 +7229,7 @@ $('backup-restore').addEventListener('click', function () {
   /* 23章(2026-10-03): 古いバックアップ(3日おきの筋トレ予定日)を読んでも金曜に直す。
      印を持つ新しいバックアップでは走らない = 「💪臨時」が二重に増えない */
   if (migrateMuscleToFriday(true) === false) restoreSaved = false;
+  if (migrateFeelToU34(true) === false) restoreSaved = false;
   $('backup-in').value = '';
   $('user-name').value = state.settings.userName;
   renderTypeList();
@@ -7158,6 +7261,7 @@ $('reset-all').addEventListener('click', function () {
   /* 23章(2026-10-03): defaultState() は印を持たないので、ここでも走らせて印を立てる。
      記録が1件も無いので①は空振りし、②と印だけが残る = 新しいスマホに入れたのと同じ状態 */
   if (migrateMuscleToFriday(true) === false) resetSaved = false;
+  if (migrateFeelToU34(true) === false) resetSaved = false;
   selected = null;
   exercisePrevTotal = {};
   $('user-name').value = '';
