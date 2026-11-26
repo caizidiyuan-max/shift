@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- shift-calendar build 2026-11-26-01 -->
+<!-- shift-calendar build 2026-11-26-02 -->
 <!-- 版番号の「正」は JavaScript の APP_BUILD。設定画面の表示はそこから出しているので、
      番号を上げるときは APP_BUILD と上の行の2つをそろえる(表示は増やさない) -->
 <html lang="ja">
@@ -1445,7 +1445,7 @@
 /* 版番号(2026-10-03 追加。前回の問題7)。設定画面の一番下にこの文字を出すので、
    スマホだけで「今入っているのがどの版か」を確かめられる。
    番号を上げるときは、ここと 2行目の HTML コメントの2つをそろえる */
-var APP_BUILD = '2026-11-26-01';
+var APP_BUILD = '2026-11-26-02';
 var STORE_KEY = 'shift-calendar-v1';
 
 /* 筋トレ種目マスタ(2026-08-13 は7種、2026-11-26 に3種追加で10種 追加。計画.md 10-7・10-8)。
@@ -4673,6 +4673,12 @@ function buildExerciseRow(row, ym) {
      中身を見る・直す・消すための「記録する」ボタンだけを出す。
      記録が1件も無い日には何も増やさない */
   var logBtnSessions = muscleSessions.length ? muscleSessions : loggedMuscleSessionsOf(ds);
+  /* 2026-11-26: 予定日でなくても、💪+(臨時の筋トレ)を押した日・✓済にした日は
+     種目(重量・回数)を記録できるように「記録する」ボタンを出す */
+  if (!muscleSessions.length && logBtnSessions.indexOf('normal') < 0
+      && (getMuscleExtraCount(ym, row.d) > 0 || getMuscleState(ym, row.d) === 'done')) {
+    logBtnSessions = logBtnSessions.concat(['normal']);
+  }
   if (logBtnSessions.length) {
     var logBtnRow = document.createElement('div');
     logBtnRow.className = 'ex-log-btn-row';
