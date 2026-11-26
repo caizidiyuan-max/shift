@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- shift-calendar build 2026-10-04-01 -->
+<!-- shift-calendar build 2026-11-26-01 -->
 <!-- 版番号の「正」は JavaScript の APP_BUILD。設定画面の表示はそこから出しているので、
      番号を上げるときは APP_BUILD と上の行の2つをそろえる(表示は増やさない) -->
 <html lang="ja">
@@ -1445,10 +1445,10 @@
 /* 版番号(2026-10-03 追加。前回の問題7)。設定画面の一番下にこの文字を出すので、
    スマホだけで「今入っているのがどの版か」を確かめられる。
    番号を上げるときは、ここと 2行目の HTML コメントの2つをそろえる */
-var APP_BUILD = '2026-10-04-01';
+var APP_BUILD = '2026-11-26-01';
 var STORE_KEY = 'shift-calendar-v1';
 
-/* 筋トレ種目マスタ7種(2026-08-13 追加。計画.md 10-7・10-8)。
+/* 筋トレ種目マスタ(2026-08-13 は7種、2026-11-26 に3種追加で10種 追加。計画.md 10-7・10-8)。
    旧固定3種目(ダンベルフライ・ベントオーバーロー・ラットプルダウン、常にセット実施)は廃止。
    id は内部管理用で編集不可。name・part は設定画面から編集できる */
 var DEFAULT_MUSCLE_EXERCISES = [
@@ -1458,8 +1458,13 @@ var DEFAULT_MUSCLE_EXERCISES = [
   { id: 'db_fly_upper', name: 'ダンベルフライ(上胸)',   part: '胸(上部)' },
   { id: 'bench_press',  name: 'ベンチプレス',           part: '胸' },
   { id: 'squat',        name: 'スクワット',             part: '脚' },
-  { id: 'leg_press',    name: 'レッグプレス',           part: '脚' }
+  { id: 'leg_press',    name: 'レッグプレス',           part: '脚' },
+  /* 2026-11-26 追加(3種目)。保存済みの端末には migrateAddMuscleEx202611() が足す */
+  { id: 'incline_db_bench', name: 'インクラインベンチダンベル', part: '胸(上部)' },
+  { id: 'lat_pulldown',     name: 'ラットプルダウン',           part: '背中' },
+  { id: 'db_back',          name: 'ダンベル背中',               part: '背中' }
 ];
+var MUSCLE_EX_ADDED_202611 = ['incline_db_bench', 'lat_pulldown', 'db_back'];
 function cloneMuscleExercise(e) { return { id: e.id, name: e.name, part: e.part }; }
 
 var DEFAULT_TYPES = [
@@ -1730,6 +1735,8 @@ function sanitizeMigrations(src) {
   if (src.muscleFriday202610 === true) out.muscleFriday202610 = true;
   /* 24章(2026-11-23): フィールの記録を U34(1日1回)用に1枠へまとめ済みかどうかの印 */
   if (src.u34Feel202611 === true) out.u34Feel202611 = true;
+  /* 2026-11-26: 筋トレ種目3つ(インクラインベンチダンベル・ラットプルダウン・ダンベル背中)を足し済みの印 */
+  if (src.muscleEx202611 === true) out.muscleEx202611 = true;
   return out;
 }
 
@@ -2076,10 +2083,43 @@ function migrateFeelToU34(quiet) {
   return false;
 }
 
+/* 2026-11-26: 筋トレ種目に3つ(インクラインベンチダンベル・ラットプルダウン・ダンベル背中)を足す。
+   すでに同じ id がある端末では足さない。1回だけ実行し、済み印は本体と同じ1回の保存で書く */
+function migrateAddMuscleEx202611(quiet) {
+  if (stateLoadFailed) return true;
+  if (!state.migrations || typeof state.migrations !== 'object'
+      || Array.isArray(state.migrations)) state.migrations = {};
+  if (state.migrations.muscleEx202611 === true) return true;
+  var list = state.exercise && state.exercise.muscleExercises;
+  var added = [];
+  if (Array.isArray(list)) {
+    var have = {};
+    list.forEach(function (e) { if (e && e.id) have[e.id] = true; });
+    DEFAULT_MUSCLE_EXERCISES.forEach(function (e) {
+      if (MUSCLE_EX_ADDED_202611.indexOf(e.id) >= 0 && !have[e.id]) {
+        list.push(cloneMuscleExercise(e));
+        added.push(e.id);
+      }
+    });
+  }
+  state.migrations.muscleEx202611 = true;
+  if (saveStateChecked()) return true;
+  state.migrations.muscleEx202611 = false;
+  /* 保存できなかったときは、次に開いたとき入れ直す(足した分は取り消して二重にしない) */
+  if (added.length) {
+    state.exercise.muscleExercises = list.filter(function (e) { return added.indexOf(e.id) < 0; });
+  }
+  if (quiet !== true) {
+    showSaveWarning('この端末に保存できませんでした。空き容量やプライベートモードを確認してください(次に開いたとき入れ直します)');
+  }
+  return false;
+}
+
 migrateToToho(true);
 /* 23章: 東邦の入れ替えの「あと」に置く(上書きの順番を変えないため) */
 migrateMuscleToFriday();
 migrateFeelToU34();
+migrateAddMuscleEx202611();
 
 /* ================= 便利関数 ================= */
 function $(id) { return document.getElementById(id); }
@@ -2895,7 +2935,7 @@ function sanitizeExercise(src) {
 }
 
 /* 筋トレ種目マスタの洗浄(2026-08-13 追加)。id重複・空文字は捨てる。
-   1件も残らなければ初期7種目に戻す */
+   1件も残らなければ初期種目に戻す */
 function sanitizeMuscleExercises(src) {
   if (!Array.isArray(src)) return DEFAULT_MUSCLE_EXERCISES.map(cloneMuscleExercise);
   var seen = {};
@@ -7230,6 +7270,7 @@ $('backup-restore').addEventListener('click', function () {
      印を持つ新しいバックアップでは走らない = 「💪臨時」が二重に増えない */
   if (migrateMuscleToFriday(true) === false) restoreSaved = false;
   if (migrateFeelToU34(true) === false) restoreSaved = false;
+  if (migrateAddMuscleEx202611(true) === false) restoreSaved = false;
   $('backup-in').value = '';
   $('user-name').value = state.settings.userName;
   renderTypeList();
@@ -7262,6 +7303,7 @@ $('reset-all').addEventListener('click', function () {
      記録が1件も無いので①は空振りし、②と印だけが残る = 新しいスマホに入れたのと同じ状態 */
   if (migrateMuscleToFriday(true) === false) resetSaved = false;
   if (migrateFeelToU34(true) === false) resetSaved = false;
+  if (migrateAddMuscleEx202611(true) === false) resetSaved = false;
   selected = null;
   exercisePrevTotal = {};
   $('user-name').value = '';
